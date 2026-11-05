@@ -19,6 +19,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Eleris.TiffNet\Eleris.TiffNet.csproj" />
     <ProjectReference Include="..\..\docs\examples\Eleris.TiffNet.Examples\Eleris.TiffNet.Examples.csproj" />
+    <ProjectReference Include="..\..\tools\Fuzz\Fuzz.csproj" />
   </ItemGroup>
 
   <ItemGroup>
