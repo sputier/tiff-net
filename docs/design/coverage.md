@@ -115,8 +115,10 @@ Arithmetic-coded JPEG, 12-bit and lossless JPEG (ITU-T T.81 processes other than
 | `Predictor` | Read | Write |
 | --- | --- | --- |
 | 1 none | R | W |
-| 2 horizontal differencing, 8 to 64-bit integers | R | W (`Auto` for integers, except 64-bit on writing where the gain is nil) |
+| 2 horizontal differencing, 8 to 64-bit samples (floating point too, on their bits, as libtiff reads them) | R | W (`Auto` for integers, except 64-bit on writing where the gain is nil) |
 | 3 floating point (Technical Note 3), 16, 32, 64-bit | R | W (`Auto` for floating point) |
+
+As libtiff does, a predictor is undone after LZW and Deflate only: with no compression or PackBits, the tag is ignored.
 
 ## Metadata
 

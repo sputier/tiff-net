@@ -1,0 +1,82 @@
+name: Fuzz
+
+# A short fuzzing campaign on the readers whenever the layers that parse untrusted bytes change. The seed is the run number
+# followed by the attempt (a re-run explores other inputs), printed with every note: a failure is reproduced with "dotnet run -c
+# Release --project tools/Fuzz -- reproduce --seed <seed> --iteration <n>" from the same corpus. The longer campaigns are run by hand (see tools/Fuzz/Program.cs).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/Eleris.TiffNet/Internal/**"
+      - "src/Eleris.TiffNet/TiffFile.cs"
+      - "src/Eleris.TiffNet/TiffImage*.cs"
+      - "src/Eleris.TiffNet/TiffReadOptions.cs"
+      - "src/Eleris.TiffNet/*.csproj"
+      - "Directory.Build.props"
+      - "global.json"
+      - "tools/Fuzz/**"
+      - "tools/make_fixtures.py"
+      - "tests/Fixtures/**"
+      - ".github/workflows/fuzz.yml"
+  pull_request:
+    paths:
+      - "src/Eleris.TiffNet/Internal/**"
+      - "src/Eleris.TiffNet/TiffFile.cs"
+      - "src/Eleris.TiffNet/TiffImage*.cs"
+      - "src/Eleris.TiffNet/TiffReadOptions.cs"
+      - "src/Eleris.TiffNet/*.csproj"
+      - "Directory.Build.props"
+      - "global.json"
+      - "tools/Fuzz/**"
+      - "tools/make_fixtures.py"
+      - "tests/Fixtures/**"
+      - ".github/workflows/fuzz.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fuzz-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: open
+            mode: mixed
+          - target: read
+            mode: mixed
+          - target: jpeg
+            mode: havoc
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        if: matrix.target != 'jpeg'
+        with:
+          python-version: "3.12"
+      - name: Generate the tifffile corpus (predictors, byte orders, layouts) as seeds
+        if: matrix.target != 'jpeg'
+        run: |
+          pip install -r tools/requirements-interop.txt
+          python -I tools/make_fixtures.py
+      - name: Fuzz for 3 minutes (fails when an input crashes, is slow or allocates too much)
+        run: >-
+          dotnet run -c Release --project tools/Fuzz --
+          run --seconds 180 --seed ${{ github.run_number }}${{ github.run_attempt }} --mode ${{ matrix.mode }}
+          --target ${{ matrix.target }} --out fuzz-out
+      - name: Keep the inputs that misbehaved
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fuzz-${{ matrix.target }}-${{ github.run_number }}
+          path: fuzz-out
+          if-no-files-found: ignore
+          retention-days: 14
