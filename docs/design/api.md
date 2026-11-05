@@ -176,8 +176,8 @@ main image of its file.
 
 ### Memory (PERF-11)
 
-- Every `Read*` returns a new array, as in FitsNet; `ReadPixels(Span<T>)` fills a caller's buffer and allocates nothing beyond
-  the decoding state. An image read from a file does not keep its pixels: reading twice decodes twice.
+- Every `Read*` returns a new array, as in FitsNet; `ReadPixels(Span<T>)` fills a caller's buffer, on the calling thread, and
+  allocates nothing beyond the decoding state. The pixel methods take `T : unmanaged, INumber<T>`. An image read from a file does not keep its pixels: reading twice decodes twice.
 - `Create` and `SetPixels` copy the caller's pixels once, so that the image does not change if the caller's buffer does.
 - An image of more than 2³¹ − 1 samples cannot be read in one array: `ReadPixels` throws an `InvalidOperationException` that
   points to `ReadRegion`. Such an image is written with [`TiffImageWriter`](#tiffimagewriter).

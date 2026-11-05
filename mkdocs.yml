@@ -47,6 +47,7 @@ nav:
       - "TiffMetadata": api/Eleris.TiffNet.TiffMetadata.md
       - "TiffPhotometric": api/Eleris.TiffNet.TiffPhotometric.md
       - "TiffPixelOrder": api/Eleris.TiffNet.TiffPixelOrder.md
+      - "TiffPixelScale": api/Eleris.TiffNet.TiffPixelScale.md
       - "TiffPredictor": api/Eleris.TiffNet.TiffPredictor.md
       - "TiffReadOptions": api/Eleris.TiffNet.TiffReadOptions.md
       - "TiffResolution": api/Eleris.TiffNet.TiffResolution.md

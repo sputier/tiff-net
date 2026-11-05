@@ -12,7 +12,7 @@ internal sealed record ImageDescriptor
         CompressionTag = 259, PhotometricTag = 262, StripOffsetsTag = 273, OrientationTag = 274, SamplesPerPixelTag = 277,
         RowsPerStripTag = 278, StripByteCountsTag = 279, PlanarConfigurationTag = 284, PredictorTag = 317, ColorMapTag = 320,
         TileWidthTag = 322, TileLengthTag = 323, TileOffsetsTag = 324, TileByteCountsTag = 325, SubIfdsTag = 330, ExtraSamplesTag = 338,
-        SampleFormatTag = 339, JpegTablesTag = 347, YCbCrSubSamplingTag = 530;
+        SampleFormatTag = 339, JpegTablesTag = 347, YCbCrSubSamplingTag = 530, FillOrderTag = 266;
 
     private ImageDescriptor()
     {
@@ -40,6 +40,9 @@ internal sealed record ImageDescriptor
 
     /// <summary>Whether each channel is stored in its own plane (PlanarConfiguration = 2, with more than one sample).</summary>
     public bool Planar { get; private init; }
+
+    /// <summary>Whether the bits of each byte are stored from the least significant (FillOrder = 2), as some fax writers do.</summary>
+    public bool ReversedBits { get; private init; }
 
     /// <summary>The Orientation tag, 1 to 8.</summary>
     public int Orientation { get; private init; }
@@ -229,6 +232,7 @@ internal sealed record ImageDescriptor
         }
 
         long predictor = reader.ReadInteger(directory, PredictorTag, 1, ushort.MaxValue);
+        long fillOrder = reader.ReadInteger(directory, FillOrderTag, 1, ushort.MaxValue);
         var descriptor = new ImageDescriptor
         {
             Directory = directory,
@@ -242,6 +246,7 @@ internal sealed record ImageDescriptor
             Predictor = predictor == 0 ? TiffPredictor.None : (TiffPredictor)predictor,   // 0 is not defined; libtiff reads it as none
             Planar = planar,
             Orientation = orientation,
+            ReversedBits = fillOrder == 2,
             Layout = tiled ? TiffLayout.Tiles : TiffLayout.Strips,
             BlockWidth = blockWidth,
             BlockHeight = blockHeight,

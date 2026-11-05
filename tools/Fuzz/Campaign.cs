@@ -16,7 +16,34 @@ internal static class Targets
     {
         ["none"] = static _ => { },
         ["open"] = Open,
+        ["read"] = Read,
     };
+
+    /// <summary>Opens the file, then reads the pixels of every page and sub-image it can, as doubles and raw.</summary>
+    private static void Read(byte[] input)
+    {
+        using var file = TiffFile.Read(new MemoryStream(input, writable: false), Options);
+        var pending = new Stack<TiffImage>(file);
+        while (pending.TryPop(out var image))
+        {
+            // An image of more samples than an array holds is read by region: whole reads refuse it, as documented.
+            if (image.UnsupportedReason is null && image.Storage!.Compression == TiffCompression.None
+                && (long)image.Width * image.Height * image.Channels <= Array.MaxLength)
+            {
+                _ = image.ReadPixels<double>(TiffPixelScale.Normalized);
+                _ = image.ReadPixels<double>(order: TiffPixelOrder.Planar);
+                if (image.Width > 2 && image.Height > 2)
+                {
+                    _ = image.ReadRegion<double>(1, 1, image.Width - 2, image.Height - 2);
+                }
+            }
+
+            foreach (var sub in image.SubImages)
+            {
+                pending.Push(sub);
+            }
+        }
+    }
 
     private static void Open(byte[] input)
     {
