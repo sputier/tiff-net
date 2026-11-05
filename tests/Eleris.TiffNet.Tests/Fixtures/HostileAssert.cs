@@ -30,7 +30,15 @@ internal static class HostileAssert
     public static void FailsWithinBounds(HostileCase hostile, Action read) =>
         FailsWithinBounds(read, hostile.Outcome, hostile.MaxTime, hostile.MaxAllocatedBytes, hostile.ToString());
 
-    public static void FailsWithinBounds(Action read, string outcome, TimeSpan maxTime, long maxAllocatedBytes, string what)
+    /// <summary>
+    /// For a step that does not reach the defect of every file (opening a file whose defect is in its pixels): the step may
+    /// succeed, but if it fails it must fail as expected, and either way within the bounds.
+    /// </summary>
+    public static void OpensOrFailsWithinBounds(HostileCase hostile, Action read) =>
+        FailsWithinBounds(read, hostile.Outcome, hostile.MaxTime, hostile.MaxAllocatedBytes, hostile.ToString(), successAllowed: true);
+
+    public static void FailsWithinBounds(Action read, string outcome, TimeSpan maxTime, long maxAllocatedBytes, string what,
+        bool successAllowed = false)
     {
         GC.Collect();
         long before = GC.GetTotalAllocatedBytes(precise: true);
@@ -48,9 +56,15 @@ internal static class HostileAssert
         clock.Stop();
         long allocated = GC.GetTotalAllocatedBytes(precise: true) - before;
 
-        if (thrown is null)
+        if (thrown is null && !successAllowed)
         {
             throw new XunitException($"{what}: no exception, {outcome} expected.");
+        }
+
+        if (thrown is null)
+        {
+            CheckBounds(what, clock.Elapsed, maxTime, allocated, maxAllocatedBytes);
+            return;
         }
 
         string actual = thrown is TiffException { Limit: { } limit } ? $"TiffException:{limit}" : thrown.GetType().Name;
@@ -59,9 +73,14 @@ internal static class HostileAssert
             throw new XunitException($"{what}: {actual} ({thrown.Message}) instead of {outcome}.");
         }
 
-        if (clock.Elapsed > maxTime)
+        CheckBounds(what, clock.Elapsed, maxTime, allocated, maxAllocatedBytes);
+    }
+
+    private static void CheckBounds(string what, TimeSpan elapsed, TimeSpan maxTime, long allocated, long maxAllocatedBytes)
+    {
+        if (elapsed > maxTime)
         {
-            throw new XunitException($"{what}: failed after {clock.Elapsed.TotalSeconds:F2} s, more than {maxTime.TotalSeconds:F2} s.");
+            throw new XunitException($"{what}: took {elapsed.TotalSeconds:F2} s, more than {maxTime.TotalSeconds:F2} s.");
         }
 
         if (allocated > maxAllocatedBytes)

@@ -114,6 +114,7 @@ public sealed class TiffImage
     public TiffColorModel ColorModel { get; }              // Grey: 1 colour channel, Rgb: 3
     public IReadOnlyList<TiffExtraChannel> ExtraChannels { get; }
     public bool IsReducedResolution { get; }               // NewSubfileType bit 0
+    public string? UnsupportedReason { get; }              // why the library cannot deliver this image, or null
     public IReadOnlyList<TiffImage> SubImages { get; }     // SubIFDs (read only)
     public void SetExtraChannels(params TiffExtraChannelKind[] kinds);   // one kind per extra channel
 
@@ -139,6 +140,13 @@ public sealed class TiffImage
     public Task<T[]> ReadPixelsAsync<T>(TiffPixelScale scale = TiffPixelScale.Stored, TiffPixelOrder order = TiffPixelOrder.Interleaved, CancellationToken cancellationToken = default) where T : unmanaged;
 }
 ```
+
+### Images the library does not handle
+
+A page whose format the library does not handle (CMYK, Lab, a compression it does not read…) does not make the whole file fail:
+it is listed with the others, with its size, its metadata, its `Storage` and `UnsupportedReason`. Its `SampleType`, `ColorModel`
+and pixels throw a `NotSupportedException` that gives the reason. A thumbnail in an unusual format therefore does not hide the
+main image of its file.
 
 ### Channels and colour model (DOM-02, DOM-03)
 
@@ -213,7 +221,7 @@ public sealed class TiffMetadata : IEnumerable<TiffTag>
     public int Count { get; }
 }
 
-public sealed record TiffTag
+public sealed class TiffTag : IEquatable<TiffTag>     // equal when code, type and values are
 {
     public int Code { get; }
     public TiffTagType Type { get; }                       // Byte, Ascii, Short, Long, Rational, …, Long8, Ifd8
@@ -254,7 +262,7 @@ public sealed record TiffStorage
     public bool BigEndian { get; }
     public bool BigTiff { get; }
     public int Orientation { get; }                                // as stored; pixels are always delivered top-left
-    public int? JpegQuality { get; }                               // estimated from the tables, for information
+    // JpegQuality (estimated from the quantization tables) comes with the JPEG decoder.
 }
 ```
 
@@ -301,6 +309,7 @@ public sealed record TiffReadOptions
     public int MaxDirectories { get; init; }                // pages + sub-directories. Default 10 000
     public int MaxTagsPerDirectory { get; init; }           // Default 4 096
     public long MaxTagBytes { get; init; }                  // per tag. Default 64 MB (ICC profiles and XMP fit)
+    public long MaxMetadataBytes { get; init; }             // all that opening reads: entries, tag values, tables. Default 256 MB
     public int MaxJpegScans { get; init; }                  // progressive JPEG. Default 100
     public int MaxDegreeOfParallelism { get; init; }        // Default -1 (all cores); 1 for single-threaded
 }
