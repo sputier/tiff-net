@@ -3,6 +3,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
+using Eleris.TiffNet.Internal.Codecs;
 using Eleris.TiffNet.Internal.Structure;
 
 namespace Eleris.TiffNet.Internal.Pixels;
@@ -29,6 +30,7 @@ internal sealed class PixelPlan
 
     private PixelPlan(ImageDescriptor d, PixelRequest request, StoredRect stored, long rowBytes, int rowsPerUnit)
     {
+        Compressed = d.Compression != TiffCompression.None;
         Descriptor = d;
         Request = request;
         Stored = stored;
@@ -48,6 +50,9 @@ internal sealed class PixelPlan
 
     public int RowsPerUnit { get; }
 
+    /// <summary>Whether the blocks are compressed: each is then decoded whole (up to the last row the read needs) by one worker.</summary>
+    public bool Compressed { get; }
+
     /// <summary>The number of threads that decode (1 for a read into a span).</summary>
     public int Workers { get; private set; }
 
@@ -60,36 +65,56 @@ internal sealed class PixelPlan
     /// <param name="request">The region, channels, order and scale asked for.</param>
     /// <param name="sampleBytes">The size of a delivered sample (the type the stored samples are unpacked to).</param>
     /// <param name="parallel">Whether the read may use several threads.</param>
-    /// <exception cref="NotSupportedException">The image is compressed with a codec not implemented yet.</exception>
+    /// <exception cref="NotSupportedException">The image is compressed with a codec or a predictor not implemented yet, or one of
+    /// its blocks is larger than an array.</exception>
     /// <exception cref="TiffException">A block is truncated, or the buffers exceed <see cref="TiffReadOptions.MaxPixelBytes"/>.</exception>
     public static PixelPlan Create(ImageDescriptor d, ResourceBudget budget, PixelRequest request, int sampleBytes, bool parallel)
     {
-        if (d.Compression != TiffCompression.None)
+        if (d.Compression is not (TiffCompression.None or TiffCompression.Lzw or TiffCompression.Deflate or TiffCompression.PackBits))
         {
             throw new NotSupportedException($"{budget.SourceName}: reading {d.Compression} compressed images is not implemented yet.");
         }
 
-        long rowBytes = ImageDescriptor.BytesPerRow(d.BlockWidth, SampleUnpacker.StoredSamples(d), d.BitsPerSample);
-        int rowsPerUnit = (int)Math.Clamp(ChunkBytes / Math.Max(1, rowBytes), 1, d.BlockHeight);
-        var plan = new PixelPlan(d, request, StoredRect.Of(d, request), rowBytes, rowsPerUnit);
+        if (d.Predictor != TiffPredictor.None)
+        {
+            throw new NotSupportedException($"{budget.SourceName}: reading images with the {d.Predictor} predictor is not implemented yet.");
+        }
 
-        long units = 0;
-        foreach (var (block, _, blockY, first, end) in plan.Blocks())
+        long rowBytes = ImageDescriptor.BytesPerRow(d.BlockWidth, SampleUnpacker.StoredSamples(d), d.BitsPerSample);
+        bool compressed = d.Compression != TiffCompression.None;
+        int rowsPerUnit = compressed ? (int)d.BlockHeight : (int)Math.Clamp(ChunkBytes / Math.Max(1, rowBytes), 1, d.BlockHeight);
+        var plan = new PixelPlan(d, request, StoredRect.Of(d, request), rowBytes, rowsPerUnit);
+        string kind = d.Layout == TiffLayout.Tiles ? "tile" : "strip";
+
+        long units = 0, largestCompressed = 0, largestDecoded = 0;
+        foreach (var (block, _, _, first, end) in plan.Blocks())
         {
             long needed = end * rowBytes;
-            if (needed > d.ByteCounts[block])
+            if (compressed)
             {
-                string kind = d.Layout == TiffLayout.Tiles ? "tile" : "strip";
+                // What a block decodes to is known once it is decoded; what it needs is bounded by its rows.
+                largestCompressed = Math.Max(largestCompressed, d.ByteCounts[block]);
+                largestDecoded = Math.Max(largestDecoded, needed);
+            }
+            else if (needed > d.ByteCounts[block])
+            {
                 throw budget.Invalid($"{kind} {block} holds {d.ByteCounts[block]} bytes, {needed} are needed: the file is truncated.");
             }
 
             units += (end - first + rowsPerUnit - 1) / rowsPerUnit;
         }
 
+        if (largestCompressed > Array.MaxLength || largestDecoded > Array.MaxLength)
+        {
+            throw new NotSupportedException(
+                $"{budget.SourceName}: compressed {kind}s of more than {Array.MaxLength} bytes are not supported; read the image by region.");
+        }
+
         // The scratch buffers of the workers are counted, so that a huge row or tile cannot make them allocate more than allowed.
         int degree = budget.Options.MaxDegreeOfParallelism is -1 ? Environment.ProcessorCount : budget.Options.MaxDegreeOfParallelism;
         plan.Workers = parallel ? (int)Math.Max(1, Math.Min(degree, units)) : 1;
-        long scratch = rowsPerUnit * rowBytes + d.BlockWidth * (d.SamplesPerPixel + 2) * sampleBytes;
+        long buffers = compressed ? largestCompressed + largestDecoded : rowsPerUnit * rowBytes;
+        long scratch = buffers + d.BlockWidth * (d.SamplesPerPixel + 2) * sampleBytes;
         budget.ReservePixels(plan.Workers * scratch, "the decoding buffers");
         return plan;
     }
@@ -191,7 +216,7 @@ internal static class PixelReader
         where TD : unmanaged, INumber<TD>
         where TOut : unmanaged, INumber<TOut>
     {
-        var context = new Context<TD, TOut>(plan, source, channels, littleEndian);
+        var context = new Context<TD, TOut>(plan, source, budget, channels, littleEndian);
         if (array is null || plan.Workers == 1)
         {
             foreach (var unit in plan.Units())
@@ -225,6 +250,8 @@ internal static class PixelReader
     {
         private readonly ImageDescriptor _d;
         private readonly TiffSource _source;
+        private readonly ResourceBudget _budget;
+        private readonly bool _compressed;
         private readonly PixelRequest _request;
         private readonly StoredRect _stored;
         private readonly int _channels;
@@ -234,10 +261,12 @@ internal static class PixelReader
         private readonly double[]? _maxima;
         private readonly bool _identity;
 
-        public Context(PixelPlan plan, TiffSource source, int channels, bool littleEndian)
+        public Context(PixelPlan plan, TiffSource source, ResourceBudget budget, int channels, bool littleEndian)
         {
             _d = plan.Descriptor;
             _source = source;
+            _budget = budget;
+            _compressed = plan.Compressed;
             _request = plan.Request;
             _stored = plan.Stored;
             _channels = channels;
@@ -250,22 +279,32 @@ internal static class PixelReader
 
         public void Process(PixelUnit unit, Span<TOut> destination)
         {
-            // The plan checked that the block holds these rows.
-            int length = (int)(unit.Rows * _rowBytes);
-            long start = unit.FirstRow * _rowBytes;
             int deliveredPerPixel = SampleUnpacker.DeliveredChannels(_d, unit.Plane);
             int rowSamples = (int)(_d.BlockWidth * deliveredPerPixel);
             bool straight = Straight(unit);
             byte[]? raw = null;
+            byte[]? decoded = null;
             TD[]? row = null;
             try
             {
-                raw = ArrayPool<byte>.Shared.Rent(length);
+                Span<byte> rows;
+                if (_compressed)
+                {
+                    rows = Decode(unit, out raw, out decoded);
+                }
+                else
+                {
+                    // The plan checked that the block holds these rows.
+                    int length = (int)(unit.Rows * _rowBytes);
+                    raw = ArrayPool<byte>.Shared.Rent(length);
+                    rows = raw.AsSpan(0, length);
+                    _source.ReadExactly(_d.Offsets[unit.Block] + unit.FirstRow * _rowBytes, rows);
+                }
+
                 row = ArrayPool<TD>.Shared.Rent(rowSamples);
-                _source.ReadExactly(_d.Offsets[unit.Block] + start, raw.AsSpan(0, length));
                 for (int r = 0; r < unit.Rows; r++)
                 {
-                    Span<byte> stored = raw.AsSpan((int)(r * _rowBytes), (int)_rowBytes);
+                    Span<byte> stored = rows.Slice((int)(r * _rowBytes), (int)_rowBytes);
                     if (straight)
                     {
                         // Nothing to reorder or convert: the row is unpacked straight into its place in the destination.
@@ -286,11 +325,63 @@ internal static class PixelReader
                     ArrayPool<byte>.Shared.Return(raw);
                 }
 
+                if (decoded is not null)
+                {
+                    ArrayPool<byte>.Shared.Return(decoded);
+                }
+
                 if (row is not null)
                 {
                     ArrayPool<TD>.Shared.Return(row);
                 }
             }
+        }
+
+        /// <summary>
+        /// Decodes a compressed block up to the last row of the unit; returns the rows of the unit. The output is bounded by what
+        /// the unit needs: a block that would decode to more stops there, one that decodes to less is damaged.
+        /// </summary>
+        private Span<byte> Decode(PixelUnit unit, out byte[] compressed, out byte[] decoded)
+        {
+            int block = unit.Block;
+            int count = (int)_d.ByteCounts[block];
+            int needed = (int)((unit.FirstRow + unit.Rows) * _rowBytes);
+            string kind = _d.Layout == TiffLayout.Tiles ? "tile" : "strip";
+            compressed = ArrayPool<byte>.Shared.Rent(count);
+            decoded = ArrayPool<byte>.Shared.Rent(needed);
+            _source.ReadExactly(_d.Offsets[block], compressed.AsSpan(0, count));
+
+            // Data beyond the block is ignored, as libtiff does, unless the read is strict and the whole block is decoded.
+            long blockRows = _d.Layout == TiffLayout.Tiles ? _d.BlockHeight : Math.Min(_d.BlockHeight, _d.Height - unit.Y0 + unit.FirstRow);
+            bool whole = unit.FirstRow + unit.Rows == blockRows;
+            Span<byte> output = decoded.AsSpan(0, needed);
+            int written;
+            bool overflow;
+            try
+            {
+                written = _d.Compression switch
+                {
+                    TiffCompression.Lzw => Lzw.Decode(compressed.AsSpan(0, count), output, out overflow),
+                    TiffCompression.PackBits => PackBits.Decode(compressed.AsSpan(0, count), output, out overflow),
+                    _ => Deflate.Decode(compressed, count, output, _budget.Options.Strict && whole, out overflow),
+                };
+            }
+            catch (InvalidDataException ex)
+            {
+                throw _budget.Invalid($"{kind} {block} cannot be decoded ({_d.Compression}): {ex.Message}");
+            }
+
+            if (written < needed)
+            {
+                throw _budget.Invalid($"{kind} {block} decodes to {written} bytes, {needed} are needed: the file is damaged or truncated.");
+            }
+
+            if (overflow && whole && _budget.Options.Strict)
+            {
+                throw _budget.Invalid($"{kind} {block} holds more data than its {blockRows} rows of {_rowBytes} bytes.");
+            }
+
+            return output.Slice((int)(unit.FirstRow * _rowBytes), (int)(unit.Rows * _rowBytes));
         }
 
         /// <summary>
