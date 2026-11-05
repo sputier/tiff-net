@@ -25,6 +25,7 @@ An image whose format the library does not handle (CMYK, Lab, a compression it d
 | [`IsReducedResolution`](#eleris-tiffnet-tiffimage-isreducedresolution) | Whether the image is a reduced-resolution version of another (a thumbnail, a level of a pyramid). |
 | [`Metadata`](#eleris-tiffnet-tiffimage-metadata) | The tags of the image other than its structure: description (the FITS header of an Astro-TIFF file), ICC profile, resolution, private tags… Read with the image and kept when it is saved again. |
 | [`SampleType`](#eleris-tiffnet-tiffimage-sampletype) | The type of the samples the image delivers. |
+| [`Storage`](#eleris-tiffnet-tiffimage-storage) | How the image is stored in the file it was read from. |
 | [`SubImages`](#eleris-tiffnet-tiffimage-subimages) | The images of the sub-directories (`SubIFDs`) of this one, usually reduced-resolution versions of it. |
 | [`UnsupportedReason`](#eleris-tiffnet-tiffimage-unsupportedreason) | Why the library cannot deliver this image, or `null` when it can. |
 | [`Width`](#eleris-tiffnet-tiffimage-width) | The width, in pixels. |
@@ -105,6 +106,15 @@ public TiffSampleType SampleType { get; }
 **Exceptions**
 
 - [`NotSupportedException`](https://learn.microsoft.com/dotnet/api/system.notsupportedexception) — The library does not handle the format of the image ([`TiffImage.UnsupportedReason`](#eleris-tiffnet-tiffimage-unsupportedreason)).
+
+<a id="eleris-tiffnet-tiffimage-storage"></a>
+### `Storage`
+
+How the image is stored in the file it was read from.
+
+```csharp
+public TiffStorage? Storage { get; }
+```
 
 <a id="eleris-tiffnet-tiffimage-subimages"></a>
 ### `SubImages`

@@ -30,12 +30,12 @@ Two tags are equal when their code, type and values are.
 | [`AsNumbers<T>()`](#eleris-tiffnet-tifftag-asnumbers-1) | The values as numbers of type `T`. |
 | [`AsString()`](#eleris-tiffnet-tifftag-asstring) | The text of the tag: up to the first NUL byte, decoded as UTF-8 when it is valid UTF-8 (ASCII is), as Latin-1 otherwise. |
 | [`AsStrings()`](#eleris-tiffnet-tifftag-asstrings) | The texts of a tag that holds several, separated by NUL bytes. |
-| [`Equals(TiffTag)`](#eleris-tiffnet-tifftag-equals-eleris-tiffnet-tifftag) |  |
-| [`Equals(object)`](#eleris-tiffnet-tifftag-equals-system-object) |  |
+| [`Equals(TiffTag)`](#eleris-tiffnet-tifftag-equals-eleris-tiffnet-tifftag) | Whether two tags have the same code, type and values. |
+| [`Equals(object)`](#eleris-tiffnet-tifftag-equals-system-object) | Whether `obj` is a tag with the same code, type and values. |
 | [`FromBytes(int, ReadOnlySpan<byte>, TiffTagType)`](#eleris-tiffnet-tifftag-frombytes-system-int32-system-readonlyspan-system-byte-eleris-tiffnet-tifftagtype) | A tag of bytes, as they are. |
 | [`FromNumbers<T>(int, ReadOnlySpan<T>)`](#eleris-tiffnet-tifftag-fromnumbers-1-system-int32-system-readonlyspan-0) | A tag of numbers, whose type follows from `T` (for example [`TiffTagType.Short`](Eleris.TiffNet.TiffTagType.md#eleris-tiffnet-tifftagtype-short) for [`UInt16`](https://learn.microsoft.com/dotnet/api/system.uint16), [`TiffTagType.Double`](Eleris.TiffNet.TiffTagType.md#eleris-tiffnet-tifftagtype-double) for [`Double`](https://learn.microsoft.com/dotnet/api/system.double)). |
 | [`FromString(int, string)`](#eleris-tiffnet-tifftag-fromstring-system-int32-system-string) | A text tag ([`TiffTagType.Ascii`](Eleris.TiffNet.TiffTagType.md#eleris-tiffnet-tifftagtype-ascii)), in ASCII when the text is, in UTF-8 otherwise, ended by a NUL byte. |
-| [`GetHashCode()`](#eleris-tiffnet-tifftag-gethashcode) |  |
+| [`GetHashCode()`](#eleris-tiffnet-tifftag-gethashcode) | A hash of the code, type and number of values. |
 | [`ToString()`](#eleris-tiffnet-tifftag-tostring) | The code, type and count of the tag. |
 
 ## Property details
@@ -128,16 +128,20 @@ public IReadOnlyList<string> AsStrings()
 <a id="eleris-tiffnet-tifftag-equals-eleris-tiffnet-tifftag"></a>
 ### `Equals(TiffTag)`
 
+Whether two tags have the same code, type and values.
+
 ```csharp
 public bool Equals(TiffTag? other)
 ```
 
 **Parameters**
 
-- `other`
+- `other` — The other tag.
 
 <a id="eleris-tiffnet-tifftag-equals-system-object"></a>
 ### `Equals(object)`
+
+Whether `obj` is a tag with the same code, type and values.
 
 ```csharp
 public override bool Equals(object? obj)
@@ -145,7 +149,7 @@ public override bool Equals(object? obj)
 
 **Parameters**
 
-- `obj`
+- `obj` — The other object.
 
 <a id="eleris-tiffnet-tifftag-frombytes-system-int32-system-readonlyspan-system-byte-eleris-tiffnet-tifftagtype"></a>
 ### `FromBytes(int, ReadOnlySpan<byte>, TiffTagType)`
@@ -196,6 +200,8 @@ public static TiffTag FromString(int code, string value)
 
 <a id="eleris-tiffnet-tifftag-gethashcode"></a>
 ### `GetHashCode()`
+
+A hash of the code, type and number of values.
 
 ```csharp
 public override int GetHashCode()
