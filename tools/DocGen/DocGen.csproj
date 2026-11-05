@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Generates docs/api from the library and its XML documentation, and copies the compiled examples into the guide.
+       Run with "dotnet run" (rewrite) or with the argument check (fail when a generated file is out of date). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <!-- A build tool, shared with Eleris.FitsNet: it sets the invariant culture at start-up (Program.cs), so the culture rules of
+         the recommended analysis level do not apply to it. -->
+    <AnalysisLevel>latest-minimum</AnalysisLevel>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Eleris.TiffNet\Eleris.TiffNet.csproj" />
+  </ItemGroup>
+
+</Project>

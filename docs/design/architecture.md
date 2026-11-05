@@ -14,7 +14,7 @@ requirements of the [review](../review-2026-11-05.md). The public surface is in 
 
 ## Layers
 
-```
+```text
  Public API          TiffFile · TiffImage · TiffMetadata · options · exceptions
  ─────────────────────────────────────────────────────────────────────────────
  Pixel pipeline      plan (which strips/tiles, where they land) → parallel decode → assemble (interleave/planar,
@@ -156,7 +156,7 @@ measured by the benchmarks of the repository.
 
 ## Repository layout
 
-```
+```text
 src/Eleris.TiffNet/              the library (Structure/, Codecs/, Jpeg/, Pipeline/, public types at the root)
 tests/Eleris.TiffNet.Tests/      unit, interop, hostile, documentation examples
 tests/Fixtures/                  committed fixtures with a README of their provenance; the tifffile corpus is generated
