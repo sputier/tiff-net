@@ -180,17 +180,41 @@ public class HostileCompressionTests
             successAllowed: true);
     }
 
-    [Fact]
-    public void A_tiny_compressed_file_declaring_a_huge_image_fails_within_its_budget()
+    [Theory]
+    [InlineData(5)]
+    [InlineData(8)]
+    [InlineData(32773)]
+    public void A_tiny_compressed_file_declaring_a_huge_image_fails_before_allocating_it(ushort compression)
     {
-        // 30 000 x 30 000 pixels in one Deflate strip of 20 bytes: the destination and one decoding buffer of 900 MB each exceed
-        // the budget; with a larger budget, the read fails as soon as the strip is decoded.
+        // 10 000 x 10 000 pixels in one strip of 20 bytes: no codec expands 20 bytes to 100 MB, which is known before allocating.
         byte[] strip = Compress(new byte[16]);
         var builder = new TiffBuilder { Data = strip };
-        builder.AddDirectory().Image(30_000, 30_000).Remove(259).Add(259, TiffTagType.Short, 8).Remove(279).Add(279, TiffTagType.Long, strip.Length);
+        builder.AddDirectory().Image(10_000, 10_000).Remove(259).Add(259, TiffTagType.Short, compression).Remove(279)
+            .Add(279, TiffTagType.Long, strip.Length);
         using var file = TiffFile.Read(new MemoryStream(builder.Build()), TiffReadOptions.Default with { MaxPixelBytes = 1L << 30 });
 
-        HostileAssert.FailsWithinBounds(() => file.Primary.ReadPixels<byte>(), "TiffException:MaxPixelBytes", TimeSpan.FromSeconds(1), 1 << 20, "huge");
+        HostileAssert.FailsWithinBounds(() => file.Primary.ReadPixels<double>(), "TiffException", TimeSpan.FromSeconds(1), 1 << 20, "huge");
+        Assert.Contains("cannot decode to", Assert.Throws<TiffException>(() => file.Primary.ReadPixels<byte>()).Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(TiffCompression.PackBits, 2, 128)]
+    [InlineData(TiffCompression.Deflate, 1, 1032)]
+    [InlineData(TiffCompression.Lzw, 9, 8 * 4096)]
+    public void The_bound_of_what_a_block_decodes_to_is_above_what_a_codec_can_give(TiffCompression compression, long count, long most)
+    {
+        Assert.True(Internal.Pixels.PixelPlan.MostDecoded(compression, count) >= most);
+    }
+
+    [Fact]
+    public void The_most_expanding_data_of_each_codec_is_within_the_bound()
+    {
+        byte[] zeros = new byte[1 << 22];
+        byte[] deflate = Compress(zeros);
+        byte[] lzw = Codecs.LzwTests.Encode(zeros);
+        Assert.True(zeros.Length <= Internal.Pixels.PixelPlan.MostDecoded(TiffCompression.Deflate, deflate.Length));
+        Assert.True(zeros.Length <= Internal.Pixels.PixelPlan.MostDecoded(TiffCompression.Lzw, lzw.Length));
+        Assert.True(128 <= Internal.Pixels.PixelPlan.MostDecoded(TiffCompression.PackBits, 2));
     }
 
     private static byte[] Compress(byte[] data)

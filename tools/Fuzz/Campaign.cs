@@ -123,7 +123,8 @@ internal static class Targets
     }
 
     /// <summary>The limits of a campaign: those of a small device, so that a valid but large input is not a finding.</summary>
-    private static readonly TiffReadOptions Options = TiffReadOptions.Default with { MaxPixelBytes = 256L << 20, MaxInputBytes = 16L << 20 };
+    // 32 MB per read: the read target makes up to 8 reads of an image, which stay within the 256 MB a well-behaved input may allocate.
+    private static readonly TiffReadOptions Options = TiffReadOptions.Default with { MaxPixelBytes = 32L << 20, MaxInputBytes = 16L << 20 };
 }
 
 /// <summary>The seed files of a campaign; an input is a pure function of the campaign seed, its iteration and this corpus.</summary>
