@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
@@ -56,6 +55,15 @@ internal sealed class PixelPlan
     /// <summary>The number of threads that decode (1 for a read into a span).</summary>
     public int Workers { get; private set; }
 
+    /// <summary>The bytes of the buffer a worker reads stored data into: rows of a strip, or the compressed bytes of a block.</summary>
+    public long ReadBytes { get; private set; }
+
+    /// <summary>The bytes of the buffer a worker decodes a compressed block into (0 for uncompressed data).</summary>
+    public long DecodedBytes { get; private set; }
+
+    /// <summary>The samples of the buffer a worker unpacks a row into: a row of a block, two samples more per pixel for a palette.</summary>
+    public long RowSamples { get; private set; }
+
     /// <summary>
     /// Checks the blocks under the request and reserves the buffers of the workers. Neither the destination nor any buffer is
     /// allocated yet: a small file declaring a huge image fails here, at the cost of its tables.
@@ -100,7 +108,7 @@ internal sealed class PixelPlan
                         + "its rows need: the file is damaged or truncated.");
                 }
 
-                largestCompressed = Math.Max(largestCompressed, d.ByteCounts[block]);
+                largestCompressed = Math.Max(largestCompressed, CompressedToRead(d.ByteCounts[block], needed));
                 largestDecoded = Math.Max(largestDecoded, needed);
             }
             else if (needed > d.ByteCounts[block])
@@ -119,12 +127,22 @@ internal sealed class PixelPlan
 
         // The scratch buffers of the workers are counted, so that a huge row or tile cannot make them allocate more than allowed.
         int degree = budget.Options.MaxDegreeOfParallelism is -1 ? Environment.ProcessorCount : budget.Options.MaxDegreeOfParallelism;
+        // They are allocated once per worker, of exactly these sizes (never rounded up by a pool, never kept after the read).
         plan.Workers = parallel ? (int)Math.Max(1, Math.Min(degree, units)) : 1;
-        long buffers = compressed ? largestCompressed + largestDecoded : rowsPerUnit * rowBytes;
-        long scratch = buffers + d.BlockWidth * (d.SamplesPerPixel + 2) * sampleBytes;
+        plan.ReadBytes = compressed ? largestCompressed : rowsPerUnit * rowBytes;
+        plan.DecodedBytes = largestDecoded;
+        plan.RowSamples = d.BlockWidth * (d.SamplesPerPixel + 2);
+        long scratch = plan.ReadBytes + plan.DecodedBytes + plan.RowSamples * sampleBytes;
         budget.ReservePixels(plan.Workers * scratch, "the decoding buffers");
         return plan;
     }
+
+    /// <summary>
+    /// The compressed bytes of a block read to decode <paramref name="needed"/> bytes: no codec needs more than twice what it gives
+    /// (LZW at most 1.5 times, PackBits 2 bytes for a lone byte, Deflate a few bytes per stored block), with some room for headers
+    /// and for seeing data beyond the rows. A hostile file whose blocks all declare the whole file costs what its pixels need.
+    /// </summary>
+    internal static long CompressedToRead(long byteCount, long needed) => Math.Min(byteCount, 2 * needed + 4096);
 
     /// <summary>
     /// The most bytes <paramref name="count"/> compressed bytes can decode to. PackBits: 2 bytes give at most 128. Deflate: at
@@ -238,10 +256,11 @@ internal static class PixelReader
         var context = new Context<TD, TOut>(plan, source, budget, channels, littleEndian);
         if (array is null || plan.Workers == 1)
         {
+            var scratch = new Scratch<TD>(plan);
             foreach (var unit in plan.Units())
             {
                 budget.ThrowIfCancelled();
-                context.Process(unit, destination);
+                context.Process(unit, destination, scratch);
             }
 
             return;
@@ -249,17 +268,37 @@ internal static class PixelReader
 
         try
         {
-            Parallel.ForEach(plan.Units(), new ParallelOptions { MaxDegreeOfParallelism = plan.Workers }, unit =>
-            {
-                budget.ThrowIfCancelled();
-                context.Process(unit, array);
-            });
+            Parallel.ForEach(plan.Units(), new ParallelOptions { MaxDegreeOfParallelism = plan.Workers }, () => new Scratch<TD>(plan),
+                (unit, _, scratch) =>
+                {
+                    budget.ThrowIfCancelled();
+                    context.Process(unit, array, scratch);
+                    return scratch;
+                },
+                _ => { });
         }
         catch (AggregateException ex) when (ex.InnerExceptions.Count > 0)
         {
             // The first failure, as it was thrown (a TiffException, the caller's IOException, a cancellation).
             ExceptionDispatchInfo.Throw(ex.InnerExceptions[0]);
         }
+    }
+
+    /// <summary>
+    /// The buffers of one worker, allocated when first needed, of the sizes the plan reserved, and reused for every unit the worker
+    /// decodes. Their contents are never read before they are written.
+    /// </summary>
+    private sealed class Scratch<TD>(PixelPlan plan) where TD : unmanaged
+    {
+        private byte[]? _read;
+        private byte[]? _decoded;
+        private TD[]? _row;
+
+        public byte[] Read => _read ??= GC.AllocateUninitializedArray<byte>((int)plan.ReadBytes);
+
+        public byte[] Decoded => _decoded ??= GC.AllocateUninitializedArray<byte>((int)plan.DecodedBytes);
+
+        public TD[] Row => _row ??= GC.AllocateUninitializedArray<TD>((int)plan.RowSamples);
     }
 
     /// <summary>The state of one read, shared by its workers (read only).</summary>
@@ -296,63 +335,38 @@ internal static class PixelReader
             _maxima = _request.Scale == TiffPixelScale.Normalized ? Maxima(_d, channels) : null;
         }
 
-        public void Process(PixelUnit unit, Span<TOut> destination)
+        public void Process(PixelUnit unit, Span<TOut> destination, Scratch<TD> scratch)
         {
             int deliveredPerPixel = SampleUnpacker.DeliveredChannels(_d, unit.Plane);
             int rowSamples = (int)(_d.BlockWidth * deliveredPerPixel);
             bool straight = Straight(unit);
-            byte[]? raw = null;
-            byte[]? decoded = null;
-            TD[]? row = null;
-            try
+            Span<byte> rows;
+            if (_compressed)
             {
-                Span<byte> rows;
-                if (_compressed)
-                {
-                    rows = Decode(unit, out raw, out decoded);
-                }
-                else
-                {
-                    // The plan checked that the block holds these rows.
-                    int length = (int)(unit.Rows * _rowBytes);
-                    raw = ArrayPool<byte>.Shared.Rent(length);
-                    rows = raw.AsSpan(0, length);
-                    _source.ReadExactly(_d.Offsets[unit.Block] + unit.FirstRow * _rowBytes, rows);
-                }
-
-                row = ArrayPool<TD>.Shared.Rent(rowSamples);
-                for (int r = 0; r < unit.Rows; r++)
-                {
-                    Span<byte> stored = rows.Slice((int)(r * _rowBytes), (int)_rowBytes);
-                    if (straight)
-                    {
-                        // Nothing to reorder or convert: the row is unpacked straight into its place in the destination.
-                        long at = ((unit.Y0 + r - _request.Y) * _request.Width + (unit.X0 - _request.X)) * _channels;
-                        Span<TD> target = MemoryMarshal.Cast<TOut, TD>(destination.Slice((int)at, rowSamples));
-                        SampleUnpacker.Unpack<TD>(_d, unit.Plane, stored, (int)_d.BlockWidth, target, _little);
-                        continue;
-                    }
-
-                    SampleUnpacker.Unpack<TD>(_d, unit.Plane, stored, (int)_d.BlockWidth, row.AsSpan(0, rowSamples), _little);
-                    Place(unit, unit.Y0 + r, row.AsSpan(0, rowSamples), deliveredPerPixel, destination);
-                }
+                rows = Decode(unit, scratch);
             }
-            finally
+            else
             {
-                if (raw is not null)
+                // The plan checked that the block holds these rows.
+                rows = scratch.Read.AsSpan(0, (int)(unit.Rows * _rowBytes));
+                _source.ReadExactly(_d.Offsets[unit.Block] + unit.FirstRow * _rowBytes, rows);
+            }
+
+            for (int r = 0; r < unit.Rows; r++)
+            {
+                Span<byte> stored = rows.Slice((int)(r * _rowBytes), (int)_rowBytes);
+                if (straight)
                 {
-                    ArrayPool<byte>.Shared.Return(raw);
+                    // Nothing to reorder or convert: the row is unpacked straight into its place in the destination.
+                    long at = ((unit.Y0 + r - _request.Y) * _request.Width + (unit.X0 - _request.X)) * _channels;
+                    Span<TD> target = MemoryMarshal.Cast<TOut, TD>(destination.Slice((int)at, rowSamples));
+                    SampleUnpacker.Unpack<TD>(_d, unit.Plane, stored, (int)_d.BlockWidth, target, _little);
+                    continue;
                 }
 
-                if (decoded is not null)
-                {
-                    ArrayPool<byte>.Shared.Return(decoded);
-                }
-
-                if (row is not null)
-                {
-                    ArrayPool<TD>.Shared.Return(row);
-                }
+                Span<TD> row = scratch.Row.AsSpan(0, rowSamples);
+                SampleUnpacker.Unpack<TD>(_d, unit.Plane, stored, (int)_d.BlockWidth, row, _little);
+                Place(unit, unit.Y0 + r, row, deliveredPerPixel, destination);
             }
         }
 
@@ -360,20 +374,19 @@ internal static class PixelReader
         /// Decodes a compressed block up to the last row of the unit; returns the rows of the unit. The output is bounded by what
         /// the unit needs: a block that would decode to more stops there, one that decodes to less is damaged.
         /// </summary>
-        private Span<byte> Decode(PixelUnit unit, out byte[] compressed, out byte[] decoded)
+        private Span<byte> Decode(PixelUnit unit, Scratch<TD> scratch)
         {
             int block = unit.Block;
-            int count = (int)_d.ByteCounts[block];
             int needed = (int)((unit.FirstRow + unit.Rows) * _rowBytes);
+            int count = (int)PixelPlan.CompressedToRead(_d.ByteCounts[block], needed);
             string kind = _d.Layout == TiffLayout.Tiles ? "tile" : "strip";
-            compressed = ArrayPool<byte>.Shared.Rent(count);
-            decoded = ArrayPool<byte>.Shared.Rent(needed);
+            byte[] compressed = scratch.Read;
             _source.ReadExactly(_d.Offsets[block], compressed.AsSpan(0, count));
 
             // Data beyond the block is ignored, as libtiff does, unless the read is strict and the whole block is decoded.
             long blockRows = _d.Layout == TiffLayout.Tiles ? _d.BlockHeight : Math.Min(_d.BlockHeight, _d.Height - unit.Y0 + unit.FirstRow);
             bool whole = unit.FirstRow + unit.Rows == blockRows;
-            Span<byte> output = decoded.AsSpan(0, needed);
+            Span<byte> output = scratch.Decoded.AsSpan(0, needed);
             int written;
             bool overflow;
             try

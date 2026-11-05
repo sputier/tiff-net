@@ -8,7 +8,7 @@ public class LzwTests
     /// An LZW encoder for the tests: TIFF 6.0 (most significant bit first, width growing one code early), or the old style
     /// (least significant bit first, width growing on time). It clears the table when it is full.
     /// </summary>
-    internal static byte[] Encode(ReadOnlySpan<byte> data, bool oldStyle = false, bool endCode = true)
+    internal static byte[] Encode(ReadOnlySpan<byte> data, bool oldStyle = false, bool endCode = true, bool clearWhenFull = true)
     {
         var output = new List<byte>();
         ulong bits = 0;
@@ -59,14 +59,19 @@ public class LzwTests
             }
 
             Put(current);
-            table[(current, b)] = free++;
+            if (free < 4096)
+            {
+                table[(current, b)] = free;
+            }
+
+            free++;
             current = b;
             if (free >= threshold(width) && width < 12)
             {
                 width++;
             }
 
-            if (free == 4094)
+            if (free == 4094 && clearWhenFull)
             {
                 Put(256);
                 table.Clear();
@@ -186,5 +191,44 @@ public class LzwTests
         var bits = string.Concat(codes.Select(c => Convert.ToString(c, 2).PadLeft(9, '0')));
         bits = bits.PadRight((bits.Length + 7) / 8 * 8, '0');
         return [.. Enumerable.Range(0, bits.Length / 8).Select(i => Convert.ToByte(bits.Substring(i * 8, 8), 2))];
+    }
+
+    [Fact]
+    public void A_stream_going_on_with_a_full_table_keeps_the_table_as_it_is()
+    {
+        // libtiff refuses it; it is decoded as written (the codes after the full table are defined), which is safe.
+        byte[] data = Sample("long");
+        byte[] decoded = new byte[data.Length];
+
+        Assert.Equal(data.Length, Lzw.Decode(Encode(data, clearWhenFull: false), decoded, out _));
+        Assert.Equal(data, decoded);
+    }
+
+    [Fact]
+    public void A_clear_code_after_a_clear_code_is_accepted()
+    {
+        byte[] decoded = new byte[2];
+
+        Assert.Equal(2, Lzw.Decode(Pack(256, 256, 65, 66, 257), decoded, out _));
+        Assert.Equal("AB"u8.ToArray(), decoded);
+    }
+
+    [Fact]
+    public void Long_runs_and_strings_cut_by_the_destination_are_decoded()
+    {
+        // A run of one value gives strings of growing length, each defined by the code being read (the "KwKwK" case).
+        byte[] data = [.. Enumerable.Repeat((byte)7, 200_000), .. Sample("random")[..1000], .. Enumerable.Repeat((byte)9, 50_000)];
+        byte[] encoded = Encode(data);
+        byte[] whole = new byte[data.Length];
+        Assert.Equal(data.Length, Lzw.Decode(encoded, whole, out _));
+        Assert.Equal(data, whole);
+
+        foreach (int size in new[] { 1, 17, 1000, 100_123, 200_500 })
+        {
+            byte[] part = new byte[size];
+            Assert.Equal(size, Lzw.Decode(encoded, part, out bool overflow));
+            Assert.True(overflow);
+            Assert.Equal(data[..size], part);
+        }
     }
 }
