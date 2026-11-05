@@ -19,10 +19,13 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Eleris.TiffNet\Eleris.TiffNet.csproj" />
     <ProjectReference Include="..\..\docs\examples\Eleris.TiffNet.Examples\Eleris.TiffNet.Examples.csproj" />
+    <ProjectReference Include="..\..\tools\Fuzz\Fuzz.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <None Include="..\Fixtures\interop\manifest.json" Link="Fixtures\interop\manifest.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Fixtures\domain\**" LinkBase="Fixtures\domain" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Fixtures\hostile\**" LinkBase="Fixtures\hostile" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
