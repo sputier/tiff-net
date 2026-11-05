@@ -27,9 +27,9 @@ public class PixelTests
 
     internal static string Sha(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes));
 
-    /// <summary>Whether the codecs the library has so far decode the image (JPEG and the predictors come later).</summary>
-    internal static bool Decodable(TiffStorage storage) => storage.Predictor == TiffPredictor.None
-        && storage.Compression is TiffCompression.None or TiffCompression.Lzw or TiffCompression.Deflate or TiffCompression.PackBits;
+    /// <summary>Whether the codecs the library has so far decode the image (JPEG comes later).</summary>
+    internal static bool Decodable(TiffStorage storage) =>
+        storage.Compression is TiffCompression.None or TiffCompression.Lzw or TiffCompression.Deflate or TiffCompression.PackBits;
 
     [Fact]
     public void Every_decodable_page_of_the_domain_fixtures_gives_the_expected_samples()
@@ -71,6 +71,7 @@ public class PixelTests
         }
 
         var counts = new Dictionary<TiffCompression, int>();
+        var predicted = new Dictionary<TiffPredictor, int>();
         foreach (var f in InteropCorpus.Files)
         {
             using var file = TiffFile.Open(Path.Combine(InteropCorpus.Folder, f.Name));
@@ -82,7 +83,11 @@ public class PixelTests
 
             Assert.True(f.SamplesSha256 == Sha(RawBytes(file.Primary)), f.Name);
             counts[storage.Compression] = counts.GetValueOrDefault(storage.Compression) + 1;
+            predicted[storage.Predictor] = predicted.GetValueOrDefault(storage.Predictor) + 1;
         }
+
+        Assert.True(predicted.GetValueOrDefault(TiffPredictor.Horizontal) > 300, $"only {predicted.GetValueOrDefault(TiffPredictor.Horizontal)} horizontal");
+        Assert.True(predicted.GetValueOrDefault(TiffPredictor.FloatingPoint) > 100, $"only {predicted.GetValueOrDefault(TiffPredictor.FloatingPoint)} floating point");
 
         Assert.All([TiffCompression.None, TiffCompression.Lzw, TiffCompression.Deflate, TiffCompression.PackBits],
             c => Assert.True(counts.GetValueOrDefault(c) > 300, $"only {counts.GetValueOrDefault(c)} {c} files"));
