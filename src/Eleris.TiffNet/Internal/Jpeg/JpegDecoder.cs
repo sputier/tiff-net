@@ -58,8 +58,9 @@ internal sealed class JpegFrame
 /// </summary>
 /// <remarks>
 /// Defects of the data are <see cref="InvalidDataException"/>; what it decodes to is counted in the budget before it is allocated.
-/// The decoding of a scan is bounded by its frame: every block is decoded once, whatever the data holds, and a truncated scan
-/// decodes as zeros, as libjpeg does.
+/// The decoding of a scan is bounded by its frame: every block is decoded at most once. As libjpeg does, the MCU in which the data
+/// of a scan runs out ends with zeros, and the blocks after it (until a restart marker) are not decoded but grey (128), which
+/// costs a fill, not a decoding; a component that no scan holds is grey too.
 /// </remarks>
 internal sealed class JpegDecoder(ResourceBudget budget)
 {
@@ -114,9 +115,14 @@ internal sealed class JpegDecoder(ResourceBudget budget)
                 case -1:
                 case 0xD9:
                     // The end of the image (or of the data, which libjpeg accepts with a warning).
-                    return _frame;
+                    return End(tablesOnly);
                 case 0xC0:
                 case 0xC1:
+                    if (tablesOnly)
+                    {
+                        throw new InvalidDataException("the JPEG tables hold a frame.");
+                    }
+
                     ReadFrame(Segment(data, ref position));
                     break;
                 case 0xC2:
@@ -142,7 +148,8 @@ internal sealed class JpegDecoder(ResourceBudget budget)
                         throw new InvalidDataException("the JPEG tables hold a scan.");
                     }
 
-                    position = ReadScan(data, Segment(data, ref position), position);
+                    var header = Segment(data, ref position);
+                    position = ReadScan(data, header, position);
                     break;
                 case 0xEE:
                     ReadAdobe(Segment(data, ref position));
@@ -162,6 +169,31 @@ internal sealed class JpegDecoder(ResourceBudget budget)
                     break;
             }
         }
+    }
+
+    /// <summary>The frame at the end of the stream: it must have been scanned; its components that no scan held are grey.</summary>
+    private JpegFrame? End(bool tablesOnly)
+    {
+        if (tablesOnly || _frame is null)
+        {
+            return null;
+        }
+
+        if (_scans == 0)
+        {
+            throw new InvalidDataException("the JPEG stream has a frame but no scan.");
+        }
+
+        foreach (var c in _frame.Components)
+        {
+            if (!c.Scanned)
+            {
+                // libjpeg's coefficients of a component without data are 0, which the IDCT turns into 128.
+                c.Plane.AsSpan().Fill(128);
+            }
+        }
+
+        return _frame;
     }
 
     /// <summary>The next marker at or after <paramref name="position"/> (garbage before it is skipped, as libjpeg does), or -1.</summary>
@@ -347,6 +379,14 @@ internal sealed class JpegDecoder(ResourceBudget budget)
         }
 
         budget.ReservePixels(bytes, "the JPEG planes");
+        foreach (var p in parts)
+        {
+            if (mcusAcross * p.H * 8 * mcusDown * p.V * 8 > Array.MaxLength)
+            {
+                throw new NotSupportedException($"a JPEG frame of {width} x {height} has a component larger than an array.");
+            }
+        }
+
         var components = new JpegComponent[count];
         for (int i = 0; i < count; i++)
         {
@@ -360,7 +400,7 @@ internal sealed class JpegDecoder(ResourceBudget budget)
                 QuantizationTable = p.Tq,
                 Width = (int)((width * (long)p.H + hMax - 1) / hMax),
                 Height = (int)((height * (long)p.V + vMax - 1) / vMax),
-                Plane = new byte[stride * mcusDown * p.V * 8],
+                Plane = new byte[(int)(stride * mcusDown * p.V * 8)],
                 Stride = stride,
             };
         }
@@ -426,7 +466,14 @@ internal sealed class JpegDecoder(ResourceBudget budget)
                 for (int bx = 0; bx < across; bx++)
                 {
                     RestartIfDue(ref reader, scan, mcu++);
-                    DecodeBlock(ref reader, c, block, bx, by);
+                    if (reader.Insufficient)
+                    {
+                        Grey(c, bx, by);
+                    }
+                    else
+                    {
+                        DecodeBlock(ref reader, c, block, bx, by);
+                    }
                 }
             }
         }
@@ -439,13 +486,21 @@ internal sealed class JpegDecoder(ResourceBudget budget)
                 for (int mx = 0; mx < across; mx++)
                 {
                     RestartIfDue(ref reader, scan, mcu++);
+                    bool skip = reader.Insufficient;
                     foreach (var c in scan)
                     {
                         for (int v = 0; v < c.V; v++)
                         {
                             for (int h = 0; h < c.H; h++)
                             {
-                                DecodeBlock(ref reader, c, block, mx * c.H + h, my * c.V + v);
+                                if (skip)
+                                {
+                                    Grey(c, mx * c.H + h, my * c.V + v);
+                                }
+                                else
+                                {
+                                    DecodeBlock(ref reader, c, block, mx * c.H + h, my * c.V + v);
+                                }
                             }
                         }
                     }
@@ -467,6 +522,15 @@ internal sealed class JpegDecoder(ResourceBudget budget)
             {
                 c.Prediction = 0;
             }
+        }
+    }
+
+    /// <summary>A block without data: its coefficients are 0, which the IDCT gives as 128 (libjpeg skips such MCUs).</summary>
+    private static void Grey(JpegComponent c, int bx, int by)
+    {
+        for (int r = 0; r < 8; r++)
+        {
+            c.Plane.AsSpan((by * 8 + r) * c.Stride + bx * 8, 8).Fill(128);
         }
     }
 
