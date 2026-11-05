@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Eleris.TiffNet/Eleris.TiffNet.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Eleris.TiffNet.Tests/Eleris.TiffNet.Tests.csproj" />
+  </Folder>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/Eleris.TiffNet.Benchmarks/Eleris.TiffNet.Benchmarks.csproj" />
+  </Folder>
+</Solution>
