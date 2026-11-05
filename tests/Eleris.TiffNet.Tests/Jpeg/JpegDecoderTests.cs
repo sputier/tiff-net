@@ -84,6 +84,36 @@ public class JpegDecoderTests
         Assert.True(hMax * vMax > 0);
     }
 
+    public static TheoryData<string> Colour() =>
+        [.. JpegFixtures.Files.Where(f => f.Entry.TryGetProperty("rgb", out _) && !f.Entry.TryGetProperty("truncated", out _)).Select(f => f.Name)];
+
+    [Theory]
+    [MemberData(nameof(Colour))]
+    public void Colour_images_upsample_and_convert_to_the_RGB_of_libjpeg_turbo(string name)
+    {
+        var frame = JpegFixtures.Decode(JpegFixtures.Bytes(name));
+        byte[] rgb = new byte[frame.Width * frame.Height * 3];
+
+        JpegColour.ToSamples(frame, ycbcr: true, rgb, frame.Width * 3, new ResourceBudget(TiffReadOptions.Default, "test"));
+
+        Assert.Equal(JpegFixtures.Entry(name).GetProperty("rgb").GetString(), Convert.ToHexString(SHA256.HashData(rgb)));
+    }
+
+    [Fact]
+    public void Components_that_are_not_YCbCr_are_interleaved_as_they_are()
+    {
+        var frame = JpegFixtures.Decode(JpegFixtures.Bytes("ycc444_q90_37x29.jpg"));
+        byte[] samples = new byte[37 * 29 * 3 + 5];
+
+        JpegColour.ToSamples(frame, ycbcr: false, samples, 37 * 3, new ResourceBudget(TiffReadOptions.Default, "test"));
+
+        for (int c = 0; c < 3; c++)
+        {
+            byte[] plane = JpegFixtures.Samples(frame.Components[c]);
+            Assert.Equal(plane, Enumerable.Range(0, 37 * 29).Select(i => samples[i * 3 + c]));
+        }
+    }
+
     [Fact]
     public void Subsampled_components_have_their_own_size()
     {
