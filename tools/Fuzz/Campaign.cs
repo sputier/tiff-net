@@ -27,8 +27,8 @@ internal static class Targets
         while (pending.TryPop(out var image))
         {
             // An image of more samples than an array holds is read by region: whole reads refuse it, as documented.
-            // Images whose codec or predictor is not implemented yet are refused with NotSupportedException, an expected outcome.
-            if (image.UnsupportedReason is null && image.Storage!.Compression != TiffCompression.Jpeg && image.Storage.Predictor == TiffPredictor.None
+            // JPEG is not implemented yet.
+            if (image.UnsupportedReason is null && image.Storage!.Compression != TiffCompression.Jpeg
                 && (Int128)image.Width * image.Height * image.Channels <= Array.MaxLength)
             {
                 _ = image.ReadPixels<double>(TiffPixelScale.Normalized);
