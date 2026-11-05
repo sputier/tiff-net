@@ -98,28 +98,28 @@ internal sealed record ImageDescriptor
             throw budget.Invalid($"the image is {width} x {height} pixels.");
         }
 
-        int samples = (int)reader.ReadInteger(directory, SamplesPerPixelTag, 1);
-        if (samples is < 1 or > ushort.MaxValue)
+        int samples = (int)reader.ReadInteger(directory, SamplesPerPixelTag, 1, ushort.MaxValue);
+        if (samples < 1)
         {
-            throw budget.Invalid($"the image declares {samples} samples per pixel.");
+            throw budget.Invalid("the image declares 0 samples per pixel.");
         }
 
         long[] bits = AllOrDefault(reader, directory, BitsPerSampleTag, samples, 1);
         long[] formats = AllOrDefault(reader, directory, SampleFormatTag, samples, 1);
-        if (bits[0] is < 1 or > 64)
+        if (bits.Any(b => b is < 1 or > 64) || formats.Any(f => f is < 0 or > ushort.MaxValue))
         {
-            throw budget.Invalid($"the image declares {bits[0]} bits per sample.");
+            throw budget.Invalid($"the image declares {bits[0]} bits per sample in the format {formats[0]}.");
         }
 
-        long compression = reader.ReadInteger(directory, CompressionTag, 1);
-        int planarCode = (int)reader.ReadInteger(directory, PlanarConfigurationTag, 1);
+        long compression = reader.ReadInteger(directory, CompressionTag, 1, ushort.MaxValue);
+        int planarCode = (int)reader.ReadInteger(directory, PlanarConfigurationTag, 1, ushort.MaxValue);
         if (planarCode is not (1 or 2))
         {
             planarCode = strict ? throw budget.Invalid($"PlanarConfiguration is {planarCode}.") : 1;
         }
 
         bool planar = planarCode == 2 && samples > 1;
-        int orientation = (int)reader.ReadInteger(directory, OrientationTag, 1);
+        int orientation = (int)reader.ReadInteger(directory, OrientationTag, 1, ushort.MaxValue);
         if (orientation is < 1 or > 8)
         {
             orientation = strict ? throw budget.Invalid($"Orientation is {orientation}.") : 1;
@@ -128,7 +128,7 @@ internal sealed record ImageDescriptor
         long photometricCode;
         if (directory.TryGet(PhotometricTag, out _))
         {
-            photometricCode = reader.ReadInteger(directory, PhotometricTag, 1);
+            photometricCode = reader.ReadInteger(directory, PhotometricTag, 1, ushort.MaxValue);
         }
         else
         {
@@ -228,13 +228,7 @@ internal sealed record ImageDescriptor
             }
         }
 
-        ushort[]? colorMap = null;
-        if (photometric == TiffPhotometric.Palette && bits[0] <= 16)
-        {
-            colorMap = ReadColorMap(reader, directory, (int)bits[0]);
-        }
-
-        long predictor = reader.ReadInteger(directory, PredictorTag, 1);
+        long predictor = reader.ReadInteger(directory, PredictorTag, 1, ushort.MaxValue);
         var descriptor = new ImageDescriptor
         {
             Directory = directory,
@@ -245,7 +239,7 @@ internal sealed record ImageDescriptor
             SampleFormat = (int)formats[0],
             Photometric = photometric,
             Compression = (TiffCompression)compression,
-            Predictor = (TiffPredictor)predictor,
+            Predictor = predictor == 0 ? TiffPredictor.None : (TiffPredictor)predictor,   // 0 is not defined; libtiff reads it as none
             Planar = planar,
             Orientation = orientation,
             Layout = tiled ? TiffLayout.Tiles : TiffLayout.Strips,
@@ -255,9 +249,17 @@ internal sealed record ImageDescriptor
             ByteCounts = counts,
             SubfileType = subfile,
             ExtraChannels = extraKinds,
-            ColorMap = colorMap,
         };
-        return descriptor.WithSupport(bits, formats);
+        descriptor = descriptor.WithSupport(bits, formats);
+
+        // The colour map matters only when the pixels can be delivered: a defect in it must not make an image the library would
+        // refuse anyway (or the whole file) fail.
+        if (descriptor.Photometric == TiffPhotometric.Palette && descriptor.Unsupported is null)
+        {
+            descriptor = descriptor with { ColorMap = ReadColorMap(reader, directory, descriptor.BitsPerSample) };
+        }
+
+        return descriptor;
     }
 
     /// <summary>Bytes of one row of <paramref name="width"/> pixels of <paramref name="samples"/> samples, padded to a byte.</summary>
@@ -373,9 +375,15 @@ internal sealed record ImageDescriptor
             return "palette images need unsigned samples of 1 to 16 bits.";
         }
 
-        if (Compression == TiffCompression.Jpeg && (b0 != 8 || SampleFormat is not (1 or 4) || SamplesPerPixel is not (1 or 3)))
+        if (Compression == TiffCompression.Jpeg && (b0 != 8 || SampleFormat is not (1 or 4) || Planar
+            || (SamplesPerPixel, Photometric) is not ((1, TiffPhotometric.MinIsBlack) or (3, TiffPhotometric.Rgb) or (3, TiffPhotometric.YCbCr))))
         {
-            return "JPEG images are supported with 1 or 3 samples of 8 bits.";
+            return "JPEG images are supported as 8-bit grey (one sample) or 8-bit colour (three interleaved samples).";
+        }
+
+        if (BlockWidth > int.MaxValue || BlockHeight > int.MaxValue)
+        {
+            return $"tiles of {BlockWidth} x {BlockHeight} pixels are not supported.";
         }
 
         return Predictor switch
@@ -405,6 +413,11 @@ internal sealed record ImageDescriptor
             return [fallback];
         }
 
+        if (entry.Count > 1 && entry.Count < samples && reader.Budget.Options.Strict)
+        {
+            throw reader.Budget.Invalid($"tag {tag} has {entry.Count} values for {samples} samples.");
+        }
+
         long[] values = reader.ReadIntegers(entry with { Count = Math.Min(entry.Count, samples) });
         return values.Length == 0 ? [fallback] : values;
     }
@@ -416,14 +429,18 @@ internal sealed record ImageDescriptor
             throw reader.Budget.Invalid($"the {unit} {what} are missing.");
         }
 
+        if (entry.Type is not (TiffTagType.Short or TiffTagType.Long or TiffTagType.Long8 or TiffTagType.Ifd or TiffTagType.Ifd8))
+        {
+            throw reader.Budget.Invalid($"the {unit} {what} are {entry.Type} values; SHORT, LONG or LONG8 are required.");
+        }
+
         if (entry.Count < blocks || (entry.Count > blocks && reader.Budget.Options.Strict))
         {
             throw reader.Budget.Invalid($"the image has {blocks} {unit}s, and {entry.Count} {unit} {what}.");
         }
 
-        // The table is in the file (its entry is valid) and has the number of blocks the geometry implies: nothing is
-        // allocated from a count the file cannot back up.
-        reader.Budget.ReservePixels(blocks * sizeof(long), $"the {unit} {what}");
+        // The table is in the file (its entry is valid) and has the number of blocks the geometry implies; reading it is counted
+        // in MaxMetadataBytes. Nothing is allocated from a count the file cannot back up.
         return reader.ReadIntegers(entry with { Count = blocks });
     }
 

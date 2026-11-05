@@ -18,9 +18,10 @@ internal static class MetadataReader
                 continue;
             }
 
-            if (!entry.Valid)
+            if (!entry.Valid || !reader.Budget.TagFits(entry.ByteLength))
             {
-                // Values outside the file: the tag is dropped, as libtiff does, unless the read is strict.
+                // Values outside the file, or larger than MaxTagBytes: the tag is left out (as libtiff drops tags it cannot
+                // read), so that a device with a low limit still opens the image; a strict read refuses the file.
                 if (reader.Budget.Options.Strict)
                 {
                     reader.Ensure(entry);

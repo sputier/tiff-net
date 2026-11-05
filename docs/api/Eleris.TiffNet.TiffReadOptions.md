@@ -31,6 +31,7 @@ Change a limit with a `with` expression: `TiffReadOptions.Default with { MaxPixe
 | [`MaxDirectories`](#eleris-tiffnet-tiffreadoptions-maxdirectories) | The number of directories read from a file: pages and sub-directories together. 10 000 by default. |
 | [`MaxInputBytes`](#eleris-tiffnet-tiffreadoptions-maxinputbytes) | The number of bytes that `TiffFile.Read` takes from a stream, which it holds in memory. 2 147 483 591 (the largest .NET array) by default. |
 | [`MaxJpegScans`](#eleris-tiffnet-tiffreadoptions-maxjpegscans) | The number of scans of a progressive JPEG image. 100 by default; a normal image has about 10. |
+| [`MaxMetadataBytes`](#eleris-tiffnet-tiffreadoptions-maxmetadatabytes) | The memory that opening a file may use for what its directories hold: the entries, the values of the tags (metadata, EXIF, ICC profiles…) and the tables of strips and tiles, all pages together. 256 MB by default. |
 | [`MaxPixelBytes`](#eleris-tiffnet-tiffreadoptions-maxpixelbytes) | The memory that decoding an image or a region may use for the data the file asks for: the pixels and the intermediate buffers of the codecs (for example the coefficients of a progressive JPEG). 2 147 483 591 bytes by default. |
 | [`MaxTagBytes`](#eleris-tiffnet-tiffreadoptions-maxtagbytes) | The size of the values of one tag. 64 MB by default, which ICC profiles and XMP packets fit in. |
 | [`MaxTagsPerDirectory`](#eleris-tiffnet-tiffreadoptions-maxtagsperdirectory) | The number of entries of one directory. 4 096 by default; real files have a few dozen. |
@@ -110,6 +111,19 @@ public int MaxJpegScans { get; init; }
 
 - [`ArgumentOutOfRangeException`](https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception) — The value is not positive.
 
+<a id="eleris-tiffnet-tiffreadoptions-maxmetadatabytes"></a>
+### `MaxMetadataBytes`
+
+The memory that opening a file may use for what its directories hold: the entries, the values of the tags (metadata, EXIF, ICC profiles…) and the tables of strips and tiles, all pages together. 256 MB by default. Tags can share their values in a file, so this is what bounds a small file that declares many large tags.
+
+```csharp
+public long MaxMetadataBytes { get; init; }
+```
+
+**Exceptions**
+
+- [`ArgumentOutOfRangeException`](https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception) — The value is not positive.
+
 <a id="eleris-tiffnet-tiffreadoptions-maxpixelbytes"></a>
 ### `MaxPixelBytes`
 
@@ -126,7 +140,7 @@ public long MaxPixelBytes { get; init; }
 <a id="eleris-tiffnet-tiffreadoptions-maxtagbytes"></a>
 ### `MaxTagBytes`
 
-The size of the values of one tag. 64 MB by default, which ICC profiles and XMP packets fit in.
+The size of the values of one tag. 64 MB by default, which ICC profiles and XMP packets fit in. A larger metadata tag is left out of [`TiffImage.Metadata`](Eleris.TiffNet.TiffImage.md#eleris-tiffnet-tiffimage-metadata) (refused with [`TiffReadOptions.Strict`](#eleris-tiffnet-tiffreadoptions-strict)); a larger table of strips or tiles is a [`TiffException`](Eleris.TiffNet.TiffException.md).
 
 ```csharp
 public long MaxTagBytes { get; init; }

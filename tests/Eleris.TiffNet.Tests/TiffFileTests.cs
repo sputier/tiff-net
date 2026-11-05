@@ -150,7 +150,12 @@ public class TiffFileTests
             Assert.True(file.Count == 1 && file.Primary.Channels == f.Channels, f.Name);
         }
     }
+}
 
+// Every hostile file must open (its defect is then in its pixels) or fail with its expected outcome, within its bounds.
+[Collection(nameof(Measurement))]
+public class HostileOpenTests
+{
     [Fact]
     public void A_fuzzing_campaign_on_opening_finds_nothing()
     {
@@ -170,12 +175,8 @@ public class TiffFileTests
             Directory.Delete(output, recursive: true);
         }
     }
-}
 
-// Every hostile file must open (its defect is then in its pixels) or fail with its expected outcome, within its bounds.
-[Collection(nameof(Measurement))]
-public class HostileOpenTests
-{
+
     [Fact]
     public void Hostile_files_open_or_fail_as_expected_within_bounds()
     {
