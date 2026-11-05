@@ -242,7 +242,7 @@ internal sealed record ImageDescriptor
             BitsPerSample = (int)bits[0],
             SampleFormat = (int)formats[0],
             Photometric = photometric,
-            Compression = (TiffCompression)compression,
+            Compression = compression == 32946 ? TiffCompression.Deflate : (TiffCompression)compression,   // the first code of Deflate
             Predictor = predictor == 0 ? TiffPredictor.None : (TiffPredictor)predictor,   // 0 is not defined; libtiff reads it as none
             Planar = planar,
             Orientation = orientation,
