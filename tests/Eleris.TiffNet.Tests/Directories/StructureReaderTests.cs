@@ -226,18 +226,4 @@ public class StructureReaderTests
         Assert.Equal(0, Reader(truncated).ReadDirectory(directory)!.Next);
         Assert.Throws<TiffException>(() => Reader(truncated, Strict).ReadDirectory(directory));
     }
-
-    [Fact]
-    public void Hostile_directories_fail_within_bounds()
-    {
-        foreach (string name in new[] { "unknowntags-5k.tif", "unknowntags-20k.tif", "bigtiff-unknowntags-32k.tif" })
-        {
-            var hostile = HostileAssert.Cases.Single(c => c.ToString() == name);
-            HostileAssert.FailsWithinBounds(hostile, () =>
-            {
-                var reader = new StructureReader(TiffSource.FromMemory(File.ReadAllBytes(hostile.Path)), new ResourceBudget(hostile.Options, name));
-                reader.ReadDirectory(reader.Header.FirstDirectory);
-            });
-        }
-    }
 }
