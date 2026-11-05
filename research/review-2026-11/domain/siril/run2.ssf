@@ -1,0 +1,6 @@
+requires 1.2.0
+rgbcomp m42 m42 m42 -out=rgb
+load rgb
+savetif m42_rgb16 -astro
+savetif32 m42_rgb32 -astro
+savetif8 m42_rgb8

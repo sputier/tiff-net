@@ -1,0 +1,49 @@
+tifffile 2026.7.14 imagecodecs 2026.6.26 numpy 2.5.1 cores 8
+tifffile read f32rgb_24_lzw_p3.tif workers=1            2185.3 ms      132 MB/s 
+tifffile read f32rgb_24_lzw_p3.tif workers=all           856.4 ms      336 MB/s 
+tifffile read f32rgb_24_none.tif workers=1               187.3 ms     1538 MB/s 
+tifffile read f32rgb_24_none.tif workers=all             193.0 ms     1492 MB/s 
+tifffile read f32rgb_24_planar_none.tif workers=1        159.1 ms     1811 MB/s 
+tifffile read f32rgb_24_planar_none.tif workers=all      204.5 ms     1408 MB/s 
+tifffile read f32rgb_24_planar_zip_p3.tif workers=1     1874.6 ms      154 MB/s 
+tifffile read f32rgb_24_planar_zip_p3.tif workers=all     834.5 ms      345 MB/s 
+tifffile read f32rgb_24_tiled_zip_p3.tif workers=1      1998.2 ms      144 MB/s 
+tifffile read f32rgb_24_tiled_zip_p3.tif workers=all     823.9 ms      350 MB/s 
+tifffile read f32rgb_24_zip.tif workers=1               1482.3 ms      194 MB/s 
+tifffile read f32rgb_24_zip.tif workers=all              646.4 ms      446 MB/s 
+tifffile read f32rgb_24_zip_p3.tif workers=1            1996.3 ms      144 MB/s 
+tifffile read f32rgb_24_zip_p3.tif workers=all           871.8 ms      330 MB/s 
+tifffile read u16_24_lzw.tif workers=1                   278.6 ms      172 MB/s 
+tifffile read u16_24_lzw.tif workers=all                 149.8 ms      320 MB/s 
+tifffile read u16_24_lzw_p2.tif workers=1                406.5 ms      118 MB/s 
+tifffile read u16_24_lzw_p2.tif workers=all              192.1 ms      250 MB/s 
+tifffile read u16_24_none.tif workers=1                   29.2 ms     1642 MB/s 
+tifffile read u16_24_none.tif workers=all                 28.9 ms     1662 MB/s 
+tifffile read u16_24_none_be.tif workers=1                53.5 ms      898 MB/s 
+tifffile read u16_24_none_be.tif workers=all              44.3 ms     1084 MB/s 
+tifffile read u16_24_none_flip.tif workers=1              28.5 ms     1683 MB/s 
+tifffile read u16_24_none_flip.tif workers=all            32.0 ms     1500 MB/s 
+tifffile read u16_24_none_onestrip.tif workers=1          31.1 ms     1543 MB/s 
+tifffile read u16_24_none_onestrip.tif workers=all        29.6 ms     1623 MB/s 
+tifffile read u16_24_packbits.tif workers=1              115.8 ms      415 MB/s 
+tifffile read u16_24_packbits.tif workers=all            145.5 ms      330 MB/s 
+tifffile read u16_24_tiled_none.tif workers=1            118.8 ms      404 MB/s 
+tifffile read u16_24_tiled_none.tif workers=all          130.3 ms      368 MB/s 
+tifffile read u16_24_tiled_zip_p2.tif workers=1          312.1 ms      154 MB/s 
+tifffile read u16_24_tiled_zip_p2.tif workers=all        144.0 ms      333 MB/s 
+tifffile read u16_24_zip.tif workers=1                   218.2 ms      220 MB/s 
+tifffile read u16_24_zip.tif workers=all                 126.3 ms      380 MB/s 
+tifffile read u16_24_zip_p2.tif workers=1                295.7 ms      162 MB/s 
+tifffile read u16_24_zip_p2.tif workers=all              129.8 ms      370 MB/s 
+tifffile read u16_24_zip_p2_be.tif workers=1             331.7 ms      145 MB/s 
+tifffile read u16_24_zip_p2_be.tif workers=all           171.4 ms      280 MB/s 
+tifffile read u16_61_none.tif workers=1                  108.2 ms     1130 MB/s 
+tifffile read u16_61_none.tif workers=all                100.9 ms     1212 MB/s 
+tifffile read u16_61_zip_p2.tif workers=1                846.9 ms      144 MB/s 
+tifffile read u16_61_zip_p2.tif workers=all              310.2 ms      394 MB/s 
+Traceback (most recent call last):
+  File "C:\Users\sputi\AppData\Local\Temp\claude\ff452179a1069d23\ee3533e7-fa7a-49d0-87d1-cebbd8c83c9a\scratchpad\review-perf\py\ref.py", line 42, in <module>
+    a.nbytes, f'out {os.path.getsize(out)/1e6:.1f} MB')
+                     ~~~~~~~~~~~~~~~^^^^^
+  File "<frozen genericpath>", line 86, in getsize
+FileNotFoundError: [WinError 2] Le fichier spécifié est introuvable: '../data\\out_py.tif'

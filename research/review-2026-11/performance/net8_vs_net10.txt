@@ -1,0 +1,16 @@
+net8.0 read u16_24_none.tif                               17,5     13,6     2742      48,5     1  file 48,0 MB
+net10.0 read u16_24_none.tif                               17,5     13,5     2747      48,5     1  file 48,0 MB
+net8.0 read u16_24_zip_p2.tif                            324,6    319,0      148     107,8     1  file 28,6 MB
+net10.0 read u16_24_zip_p2.tif                            282,8    275,1      170     107,5     1  file 28,6 MB
+net8.0 read u16_24_lzw_p2.tif                            254,2    246,5      189      96,7     1  file 33,5 MB
+net10.0 read u16_24_lzw_p2.tif                            265,4    257,9      181      96,7     1  file 33,5 MB
+net8.0 read f32rgb_24_zip_p3.tif                        1431,5   1427,7      201     660,6     1  file 187,6 MB
+net10.0 read f32rgb_24_zip_p3.tif                        1661,8   1357,5      173     653,5     1  file 187,6 MB
+net8.0 write u16_24 Deflate (file)                      3832,5   3784,3       13     148,7     0  out 28,6 MB
+net10.0 write u16_24 Deflate (file)                      4320,1   3632,0       11     148,5     0  out 28,6 MB
+net8.0 write u16_24 Lzw (file)                           483,0    474,9       99      97,0     0  out 33,5 MB
+net10.0 write u16_24 Lzw (file)                           485,9    476,3       99      97,0     0  out 33,5 MB
+patched net8.0 read u16_24_zip_p2.tif                            179,4    174,0      267      48,7     1  file 28,6 MB
+patched net10.0 read u16_24_zip_p2.tif                            178,7    177,2      269      48,7     1  file 28,6 MB
+patched net8.0 write u16_24 Deflate (file)                      1212,3   1203,4       40      99,2     2  out 28,5 MB
+patched net10.0 write u16_24 Deflate (file)                       748,2    734,8       64      99,2     2  out 27,9 MB

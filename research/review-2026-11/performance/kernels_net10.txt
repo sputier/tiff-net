@@ -1,0 +1,34 @@
+| Method                   | Mean       | Error      | StdDev     | Median     | Gen0    | Allocated |
+|------------------------- |-----------:|-----------:|-----------:|-----------:|--------:|----------:|
+| HorAcc16_Original        | 215.833 us | 52.2355 us | 34.5506 us | 218.668 us | 40.0391 |  252504 B |
+| HorAcc16_Span            |  86.692 us |  4.7160 us |  2.8064 us |  86.885 us |       - |         - |
+| HorDiff16_Original       | 131.238 us |  3.5292 us |  2.3344 us | 132.131 us | 40.0391 |  252504 B |
+| HorDiff16_Vector         |  11.962 us |  0.6673 us |  0.3971 us |  12.016 us |       - |         - |
+| FpAcc32_Original         | 403.191 us | 13.5771 us |  8.9804 us | 405.513 us | 45.4102 |  288096 B |
+| FpAcc32_Span             | 241.638 us |  4.5425 us |  3.0046 us | 241.529 us |       - |         - |
+| FpDiff32_Original        | 263.489 us |  3.9558 us |  2.6165 us | 263.192 us | 45.4102 |  288096 B |
+| FpDiff32_Span            | 228.805 us | 11.2871 us |  7.4657 us | 229.847 us |       - |         - |
+| Swab16_Original          | 175.143 us |  6.5290 us |  3.8853 us | 175.896 us |       - |  252024 B |
+| Swab16_ReverseEndianness |   6.085 us |  0.1926 us |  0.1274 us |   6.078 us |       - |         - |
+| Scatter32_Original       |   4.355 us |  0.2140 us |  0.1416 us |   4.338 us |       - |         - |
+| Scatter32_Typed          |   2.830 us |  0.1057 us |  0.0699 us |   2.837 us |       - |         - |
+| Method                       | Mean     | Error    | StdDev  | Median   | Ratio | RatioSD | Allocated | Alloc Ratio |
+|----------------------------- |---------:|---------:|--------:|---------:|------:|--------:|----------:|------------:|
+| LibTiff_ReadEncodedStrip_all | 272.4 ms | 12.02 ms | 7.95 ms | 272.2 ms |  1.00 |    0.04 |  557520 B |       1.000 |
+| FastLzw_all                  | 211.5 ms |  4.73 ms | 3.13 ms | 211.6 ms |  0.78 |    0.02 |       8 B |       0.000 |
+System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation.
+ ---> System.IO.EndOfStreamException: Unable to read beyond the end of the stream.
+| Method                     | File_                | Mean        | Error       | StdDev      | Median      | Min         | Ratio | RatioSD | Gen0       | Gen1       | Allocated   | Alloc Ratio |
+|--------------------------- |--------------------- |------------:|------------:|------------:|------------:|------------:|------:|--------:|-----------:|-----------:|------------:|------------:|
+| Inflate_ComponentAce       | f32rgb_24_zip_p3.tif |  1,479.3 ms |    54.45 ms |    24.18 ms |  1,477.7 ms |  1,447.9 ms |  1.00 |    0.02 | 12000.0000 |  1000.0000 | 74848.35 KB |       1.000 |
+| Inflate_ZLibStream         | f32rgb_24_zip_p3.tif |    914.7 ms |    26.63 ms |    11.83 ms |    917.0 ms |    893.3 ms |  0.62 |    0.01 |          - |          - |   304.69 KB |       0.004 |
+| Deflate6_ComponentAce      | f32rgb_24_zip_p3.tif | 12,877.2 ms | 2,333.59 ms | 1,036.13 ms | 13,327.9 ms | 11,749.4 ms |  8.71 |    0.67 | 42000.0000 | 10000.0000 |   262250 KB |       3.504 |
+| Deflate_ZLibStream_Optimal | f32rgb_24_zip_p3.tif |  7,009.0 ms | 1,635.34 ms |   726.10 ms |  6,480.5 ms |  6,405.9 ms |  4.74 |    0.46 |          - |          - |   289.06 KB |       0.004 |
+| Deflate_ZLibStream_Fastest | f32rgb_24_zip_p3.tif |  2,653.1 ms |   136.63 ms |    60.66 ms |  2,642.5 ms |  2,591.2 ms |  1.79 |    0.05 |          - |          - |   289.06 KB |       0.004 |
+|                            |                      |             |             |             |             |             |       |         |            |            |             |             |
+| Inflate_ComponentAce       | u16_24_zip_p2.tif    |    418.9 ms |    13.73 ms |     6.10 ms |    418.5 ms |    408.8 ms |  1.00 |    0.02 |  1000.0000 |          - | 10489.44 KB |       1.000 |
+| Inflate_ZLibStream         | u16_24_zip_p2.tif    |          NA |          NA |          NA |          NA |          NA |     ? |       ? |         NA |         NA |          NA |           ? |
+| Deflate6_ComponentAce      | u16_24_zip_p2.tif    |  5,421.7 ms | 3,139.29 ms | 1,393.86 ms |  6,038.1 ms |  3,825.1 ms | 12.94 |    3.12 |  8000.0000 |  2000.0000 | 50089.75 KB |       4.775 |
+| Deflate_ZLibStream_Optimal | u16_24_zip_p2.tif    |    829.8 ms |    37.00 ms |    16.43 ms |    830.4 ms |    800.3 ms |  1.98 |    0.05 |          - |          - |    55.21 KB |       0.005 |
+| Deflate_ZLibStream_Fastest | u16_24_zip_p2.tif    |    490.6 ms |    10.60 ms |     4.71 ms |    491.1 ms |    481.0 ms |  1.17 |    0.02 |          - |          - |    55.21 KB |       0.005 |
+  Summary -> Detected error exit code from one of the benchmarks. It might be caused by following antivirus software:
