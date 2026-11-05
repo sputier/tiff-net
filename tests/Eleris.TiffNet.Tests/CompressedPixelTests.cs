@@ -152,6 +152,41 @@ public class CompressedPixelTests
 
         Assert.Contains("predictor", Assert.Throws<NotSupportedException>(() => file.Primary.ReadPixels<float>()).Message, StringComparison.Ordinal);
     }
+
+    [Theory]
+    [InlineData(5)]
+    [InlineData(8)]
+    [InlineData(32773)]
+    public void A_compressed_tiled_region_does_not_depend_on_the_number_of_threads(ushort compression)
+    {
+        // 9 x 7 tiles of 16 x 16, with partial tiles at the right and the bottom.
+        const int width = 140, height = 100, across = 9, down = 7;
+        var random = new Random(compression);
+        var blocks = Enumerable.Range(0, across * down).Select(_ =>
+        {
+            byte[] tile = new byte[256];
+            random.NextBytes(tile);
+            return Encode(compression, tile);
+        }).ToList();
+        var builder = new TiffBuilder { Data = [.. blocks.SelectMany(b => b)] };
+        var offsets = new List<long>();
+        long at = builder.DataOffset;
+        foreach (var b in blocks)
+        {
+            offsets.Add(at);
+            at += b.Length;
+        }
+
+        builder.AddDirectory().Image(width, height).Remove(259).Add(259, TiffTagType.Short, compression).Remove(273).Remove(278).Remove(279)
+            .Add(274, TiffTagType.Short, 6).Add(322, TiffTagType.Short, 16).Add(323, TiffTagType.Short, 16)
+            .Add(324, TiffTagType.Long, [.. offsets]).Add(325, TiffTagType.Long, [.. blocks.Select(b => (long)b.Length)]);
+        using var one = Open(builder, TiffReadOptions.Default with { MaxDegreeOfParallelism = 1 });
+        using var many = Open(builder, TiffReadOptions.Default with { MaxDegreeOfParallelism = 8 });
+
+        Assert.Equal(one.Primary.ReadPixels<byte>(), many.Primary.ReadPixels<byte>());
+        Assert.Equal(one.Primary.ReadRegion<float>(7, 21, 60, 100, order: TiffPixelOrder.Planar),
+            many.Primary.ReadRegion<float>(7, 21, 60, 100, order: TiffPixelOrder.Planar));
+    }
 }
 
 /// <summary>Compressed data that decodes to far more than it is: a read costs what it delivers, not what the data could give.</summary>
@@ -215,6 +250,25 @@ public class HostileCompressionTests
         Assert.True(zeros.Length <= Internal.Pixels.PixelPlan.MostDecoded(TiffCompression.Deflate, deflate.Length));
         Assert.True(zeros.Length <= Internal.Pixels.PixelPlan.MostDecoded(TiffCompression.Lzw, lzw.Length));
         Assert.True(128 <= Internal.Pixels.PixelPlan.MostDecoded(TiffCompression.PackBits, 2));
+    }
+
+    [Fact]
+    public void Tiles_sharing_one_stream_that_declare_the_whole_file_cost_what_their_pixels_need()
+    {
+        // 20 000 tiles of 16 x 16, all pointing at one small Deflate stream and each declaring the whole file as its bytes:
+        // every tile reads only what its pixels can need, not the whole file each time.
+        const int tiles = 20_000;
+        byte[] stream = Compress(new byte[256]);
+        var builder = new TiffBuilder { Data = [.. stream, .. new byte[2_000_000]] };
+        long length = builder.DataOffset + stream.Length + 2_000_000;
+        builder.AddDirectory().Image(16 * 200, 16 * 100).Remove(259).Add(259, TiffTagType.Short, 8).Remove(273).Remove(278).Remove(279)
+            .Add(322, TiffTagType.Short, 16).Add(323, TiffTagType.Short, 16)
+            .Add(324, TiffTagType.Long, [.. Enumerable.Repeat(builder.DataOffset, tiles)])
+            .Add(325, TiffTagType.Long, [.. Enumerable.Repeat(length, tiles)]);
+        using var file = TiffFile.Read(new MemoryStream(builder.Build()));
+
+        HostileAssert.FailsWithinBounds(() => file.Primary.ReadPixels<byte>(), "TiffException", TimeSpan.FromSeconds(2), 32L << 20, "shared tiles",
+            successAllowed: true);
     }
 
     private static byte[] Compress(byte[] data)
