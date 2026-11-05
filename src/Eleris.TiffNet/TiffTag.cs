@@ -191,14 +191,16 @@ public sealed class TiffTag : IEquatable<TiffTag>
     /// <summary>The values as bytes, little endian whatever the byte order of the file.</summary>
     public ReadOnlyMemory<byte> AsBytes() => _values;
 
-    /// <inheritdoc/>
+    /// <summary>Whether two tags have the same code, type and values.</summary>
+    /// <param name="other">The other tag.</param>
     public bool Equals(TiffTag? other) =>
         other is not null && Code == other.Code && Type == other.Type && _values.AsSpan().SequenceEqual(other._values);
 
-    /// <inheritdoc/>
+    /// <summary>Whether <paramref name="obj"/> is a tag with the same code, type and values.</summary>
+    /// <param name="obj">The other object.</param>
     public override bool Equals(object? obj) => Equals(obj as TiffTag);
 
-    /// <inheritdoc/>
+    /// <summary>A hash of the code, type and number of values.</summary>
     public override int GetHashCode() => HashCode.Combine(Code, Type, _values.Length);
 
     /// <summary>The code, type and count of the tag.</summary>

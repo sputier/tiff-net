@@ -52,6 +52,7 @@ nav:
       - "TiffResolution": api/Eleris.TiffNet.TiffResolution.md
       - "TiffResolutionUnit": api/Eleris.TiffNet.TiffResolutionUnit.md
       - "TiffSampleType": api/Eleris.TiffNet.TiffSampleType.md
+      - "TiffStorage": api/Eleris.TiffNet.TiffStorage.md
       - "TiffTag": api/Eleris.TiffNet.TiffTag.md
       - "TiffTagType": api/Eleris.TiffNet.TiffTagType.md
   # END API NAVIGATION

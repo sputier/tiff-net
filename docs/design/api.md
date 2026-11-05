@@ -262,7 +262,7 @@ public sealed record TiffStorage
     public bool BigEndian { get; }
     public bool BigTiff { get; }
     public int Orientation { get; }                                // as stored; pixels are always delivered top-left
-    public int? JpegQuality { get; }                               // estimated from the tables, for information
+    // JpegQuality (estimated from the quantization tables) comes with the JPEG decoder.
 }
 ```
 
