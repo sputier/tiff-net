@@ -28,14 +28,22 @@ internal static class Targets
         {
             // An image of more samples than an array holds is read by region: whole reads refuse it, as documented.
             if (image.UnsupportedReason is null && image.Storage!.Compression == TiffCompression.None
-                && (long)image.Width * image.Height * image.Channels <= Array.MaxLength)
+                && (Int128)image.Width * image.Height * image.Channels <= Array.MaxLength)
             {
                 _ = image.ReadPixels<double>(TiffPixelScale.Normalized);
                 _ = image.ReadPixels<double>(order: TiffPixelOrder.Planar);
+                _ = image.ReadPixels<float>(order: TiffPixelOrder.Planar);
+                _ = ReadRaw(image);
+                _ = image.ReadChannel<double>(image.Channels - 1, TiffPixelScale.Normalized);
                 if (image.Width > 2 && image.Height > 2)
                 {
                     _ = image.ReadRegion<double>(1, 1, image.Width - 2, image.Height - 2);
+                    _ = image.ReadRegion<float>(image.Width / 2, 1, image.Width - image.Width / 2, image.Height - 2, order: TiffPixelOrder.Planar);
                 }
+
+                // The span overload decodes on the calling thread only.
+                var buffer = new double[image.Width * image.Height * image.Channels];
+                image.ReadPixels<double>(buffer);
             }
 
             foreach (var sub in image.SubImages)
@@ -44,6 +52,22 @@ internal static class Targets
             }
         }
     }
+
+    /// <summary>The samples of an image raw, of their type.</summary>
+    private static Array ReadRaw(TiffImage image) => image.SampleType switch
+    {
+        TiffSampleType.UInt8 => image.ReadRawPixels<byte>(),
+        TiffSampleType.Int8 => image.ReadRawPixels<sbyte>(),
+        TiffSampleType.UInt16 => image.ReadRawPixels<ushort>(TiffPixelOrder.Planar),
+        TiffSampleType.Int16 => image.ReadRawPixels<short>(),
+        TiffSampleType.UInt32 => image.ReadRawPixels<uint>(),
+        TiffSampleType.Int32 => image.ReadRawPixels<int>(),
+        TiffSampleType.UInt64 => image.ReadRawPixels<ulong>(),
+        TiffSampleType.Int64 => image.ReadRawPixels<long>(),
+        TiffSampleType.Float16 => image.ReadRawRegion<Half>(0, 0, image.Width, image.Height),
+        TiffSampleType.Float32 => image.ReadRawPixels<float>(),
+        _ => image.ReadRawPixels<double>(),
+    };
 
     private static void Open(byte[] input)
     {

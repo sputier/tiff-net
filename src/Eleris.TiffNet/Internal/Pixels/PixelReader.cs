@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 using Eleris.TiffNet.Internal.Structure;
@@ -9,97 +10,125 @@ namespace Eleris.TiffNet.Internal.Pixels;
 /// <summary>What a read asks for: a region of the delivered (oriented) image, its channels, their order and scale.</summary>
 internal readonly record struct PixelRequest(int X, int Y, int Width, int Height, int? Channel, TiffPixelOrder Order, TiffPixelScale Scale)
 {
-    public long Count(int channels) => (long)Width * Height * (Channel is null ? channels : 1);
+    /// <summary>The number of samples the read delivers; more than <see cref="long.MaxValue"/> saturates rather than wraps.</summary>
+    public long Count(int channels)
+    {
+        Int128 count = (Int128)Width * Height * (Channel is null ? channels : 1);
+        return count > long.MaxValue ? long.MaxValue : (long)count;
+    }
 }
 
 /// <summary>
-/// Reads the pixels of an image: plans the strips or tiles a region needs, decodes them in parallel into pooled buffers, and puts
-/// each sample in its place in the destination (orientation, region, order, channel, conversion), straight from the stored rows.
+/// The strips or tiles a read needs, checked before anything is allocated: their byte counts hold the rows the read takes from
+/// them, and the buffers of the workers fit in the budget. The units of work are produced as they are consumed, never listed.
 /// </summary>
-/// <remarks>
-/// Uncompressed strips are read in chunks of rows, never whole, so that an image stored in one strip costs its destination and a
-/// few buffers, not twice its size. The writes of the workers are disjoint: the result does not depend on the number of threads.
-/// </remarks>
-internal static class PixelReader
+internal sealed class PixelPlan
 {
     /// <summary>The bytes of stored rows read at once from an uncompressed strip or tile.</summary>
     private const int ChunkBytes = 1 << 20;
 
-    /// <summary>One piece of work: rows of one strip or tile (of one plane).</summary>
-    private readonly record struct Unit(int Block, int Plane, long X0, long Y0, int FirstRow, int Rows);
-
-    public static void Read<TD, TOut>(TiffImage image, TiffSource source, ResourceBudget budget, PixelRequest request, Span<TOut> destination,
-        TOut[]? array, bool littleEndian)
-        where TD : unmanaged, INumber<TD>
-        where TOut : unmanaged, INumber<TOut>
+    private PixelPlan(ImageDescriptor d, PixelRequest request, StoredRect stored, long rowBytes, int rowsPerUnit)
     {
-        var d = image.Descriptor;
+        Descriptor = d;
+        Request = request;
+        Stored = stored;
+        RowBytes = rowBytes;
+        RowsPerUnit = rowsPerUnit;
+    }
+
+    public ImageDescriptor Descriptor { get; }
+
+    public PixelRequest Request { get; }
+
+    /// <summary>The rectangle of the stored image under the region.</summary>
+    public StoredRect Stored { get; }
+
+    /// <summary>The bytes of one stored row of a block (of one plane for a planar image).</summary>
+    public long RowBytes { get; }
+
+    public int RowsPerUnit { get; }
+
+    /// <summary>The number of threads that decode (1 for a read into a span).</summary>
+    public int Workers { get; private set; }
+
+    /// <summary>
+    /// Checks the blocks under the request and reserves the buffers of the workers. Neither the destination nor any buffer is
+    /// allocated yet: a small file declaring a huge image fails here, at the cost of its tables.
+    /// </summary>
+    /// <param name="d">The image.</param>
+    /// <param name="budget">The limits of the read.</param>
+    /// <param name="request">The region, channels, order and scale asked for.</param>
+    /// <param name="sampleBytes">The size of a delivered sample (the type the stored samples are unpacked to).</param>
+    /// <param name="parallel">Whether the read may use several threads.</param>
+    /// <exception cref="NotSupportedException">The image is compressed with a codec not implemented yet.</exception>
+    /// <exception cref="TiffException">A block is truncated, or the buffers exceed <see cref="TiffReadOptions.MaxPixelBytes"/>.</exception>
+    public static PixelPlan Create(ImageDescriptor d, ResourceBudget budget, PixelRequest request, int sampleBytes, bool parallel)
+    {
         if (d.Compression != TiffCompression.None)
         {
-            throw new NotSupportedException($"{source.Name}: reading {d.Compression} compressed images is not implemented yet.");
+            throw new NotSupportedException($"{budget.SourceName}: reading {d.Compression} compressed images is not implemented yet.");
         }
 
-        var context = new Context<TD, TOut>(d, source, budget, request, image.Channels, littleEndian);
-        var units = Plan(d, context.Stored, request.Channel);
+        long rowBytes = ImageDescriptor.BytesPerRow(d.BlockWidth, SampleUnpacker.StoredSamples(d), d.BitsPerSample);
+        int rowsPerUnit = (int)Math.Clamp(ChunkBytes / Math.Max(1, rowBytes), 1, d.BlockHeight);
+        var plan = new PixelPlan(d, request, StoredRect.Of(d, request), rowBytes, rowsPerUnit);
+
+        long units = 0;
+        foreach (var (block, _, blockY, first, end) in plan.Blocks())
+        {
+            long needed = end * rowBytes;
+            if (needed > d.ByteCounts[block])
+            {
+                string kind = d.Layout == TiffLayout.Tiles ? "tile" : "strip";
+                throw budget.Invalid($"{kind} {block} holds {d.ByteCounts[block]} bytes, {needed} are needed: the file is truncated.");
+            }
+
+            units += (end - first + rowsPerUnit - 1) / rowsPerUnit;
+        }
 
         // The scratch buffers of the workers are counted, so that a huge row or tile cannot make them allocate more than allowed.
         int degree = budget.Options.MaxDegreeOfParallelism is -1 ? Environment.ProcessorCount : budget.Options.MaxDegreeOfParallelism;
-        int workers = array is null ? 1 : Math.Max(1, Math.Min(degree, units.Count));
-        budget.ReservePixels(workers * context.ScratchBytes, "the decoding buffers");
-
-        if (array is null || workers == 1)
-        {
-            foreach (var unit in units)
-            {
-                budget.ThrowIfCancelled();
-                context.Process(unit, destination);
-            }
-
-            return;
-        }
-
-        try
-        {
-            Parallel.ForEach(units, new ParallelOptions { MaxDegreeOfParallelism = workers }, unit =>
-            {
-                budget.ThrowIfCancelled();
-                context.Process(unit, array);
-            });
-        }
-        catch (AggregateException ex) when (ex.InnerExceptions.Count > 0)
-        {
-            // The first failure, as it was thrown (a TiffException, the caller's IOException, a cancellation).
-            ExceptionDispatchInfo.Throw(ex.InnerExceptions[0]);
-        }
+        plan.Workers = parallel ? (int)Math.Max(1, Math.Min(degree, units)) : 1;
+        long scratch = rowsPerUnit * rowBytes + d.BlockWidth * (d.SamplesPerPixel + 2) * sampleBytes;
+        budget.ReservePixels(plan.Workers * scratch, "the decoding buffers");
+        return plan;
     }
 
     /// <summary>The units of work covering the stored rectangle, block after block (plane by plane for planar images).</summary>
-    private static List<Unit> Plan(ImageDescriptor d, StoredRect r, int? channel)
+    public IEnumerable<PixelUnit> Units()
     {
-        var units = new List<Unit>();
-        long rowBytes = ImageDescriptor.BytesPerRow(d.BlockWidth, SampleUnpacker.StoredSamples(d), d.BitsPerSample);
-        int rowsPerUnit = (int)Math.Clamp(ChunkBytes / Math.Max(1, rowBytes), 1, d.BlockHeight);
-        long across = (d.Width + d.BlockWidth - 1) / d.BlockWidth;
+        foreach (var (block, plane, blockY, first, end) in Blocks())
+        {
+            long x0 = block % Across * Descriptor.BlockWidth;
+            for (long row = first; row < end; row += RowsPerUnit)
+            {
+                yield return new PixelUnit(block, plane, x0, blockY + row, (int)row, (int)Math.Min(RowsPerUnit, end - row));
+            }
+        }
+    }
+
+    private long Across => (Descriptor.Width + Descriptor.BlockWidth - 1) / Descriptor.BlockWidth;
+
+    /// <summary>The blocks under the stored rectangle, with the rows [first, end) the read takes from each.</summary>
+    private IEnumerable<(int Block, int Plane, long BlockY, long First, long End)> Blocks()
+    {
+        var d = Descriptor;
+        var r = Stored;
+        long across = Across;
         long down = (d.Height + d.BlockHeight - 1) / d.BlockHeight;
-        foreach (int plane in Planes(d, channel))
+        foreach (int plane in Planes(d, Request.Channel))
         {
             for (long by = r.Y0 / d.BlockHeight; by * d.BlockHeight < r.Y1; by++)
             {
+                long blockY = by * d.BlockHeight;
+                long first = Math.Max(r.Y0, blockY) - blockY;
+                long end = Math.Min(Math.Min(r.Y1, blockY + d.BlockHeight), d.Height) - blockY;
                 for (long bx = r.X0 / d.BlockWidth; bx * d.BlockWidth < r.X1; bx++)
                 {
-                    int block = (int)(plane * across * down + by * across + bx);
-                    long blockY = by * d.BlockHeight;
-                    long first = Math.Max(r.Y0, blockY) - blockY;
-                    long end = Math.Min(Math.Min(r.Y1, blockY + d.BlockHeight), d.Height) - blockY;
-                    for (long row = first; row < end; row += rowsPerUnit)
-                    {
-                        units.Add(new Unit(block, plane, bx * d.BlockWidth, blockY + row, (int)row, (int)Math.Min(rowsPerUnit, end - row)));
-                    }
+                    yield return ((int)(plane * across * down + by * across + bx), plane, blockY, first, end);
                 }
             }
         }
-
-        return units;
     }
 
     /// <summary>The planes a request needs: one for an interleaved image; for a planar one, only the plane of the requested channel.</summary>
@@ -118,9 +147,76 @@ internal static class PixelReader
 
         return Enumerable.Range(0, d.SamplesPerPixel);
     }
+}
 
-    /// <summary>The rectangle of the stored image that holds a region of the delivered one: [X0, X1) x [Y0, Y1).</summary>
-    internal readonly record struct StoredRect(long X0, long Y0, long X1, long Y1);
+/// <summary>One piece of work: rows [FirstRow, FirstRow + Rows) of one strip or tile (of one plane), at (X0, Y0) in the stored image.</summary>
+internal readonly record struct PixelUnit(int Block, int Plane, long X0, long Y0, int FirstRow, int Rows);
+
+/// <summary>The rectangle of the stored image that holds a region of the delivered one: [X0, X1) x [Y0, Y1).</summary>
+internal readonly record struct StoredRect(long X0, long Y0, long X1, long Y1)
+{
+    /// <summary>The stored rectangle under a region of the delivered image (its corners mapped back).</summary>
+    public static StoredRect Of(ImageDescriptor d, PixelRequest q)
+    {
+        long w = d.Width, h = d.Height;
+        (long, long) Stored(long vx, long vy) => d.Orientation switch
+        {
+            2 => (w - 1 - vx, vy),
+            3 => (w - 1 - vx, h - 1 - vy),
+            4 => (vx, h - 1 - vy),
+            5 => (vy, vx),
+            6 => (vy, h - 1 - vx),
+            7 => (w - 1 - vy, h - 1 - vx),
+            8 => (w - 1 - vy, vx),
+            _ => (vx, vy),
+        };
+        var (ax, ay) = Stored(q.X, q.Y);
+        var (bx, by) = Stored(q.X + q.Width - 1, q.Y + q.Height - 1);
+        return new StoredRect(Math.Min(ax, bx), Math.Min(ay, by), Math.Max(ax, bx) + 1, Math.Max(ay, by) + 1);
+    }
+}
+
+/// <summary>
+/// Reads the pixels of an image along a checked <see cref="PixelPlan"/>: decodes its units in parallel into pooled buffers, and
+/// puts each sample in its place in the destination (orientation, region, order, channel, conversion), straight from the stored rows.
+/// </summary>
+/// <remarks>
+/// Uncompressed strips are read in chunks of rows, never whole, so that an image stored in one strip costs its destination and a
+/// few buffers, not twice its size. The writes of the workers are disjoint: the result does not depend on the number of threads.
+/// </remarks>
+internal static class PixelReader
+{
+    public static void Read<TD, TOut>(PixelPlan plan, TiffSource source, ResourceBudget budget, int channels, bool littleEndian,
+        Span<TOut> destination, TOut[]? array)
+        where TD : unmanaged, INumber<TD>
+        where TOut : unmanaged, INumber<TOut>
+    {
+        var context = new Context<TD, TOut>(plan, source, channels, littleEndian);
+        if (array is null || plan.Workers == 1)
+        {
+            foreach (var unit in plan.Units())
+            {
+                budget.ThrowIfCancelled();
+                context.Process(unit, destination);
+            }
+
+            return;
+        }
+
+        try
+        {
+            Parallel.ForEach(plan.Units(), new ParallelOptions { MaxDegreeOfParallelism = plan.Workers }, unit =>
+            {
+                budget.ThrowIfCancelled();
+                context.Process(unit, array);
+            });
+        }
+        catch (AggregateException ex) when (ex.InnerExceptions.Count > 0)
+        {
+            // The first failure, as it was thrown (a TiffException, the caller's IOException, a cancellation).
+            ExceptionDispatchInfo.Throw(ex.InnerExceptions[0]);
+        }
+    }
 
     /// <summary>The state of one read, shared by its workers (read only).</summary>
     private sealed class Context<TD, TOut>
@@ -129,61 +225,51 @@ internal static class PixelReader
     {
         private readonly ImageDescriptor _d;
         private readonly TiffSource _source;
-        private readonly ResourceBudget _budget;
         private readonly PixelRequest _request;
+        private readonly StoredRect _stored;
         private readonly int _channels;
         private readonly long _rowBytes;
         private readonly bool _little;
         private readonly int _orientation;
-        private readonly double _scale;
+        private readonly double[]? _maxima;
         private readonly bool _identity;
 
-        public Context(ImageDescriptor d, TiffSource source, ResourceBudget budget, PixelRequest request, int channels, bool littleEndian)
+        public Context(PixelPlan plan, TiffSource source, int channels, bool littleEndian)
         {
-            _d = d;
+            _d = plan.Descriptor;
             _source = source;
-            _budget = budget;
-            _request = request;
+            _request = plan.Request;
+            _stored = plan.Stored;
             _channels = channels;
             _little = littleEndian;
-            _orientation = d.Orientation;
-            _rowBytes = ImageDescriptor.BytesPerRow(d.BlockWidth, SampleUnpacker.StoredSamples(d), d.BitsPerSample);
-            Stored = StoredRectOf(d, request);
-            _identity = typeof(TD) == typeof(TOut) && request.Scale == TiffPixelScale.Stored;
-            _scale = request.Scale == TiffPixelScale.Normalized ? 1.0 / Maximum(d) : 1.0;
-            long rows = Math.Clamp(ChunkBytes / Math.Max(1, _rowBytes), 1, d.BlockHeight);
-            ScratchBytes = rows * _rowBytes + d.BlockWidth * Math.Max(d.Channels, d.SamplesPerPixel) * Marshal.SizeOf<TD>();
+            _orientation = _d.Orientation;
+            _rowBytes = plan.RowBytes;
+            _identity = typeof(TD) == typeof(TOut) && _request.Scale == TiffPixelScale.Stored;
+            _maxima = _request.Scale == TiffPixelScale.Normalized ? Maxima(_d, channels) : null;
         }
 
-        public StoredRect Stored { get; }
-
-        public long ScratchBytes { get; }
-
-        public void Process(Unit unit, Span<TOut> destination)
+        public void Process(PixelUnit unit, Span<TOut> destination)
         {
-            long length = unit.Rows * _rowBytes;
-            long start = (long)unit.FirstRow * _rowBytes;
-            if (start + length > _d.ByteCounts[unit.Block])
-            {
-                string kind = _d.Layout == TiffLayout.Tiles ? "tile" : "strip";
-                throw _budget.Invalid($"{kind} {unit.Block} holds {_d.ByteCounts[unit.Block]} bytes, {start + length} are needed: the file is truncated.");
-            }
-
+            // The plan checked that the block holds these rows.
+            int length = (int)(unit.Rows * _rowBytes);
+            long start = unit.FirstRow * _rowBytes;
             int deliveredPerPixel = SampleUnpacker.DeliveredChannels(_d, unit.Plane);
             int rowSamples = (int)(_d.BlockWidth * deliveredPerPixel);
             bool straight = Straight(unit);
-            byte[] raw = ArrayPool<byte>.Shared.Rent((int)length);
-            TD[] row = ArrayPool<TD>.Shared.Rent(rowSamples);
+            byte[]? raw = null;
+            TD[]? row = null;
             try
             {
-                _source.ReadExactly(_d.Offsets[unit.Block] + start, raw.AsSpan(0, (int)length));
+                raw = ArrayPool<byte>.Shared.Rent(length);
+                row = ArrayPool<TD>.Shared.Rent(rowSamples);
+                _source.ReadExactly(_d.Offsets[unit.Block] + start, raw.AsSpan(0, length));
                 for (int r = 0; r < unit.Rows; r++)
                 {
                     Span<byte> stored = raw.AsSpan((int)(r * _rowBytes), (int)_rowBytes);
                     if (straight)
                     {
                         // Nothing to reorder or convert: the row is unpacked straight into its place in the destination.
-                        long at = ((unit.Y0 + r - _request.Y) * (long)_request.Width + (unit.X0 - _request.X)) * _channels;
+                        long at = ((unit.Y0 + r - _request.Y) * _request.Width + (unit.X0 - _request.X)) * _channels;
                         Span<TD> target = MemoryMarshal.Cast<TOut, TD>(destination.Slice((int)at, rowSamples));
                         SampleUnpacker.Unpack<TD>(_d, unit.Plane, stored, (int)_d.BlockWidth, target, _little);
                         continue;
@@ -195,8 +281,15 @@ internal static class PixelReader
             }
             finally
             {
-                ArrayPool<byte>.Shared.Return(raw);
-                ArrayPool<TD>.Shared.Return(row);
+                if (raw is not null)
+                {
+                    ArrayPool<byte>.Shared.Return(raw);
+                }
+
+                if (row is not null)
+                {
+                    ArrayPool<TD>.Shared.Return(row);
+                }
             }
         }
 
@@ -204,16 +297,16 @@ internal static class PixelReader
         /// Whether the rows of a unit go to the destination as they are: same type and scale, top-left orientation, interleaved
         /// samples of every channel, and the whole width of the block inside the region (so that no column is cut).
         /// </summary>
-        private bool Straight(Unit unit) => _identity && _orientation == 1 && !_d.Planar && _request.Channel is null
+        private bool Straight(PixelUnit unit) => _identity && _orientation == 1 && !_d.Planar && _request.Channel is null
             && _request.Order == TiffPixelOrder.Interleaved && unit.X0 >= _request.X
             && unit.X0 + _d.BlockWidth <= _request.X + (long)_request.Width;
 
         /// <summary>Puts the samples of stored row <paramref name="sy"/> in their places in the destination.</summary>
-        private void Place(Unit unit, long sy, ReadOnlySpan<TD> row, int perPixel, Span<TOut> destination)
+        private void Place(PixelUnit unit, long sy, ReadOnlySpan<TD> row, int perPixel, Span<TOut> destination)
         {
             var q = _request;
-            long x0 = Math.Max(unit.X0, Stored.X0);
-            long x1 = Math.Min(Math.Min(unit.X0 + _d.BlockWidth, Stored.X1), _d.Width);
+            long x0 = Math.Max(unit.X0, _stored.X0);
+            long x1 = Math.Min(Math.Min(unit.X0 + _d.BlockWidth, _stored.X1), _d.Width);
             if (x1 <= x0)
             {
                 return;
@@ -226,8 +319,8 @@ internal static class PixelReader
             bool planar = q.Order == TiffPixelOrder.Planar && q.Channel is null;
             long pixelStep = planar ? dx + dy * (long)q.Width : (dx + dy * (long)q.Width) * outChannels;
             long index = planar
-                ? (vy - q.Y) * (long)q.Width + (vx - q.X)
-                : ((vy - q.Y) * (long)q.Width + (vx - q.X)) * outChannels;
+                ? (vy - q.Y) * q.Width + (vx - q.X)
+                : ((vy - q.Y) * q.Width + (vx - q.X)) * outChannels;
             long planeSize = (long)q.Width * q.Height;
             int firstChannel = _d.Planar ? ChannelOfPlane(unit.Plane) : 0;
 
@@ -244,12 +337,12 @@ internal static class PixelReader
                             continue;
                         }
 
-                        destination[(int)index] = Convert(row[from + c]);
+                        destination[(int)index] = Convert(row[from + c], channel);
                         continue;
                     }
 
                     long at = planar ? index + channel * planeSize : index + channel;
-                    destination[(int)at] = Convert(row[from + c]);
+                    destination[(int)at] = Convert(row[from + c], channel);
                 }
             }
         }
@@ -257,9 +350,18 @@ internal static class PixelReader
         private int ChannelOfPlane(int plane) =>
             _d.Photometric == TiffPhotometric.Palette && plane > 0 ? plane + 2 : plane;
 
-        private TOut Convert(TD value) => _identity
-            ? System.Runtime.CompilerServices.Unsafe.As<TD, TOut>(ref value)
-            : _scale == 1.0 ? TOut.CreateTruncating(value) : TOut.CreateTruncating(double.CreateTruncating(value) * _scale);
+        /// <summary>A sample as delivered: unchanged, converted, or divided by the largest value of its channel (as numpy does).</summary>
+        private TOut Convert(TD value, int channel)
+        {
+            if (_identity)
+            {
+                return Unsafe.As<TD, TOut>(ref value);
+            }
+
+            return _maxima is null
+                ? TOut.CreateTruncating(value)
+                : TOut.CreateTruncating(double.CreateTruncating(value) / _maxima[channel]);
+        }
 
         /// <summary>The delivered (visual) position of stored pixel (sx, sy), TIFF 6.0 Orientation.</summary>
         private (long X, long Y) Visual(long sx, long sy)
@@ -287,31 +389,26 @@ internal static class PixelReader
             _ => (1, 0),
         };
 
-        private static double Maximum(ImageDescriptor d) => d.SampleFormat switch
+        /// <summary>
+        /// The largest value of each delivered channel: 1 for floating point, the largest positive value for signed samples, the
+        /// largest value of the stored depth otherwise; the 16-bit colour map for the colours of a palette image.
+        /// </summary>
+        private static double[] Maxima(ImageDescriptor d, int channels)
         {
-            3 => 1.0,
-            2 => d.BitsPerSample switch { 8 => sbyte.MaxValue, 16 => short.MaxValue, 32 => int.MaxValue, _ => long.MaxValue },
-            _ => d.Photometric == TiffPhotometric.Palette ? ushort.MaxValue : Math.Pow(2, d.BitsPerSample) - 1,
-        };
-
-        /// <summary>The stored rectangle under a region of the delivered image (its corners mapped back).</summary>
-        private static StoredRect StoredRectOf(ImageDescriptor d, PixelRequest q)
-        {
-            long w = d.Width, h = d.Height;
-            (long, long) Stored(long vx, long vy) => d.Orientation switch
+            double depth = d.SampleFormat switch
             {
-                2 => (w - 1 - vx, vy),
-                3 => (w - 1 - vx, h - 1 - vy),
-                4 => (vx, h - 1 - vy),
-                5 => (vy, vx),
-                6 => (vy, h - 1 - vx),
-                7 => (w - 1 - vy, h - 1 - vx),
-                8 => (w - 1 - vy, vx),
-                _ => (vx, vy),
+                3 => 1.0,
+                2 => Math.Pow(2, d.BitsPerSample - 1) - 1,
+                _ => Math.Pow(2, d.BitsPerSample) - 1,
             };
-            var (ax, ay) = Stored(q.X, q.Y);
-            var (bx, by) = Stored(q.X + q.Width - 1, q.Y + q.Height - 1);
-            return new StoredRect(Math.Min(ax, bx), Math.Min(ay, by), Math.Max(ax, bx) + 1, Math.Max(ay, by) + 1);
+            var maxima = new double[channels];
+            Array.Fill(maxima, depth);
+            if (d.Photometric == TiffPhotometric.Palette)
+            {
+                maxima.AsSpan(0, 3).Fill(ushort.MaxValue);
+            }
+
+            return maxima;
         }
     }
 }
