@@ -1,0 +1,275 @@
+{
+  "generator": "Pillow 12.3.0, libjpeg-turbo 8.0",
+  "files": {
+    "grey_q90_37x29.jpg": {
+      "width": 37,
+      "height": 29,
+      "components": 1,
+      "sampling": [
+        [
+          1,
+          1
+        ]
+      ],
+      "restart": false,
+      "sha256": "E28C6E8707A2F571CEE9B084AA2ABE83225843EBCC06D7CF2600CADE793BD128",
+      "planes": [
+        "F2F847686622BF57A91C78972220A8DC3FD67C09709E7FB2B4747938F2F3906C"
+      ]
+    },
+    "grey_q100_64x64.jpg": {
+      "width": 64,
+      "height": 64,
+      "components": 1,
+      "sampling": [
+        [
+          1,
+          1
+        ]
+      ],
+      "restart": false,
+      "sha256": "FDCA7C585124357F20C2F44DCE9853F2A867C9B96C4F64B67917447719696370",
+      "planes": [
+        "00E6654D407507EA8514ADA2E4EE568F401B59E2752B10EBF2610152F92D567B"
+      ]
+    },
+    "grey_q20_100x75.jpg": {
+      "width": 100,
+      "height": 75,
+      "components": 1,
+      "sampling": [
+        [
+          1,
+          1
+        ]
+      ],
+      "restart": false,
+      "sha256": "B74E723AE4C480DB5DDBA94B0992EFEF25A94A6442A492163F822B06012FBA71",
+      "planes": [
+        "3876F5E6865051F9BCD35EC0B9F97D70C74583533068D192593FE5963CA3BC28"
+      ]
+    },
+    "grey_q75_restart_5.jpg": {
+      "width": 61,
+      "height": 47,
+      "components": 1,
+      "sampling": [
+        [
+          1,
+          1
+        ]
+      ],
+      "restart": true,
+      "sha256": "816342C2300F24605D2DE59383ACFBB635D53805AD3BC9480C42CE283FB2005C",
+      "planes": [
+        "42857482EDED4A88B92FBF64197BAA9030D43073A369E697FEE01313C5C5C13B"
+      ]
+    },
+    "grey_q50_1x1.jpg": {
+      "width": 1,
+      "height": 1,
+      "components": 1,
+      "sampling": [
+        [
+          1,
+          1
+        ]
+      ],
+      "restart": false,
+      "sha256": "78CB42B3269D5E382391C03B916260AEF13030AF183E4EF9485DE63AA66C761B",
+      "planes": [
+        "6E340B9CFFB37A989CA544E6BB780A2C78901D3FB33738768511A30617AFA01D"
+      ]
+    },
+    "grey_qtable16.jpg": {
+      "width": 40,
+      "height": 24,
+      "components": 1,
+      "sampling": [
+        [
+          1,
+          1
+        ]
+      ],
+      "restart": false,
+      "sha256": "7762B7F28E4016BAA7E85A1470FB857676CFF6B7C3A1B29C038889B54A2973A0",
+      "planes": [
+        "60EDCFB979B76EB6E85DE733423CD66444B2A97E0D05370A25947D9BBBDA683F"
+      ]
+    },
+    "ycc444_q90_37x29.jpg": {
+      "width": 37,
+      "height": 29,
+      "components": 3,
+      "sampling": [
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "restart": false,
+      "sha256": "11A735A1574D02D8A1A5360BF04FF50C0A292EE9CE978D4E3ECF185CB8B69522",
+      "planes": [
+        "D0B9642EBD08DF2EB17EAE80D7D81807014668A3ACB93DE523027BA5BF6E6A06",
+        "A6636D4AF06BC2BF0D93C179277F37A7D6DB9836B35761042B0D4A650B7CDB84",
+        "36B607FF604E3BDEE559A26783AEB2AC8149F77978ECED4480C28DFEF1395343"
+      ]
+    },
+    "ycc444_q100_48x40.jpg": {
+      "width": 48,
+      "height": 40,
+      "components": 3,
+      "sampling": [
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "restart": false,
+      "sha256": "0C6B56F671E24BAA0121C607796CFBF6339DCCEDE48BE0C644CCDA0A4D523C96",
+      "planes": [
+        "9688BE561D1D2D256DA1E333F08571930461E7FD3FE20C977FDEF8A70ACFD35C",
+        "FCAD272CD7BE1CCD871EA7A0014A4555276B3FCA2D575B93F03F18E3DD923563",
+        "D44C065324E460EEEE5C8DD34FBF5160F204EC94F6AA0F1BF1CEF127E77BAFA7"
+      ]
+    },
+    "ycc444_q75_restart_2.jpg": {
+      "width": 53,
+      "height": 31,
+      "components": 3,
+      "sampling": [
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "restart": true,
+      "sha256": "40D91360023EF899C6CA9CF6CC3040356F6EB87FE8A63C98F1B58D939CF46128",
+      "planes": [
+        "98937A3BEC102D2FC0DC4C5A8D7D7A8C114C3BEE37FC4CCC643D1F10F7FF03B6",
+        "676E71CDB9348879DAC41B4551664E516D81A3C7F8E48D7B22F020C93C8F6AF3",
+        "50AAF50B72CFB35A20022080D77FB5C6F0B3607D64025E8560219B4C1128AB7F"
+      ]
+    },
+    "ycc422_q85_45x33.jpg": {
+      "width": 45,
+      "height": 33,
+      "components": 3,
+      "sampling": [
+        [
+          2,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "restart": false,
+      "sha256": "87C79A2E78EEF8BB23EFECB725B93FC77272A2785E8A986064412B22ACDDED2C",
+      "planes": [
+        "07EC6A8CC6FC45967B9AF293E0779CDBACD19F2F6E41707056C58B325BC08366"
+      ]
+    },
+    "ycc420_q85_45x33.jpg": {
+      "width": 45,
+      "height": 33,
+      "components": 3,
+      "sampling": [
+        [
+          2,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "restart": false,
+      "sha256": "19BBF6DD62095D9CA0BE651E148F6E95C5FDF7B5F7AA381A58C0FBCECD757AA8",
+      "planes": [
+        "4B01CD0BCDD8E1CB0134449705ECDF3031176AAAD590D0D75AA524E7C5E4F800"
+      ]
+    },
+    "ycc420_q60_restart_3.jpg": {
+      "width": 70,
+      "height": 50,
+      "components": 3,
+      "sampling": [
+        [
+          2,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "restart": true,
+      "sha256": "CE2791105B034355A6A2E3C13621880D880D440CCC082691E83933EC9C938CDD",
+      "planes": [
+        "8888AD7EACE630E8FF614857D4269D24A6AB399BE5790CA506DA5F1DFE1C499A"
+      ]
+    },
+    "ycc420_q95_256x192.jpg": {
+      "width": 256,
+      "height": 192,
+      "components": 3,
+      "sampling": [
+        [
+          2,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "restart": false,
+      "sha256": "9A67B549AD19F1B9365E01AC7EDF60143E8E56164297B8AB4155A0D29714887D",
+      "planes": [
+        "711C809EFB117B5A6C370C4076F25CE91F731B76B4A10694FDED7E99BF7F6CED"
+      ]
+    }
+  }
+}

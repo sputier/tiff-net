@@ -46,6 +46,8 @@ jobs:
       - run: pip install -r tools/requirements-interop.txt
       - name: Generate the tifffile corpus and check it against the manifest
         run: python -I tools/make_fixtures.py
+      - name: Check that the JPEG fixtures decode with libjpeg-turbo (through Pillow) as their manifest says
+        run: python -I tools/make_jpeg_fixtures.py --check
       - name: Build
         run: dotnet build Eleris.TiffNet.slnx -c Release
       - name: Test with the corpus (every test, the interop gate included)
