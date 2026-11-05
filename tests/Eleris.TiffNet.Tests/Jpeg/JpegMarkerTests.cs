@@ -127,4 +127,17 @@ public class JpegMarkerTests
 
         Assert.True(decoded > 1000, $"only {decoded} mutated streams decoded");
     }
+
+    [Fact]
+    public void A_component_that_no_scan_holds_is_grey()
+    {
+        // A frame of three components and a scan of the first only, as a multi-scan stream cut after its first scan.
+        byte[] data = JpegFixtures.Bytes("ycc444_q90_37x29.jpg");
+        var scan = Segments(data).Single(s => s.Marker == 0xDA);
+        byte[] single = [.. data[..scan.Offset], 0xFF, 0xDA, 0, 8, 1, data[scan.Offset + 5], data[scan.Offset + 6], 0, 63, 0, 0xFF, 0xD9];
+
+        var frame = JpegFixtures.Decode(single);
+
+        Assert.All(frame.Components.Skip(1), c => Assert.All(c.Plane, b => Assert.Equal(128, b)));
+    }
 }

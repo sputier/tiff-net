@@ -43,10 +43,45 @@ public class JpegDecoderTests
         var sampling = entry.GetProperty("sampling").EnumerateArray().Select(s => (s[0].GetInt32(), s[1].GetInt32())).ToArray();
         Assert.Equal(sampling, frame.Components.Select(c => (c.H, c.V)));
         var planes = entry.GetProperty("planes").EnumerateArray().Select(p => p.GetString()).ToArray();
+        if (entry.TryGetProperty("truncated", out _))
+        {
+            Truncated(name, frame, planes.Length);
+            return;
+        }
+
         for (int i = 0; i < planes.Length; i++)
         {
             Assert.True(planes[i] == Convert.ToHexString(SHA256.HashData(JpegFixtures.Samples(frame.Components[i]))), $"{name}, component {i}");
         }
+    }
+
+    /// <summary>
+    /// A cut stream decodes as libjpeg decodes it: every sample is the same, except in the one MCU where the data runs out, whose
+    /// samples are decoded from zero bits (noise in any decoder); the MCUs after it are grey.
+    /// </summary>
+    private static void Truncated(string name, JpegFrame frame, int planes)
+    {
+        byte[] expected = File.ReadAllBytes(Path.Combine(JpegFixtures.Folder, Path.ChangeExtension(name, ".planes")));
+        int hMax = frame.Components.Max(c => c.H), vMax = frame.Components.Max(c => c.V);
+        var mcus = new HashSet<(int, int)>();
+        int offset = 0;
+        for (int i = 0; i < planes; i++)
+        {
+            var c = frame.Components[i];
+            byte[] actual = JpegFixtures.Samples(c);
+            for (int k = 0; k < actual.Length; k++)
+            {
+                if (actual[k] != expected[offset + k])
+                {
+                    mcus.Add((k % c.Width / (8 * c.H), k / c.Width / (8 * c.V)));
+                }
+            }
+
+            offset += actual.Length;
+        }
+
+        Assert.True(mcus.Count <= 1, $"{name}: {mcus.Count} MCUs differ from libjpeg-turbo");
+        Assert.True(hMax * vMax > 0);
     }
 
     [Fact]
@@ -60,12 +95,46 @@ public class JpegDecoderTests
     }
 
     [Fact]
-    public void A_truncated_scan_decodes_to_the_end_of_its_blocks()
+    public void A_scan_whose_data_runs_out_costs_a_fill_not_a_decoding()
     {
-        byte[] data = JpegFixtures.Bytes("ycc420_q95_256x192.jpg");
-        var frame = JpegFixtures.Decode(data[..(data.Length / 2)]);
+        // A few bytes of scan for 4000 x 4000 pixels: libjpeg decodes the first MCU and leaves the others grey.
+        byte[] data = JpegFixtures.Bytes("grey_q90_37x29.jpg");
+        int sof = data.AsSpan().IndexOf([(byte)0xFF, (byte)0xC0]);
+        (data[sof + 5], data[sof + 6], data[sof + 7], data[sof + 8]) = (0x0F, 0xA0, 0x0F, 0xA0);
+        int sos = data.AsSpan().IndexOf([(byte)0xFF, (byte)0xDA]);
+        byte[] cut = data[..(sos + 20)];
 
-        Assert.Equal(256, frame.Components[0].Width);
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var frame = JpegFixtures.Decode(cut);
+
+        Assert.True(clock.ElapsedMilliseconds < 1000, $"{clock.ElapsedMilliseconds} ms");
+        Assert.Equal(128, frame.Components[0].Plane[^1]);
+    }
+
+    [Fact]
+    public void A_frame_without_a_scan_is_damaged_data()
+    {
+        byte[] data = JpegFixtures.Bytes("grey_q90_37x29.jpg");
+        int sos = data.AsSpan().IndexOf([(byte)0xFF, (byte)0xDA]);
+
+        Assert.Throws<InvalidDataException>(() => JpegFixtures.Decode([.. data[..sos], 0xFF, 0xD9]));
+    }
+
+    [Fact]
+    public void A_frame_too_large_for_an_array_is_not_supported_even_within_the_budget()
+    {
+        byte[] frame = [0xFF, 0xD8, 0xFF, 0xC0, 0, 11, 8, 0xB5, 0x04, 0xB5, 0x04, 1, 1, 0x11, 0, 0xFF, 0xD9];   // 46340 x 46340
+
+        Assert.Throws<NotSupportedException>(() => JpegFixtures.Decode(frame, TiffReadOptions.Default with { MaxPixelBytes = 4L << 30 }));
+    }
+
+    [Fact]
+    public void Tables_holding_a_frame_are_refused_before_the_frame_is_allocated()
+    {
+        byte[] tables = [0xFF, 0xD8, 0xFF, 0xC0, 0, 11, 8, 0x7F, 0xFF, 0x7F, 0xFF, 1, 1, 0x11, 0, 0xFF, 0xD9];
+        var decoder = new JpegDecoder(new ResourceBudget(TiffReadOptions.Default with { MaxPixelBytes = 1000 }, "test"));
+
+        Assert.Throws<InvalidDataException>(() => decoder.ReadTables(tables));
     }
 
     [Fact]

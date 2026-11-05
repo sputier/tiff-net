@@ -4,8 +4,8 @@ namespace Eleris.TiffNet.Internal.Jpeg;
 
 /// <summary>
 /// Reads the entropy-coded data of a scan, most significant bit first (F.2.2.5): a 0xFF byte is followed by a stuffed 0x00, and
-/// a marker ends the data. Past a marker or the end of the data the reader gives zeros, as libjpeg does, so that a truncated scan
-/// decodes to the end of its blocks without reading outside the stream.
+/// a marker ends the data. Past a marker or the end of the data the reader gives zeros and says that the data is insufficient,
+/// as libjpeg does: the MCU being decoded ends with zeros, and the following ones are not decoded (see <see cref="Insufficient"/>).
 /// </summary>
 internal ref struct JpegBitReader
 {
@@ -14,6 +14,7 @@ internal ref struct JpegBitReader
     private ulong _bits;
     private int _count;
     private bool _ended;
+    private bool _insufficient;
 
     public JpegBitReader(ReadOnlySpan<byte> data, int position)
     {
@@ -23,6 +24,12 @@ internal ref struct JpegBitReader
 
     /// <summary>Where the reading stopped: at the marker that ended the data, or after the last byte read.</summary>
     public readonly int Position => _position;
+
+    /// <summary>
+    /// Whether bits beyond the data were consumed (libjpeg's <c>insufficient_data</c>): the data of the scan is exhausted until
+    /// the next restart marker.
+    /// </summary>
+    public readonly bool Insufficient => _insufficient;
 
     /// <summary>The next 16 bits, without consuming them.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -41,6 +48,10 @@ internal ref struct JpegBitReader
     {
         _bits <<= bits;
         _count -= bits;
+        if (_count < 0)
+        {
+            _insufficient = true;
+        }
     }
 
     /// <summary>The next <paramref name="bits"/> bits (1 to 16) as an unsigned value.</summary>
@@ -53,8 +64,7 @@ internal ref struct JpegBitReader
         }
 
         int value = (int)(_bits >> (64 - bits));
-        _bits <<= bits;
-        _count -= bits;
+        Skip(bits);
         return value;
     }
 
@@ -93,8 +103,10 @@ internal ref struct JpegBitReader
 
         if (_position + 1 < _data.Length && _data[_position] == 0xFF && _data[_position + 1] is >= 0xD0 and <= 0xD7)
         {
+            // The data goes on: decoding resumes, even after an exhausted interval.
             _position += 2;
             _ended = false;
+            _insufficient = false;
             return;
         }
 
@@ -107,8 +119,7 @@ internal ref struct JpegBitReader
         {
             if (_ended)
             {
-                // Zeros: the bits below the valid ones are already 0.
-                _count = 64;
+                // Zeros: the bits below the valid ones are already 0; consuming them marks the data as insufficient.
                 return;
             }
 

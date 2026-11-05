@@ -12,8 +12,9 @@ namespace Eleris.TiffNet.Internal.Codecs;
 /// </summary>
 /// <remarks>
 /// Each row is undone where it lies, through typed spans, without allocating: the floating point predictor uses a row of scratch
-/// given by the caller. Accumulating is a chain of dependent additions, about one sample per cycle: far faster than the
-/// decompression that precedes it, which it never limits.
+/// given by the caller. Accumulating is a chain of dependent additions, about one sample per cycle (1 to 3 GB/s): fast next to
+/// the decompression that precedes it, but not negligible for 8-bit and floating point samples, whose accumulation runs byte by
+/// byte; vectorising it is measured with the benchmarks of the library (issue #48).
 /// </remarks>
 internal static class Predictors
 {
