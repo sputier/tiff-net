@@ -10,6 +10,7 @@ internal sealed class TiffBuilder(bool bigTiff = false, bool littleEndian = true
 {
     private readonly List<Directory> _directories = [];
     private readonly List<(long Offset, byte[] Bytes)> _blobs = [];
+    private readonly List<long> _laidOut = [];
 
     public bool BigTiff { get; } = bigTiff;
 
@@ -62,6 +63,8 @@ internal sealed class TiffBuilder(bool bigTiff = false, bool littleEndian = true
             nextFields.Add(d.Write(output));
         }
 
+        _laidOut.Clear();
+        _laidOut.AddRange(offsets);
         for (int i = 0; i < _directories.Count; i++)
         {
             long next = _directories[i].NextOverride ?? (i + 1 < _directories.Count ? offsets[i + 1] : 0);
@@ -82,31 +85,12 @@ internal sealed class TiffBuilder(bool bigTiff = false, bool littleEndian = true
         return bytes;
     }
 
-    /// <summary>The offset at which directory <paramref name="index"/> will be written (for links built before the file).</summary>
+    /// <summary>The offset at which directory <paramref name="index"/> is written (its place in the file, whatever the links).</summary>
     public long OffsetOf(int index)
     {
-        byte[] built = Build();
-        long offset = BigTiff ? (long)BinaryPrimitives.ReadUInt64LittleEndian(built.AsSpan(8)) : BinaryPrimitives.ReadUInt32LittleEndian(built.AsSpan(4));
-        if (!LittleEndian)
-        {
-            offset = BigTiff ? (long)BinaryPrimitives.ReadUInt64BigEndian(built.AsSpan(8)) : BinaryPrimitives.ReadUInt32BigEndian(built.AsSpan(4));
-        }
-
-        for (int i = 0; i < index; i++)
-        {
-            int count = BigTiff ? (int)Read64(built, offset) : Read16(built, offset);
-            long nextField = offset + (BigTiff ? 8 : 2) + count * (BigTiff ? 20 : 12);
-            offset = BigTiff ? (long)Read64(built, nextField) : Read32(built, nextField);
-        }
-
-        return offset;
+        Build();
+        return _laidOut[index];
     }
-
-    private ushort Read16(byte[] b, long o) => LittleEndian ? BinaryPrimitives.ReadUInt16LittleEndian(b.AsSpan((int)o)) : BinaryPrimitives.ReadUInt16BigEndian(b.AsSpan((int)o));
-
-    private uint Read32(byte[] b, long o) => LittleEndian ? BinaryPrimitives.ReadUInt32LittleEndian(b.AsSpan((int)o)) : BinaryPrimitives.ReadUInt32BigEndian(b.AsSpan((int)o));
-
-    private ulong Read64(byte[] b, long o) => LittleEndian ? BinaryPrimitives.ReadUInt64LittleEndian(b.AsSpan((int)o)) : BinaryPrimitives.ReadUInt64BigEndian(b.AsSpan((int)o));
 
     private static void Align(List<byte> output)
     {

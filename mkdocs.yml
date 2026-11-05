@@ -44,10 +44,14 @@ nav:
       - "TiffFile": api/Eleris.TiffNet.TiffFile.md
       - "TiffImage": api/Eleris.TiffNet.TiffImage.md
       - "TiffLayout": api/Eleris.TiffNet.TiffLayout.md
+      - "TiffMetadata": api/Eleris.TiffNet.TiffMetadata.md
       - "TiffPhotometric": api/Eleris.TiffNet.TiffPhotometric.md
       - "TiffPixelOrder": api/Eleris.TiffNet.TiffPixelOrder.md
       - "TiffPredictor": api/Eleris.TiffNet.TiffPredictor.md
       - "TiffReadOptions": api/Eleris.TiffNet.TiffReadOptions.md
+      - "TiffResolution": api/Eleris.TiffNet.TiffResolution.md
+      - "TiffResolutionUnit": api/Eleris.TiffNet.TiffResolutionUnit.md
       - "TiffSampleType": api/Eleris.TiffNet.TiffSampleType.md
+      - "TiffTag": api/Eleris.TiffNet.TiffTag.md
       - "TiffTagType": api/Eleris.TiffNet.TiffTagType.md
   # END API NAVIGATION

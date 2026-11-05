@@ -18,9 +18,10 @@ public sealed class TiffImage
 {
     private readonly ImageDescriptor _descriptor;
 
-    internal TiffImage(ImageDescriptor descriptor, IReadOnlyList<TiffImage> subImages)
+    internal TiffImage(ImageDescriptor descriptor, TiffMetadata metadata, IReadOnlyList<TiffImage> subImages)
     {
         _descriptor = descriptor;
+        Metadata = metadata;
         SubImages = subImages;
         ExtraChannels = [.. descriptor.ExtraChannels.Select(k => new TiffExtraChannel(k))];
     }
@@ -52,6 +53,12 @@ public sealed class TiffImage
 
     /// <summary>The images of the sub-directories (<c>SubIFDs</c>) of this one, usually reduced-resolution versions of it.</summary>
     public IReadOnlyList<TiffImage> SubImages { get; }
+
+    /// <summary>
+    /// The tags of the image other than its structure: description (the FITS header of an Astro-TIFF file), ICC profile, resolution,
+    /// private tags… Read with the image and kept when it is saved again.
+    /// </summary>
+    public TiffMetadata Metadata { get; }
 
     /// <summary>Why the library cannot deliver this image, or <see langword="null"/> when it can.</summary>
     public string? UnsupportedReason => _descriptor.Unsupported;
