@@ -154,6 +154,6 @@ public sealed class TiffFile : IReadOnlyList<TiffImage>, IDisposable
             }
         }
 
-        return new TiffImage(descriptor, subImages);
+        return new TiffImage(descriptor, MetadataReader.Read(reader, directory), subImages);
     }
 }
