@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The code samples of the documentation. Each #region Example:Name is copied into the Markdown pages by tools/DocGen,
+       and the tests run every method, so the samples in the guide always compile and work. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="Eleris.TiffNet" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Eleris.TiffNet\Eleris.TiffNet.csproj" />
+  </ItemGroup>
+
+</Project>
