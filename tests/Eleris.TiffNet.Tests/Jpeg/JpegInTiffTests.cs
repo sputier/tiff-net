@@ -119,4 +119,56 @@ public class JpegInTiffTests
 
         Assert.Contains("cannot hold a JPEG frame", Assert.Throws<TiffException>(() => file.Primary.ReadRawPixels<byte>()).Message, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void A_frame_of_two_components_is_damaged_whatever_the_samples_per_pixel()
+    {
+        // Found by review: a 2-component frame in a 3-sample image must not reach the colour conversion.
+        byte[] stream = JpegFixtures.Bytes("ycc444_q90_37x29.jpg");
+        int sof = stream.AsSpan().IndexOf([(byte)0xFF, (byte)0xC0]);
+        stream[sof + 3] = 14;   // length of 2 components
+        stream[sof + 9] = 2;    // 2 components
+        byte[] two = [.. stream[..(sof + 16)], .. stream[(sof + 19)..]];
+        using var file = Strip(two, 37, 29, 29, photometric: 6, samples: 3);
+
+        Assert.IsType<TiffException>(Assert.ThrowsAny<Exception>(() => file.Primary.ReadRawPixels<byte>()));
+    }
+
+    [Fact]
+    public void JPEGTables_are_read_once_for_all_the_tiles()
+    {
+        // 1024 tiles of 16 x 16 sharing 2 MB of JPEGTables (SOI, zeros, EOI): read once, not once per tile.
+        byte[] tables = [0xFF, 0xD8, .. new byte[2_000_000], 0xFF, 0xD9];
+        byte[] stream = JpegFixtures.Bytes("grey_q50_1x1.jpg");
+        var builder = new TiffBuilder { Data = stream };
+        builder.AddDirectory().Image(16 * 32, 16 * 32).Remove(259).Add(259, TiffTagType.Short, 7).Remove(273).Remove(278).Remove(279)
+            .Add(322, TiffTagType.Short, 16).Add(323, TiffTagType.Short, 16)
+            .Add(324, TiffTagType.Long, [.. Enumerable.Repeat(builder.DataOffset, 1024)])
+            .Add(325, TiffTagType.Long, [.. Enumerable.Repeat((long)stream.Length, 1024)])
+            .Raw(347, TiffTagType.Undefined, tables).Sorted();
+        using var file = TiffFile.Read(new MemoryStream(builder.Build()));
+
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        Assert.Throws<TiffException>(() => file.Primary.ReadRawPixels<byte>());   // the 1 x 1 frame does not cover a tile
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(1), $"{clock.Elapsed.TotalSeconds} s");
+    }
+
+    [Fact]
+    public void The_buffers_of_each_tile_are_given_back_to_the_budget()
+    {
+        // 64 tiles, a budget for the image and the buffers of a few tiles at a time: a tile that kept its reservation would
+        // exhaust it long before the last one.
+        byte[] stream = JpegFixtures.Bytes("grey_q100_64x64.jpg");
+        var builder = new TiffBuilder { Data = stream };
+        builder.AddDirectory().Image(64 * 8, 64 * 8).Remove(259).Add(259, TiffTagType.Short, 7).Remove(273).Remove(278).Remove(279)
+            .Add(322, TiffTagType.Short, 64).Add(323, TiffTagType.Short, 64)
+            .Add(324, TiffTagType.Long, [.. Enumerable.Repeat(builder.DataOffset, 64)])
+            .Add(325, TiffTagType.Long, [.. Enumerable.Repeat((long)stream.Length, 64)]).Sorted();
+        var options = TiffReadOptions.Default with { MaxPixelBytes = 512 * 512 + 8 * 64 * 64 * 4 + 200_000, MaxDegreeOfParallelism = 2 };
+        using var file = TiffFile.Read(new MemoryStream(builder.Build()), options);
+
+        byte[] pixels = file.Primary.ReadRawPixels<byte>();
+
+        Assert.Equal(Decoded("grey_q100_64x64.jpg", 64), pixels.AsSpan(0, 64).ToArray().Concat(Enumerable.Range(1, 63).SelectMany(y => pixels.AsSpan(y * 512, 64).ToArray())));
+    }
 }

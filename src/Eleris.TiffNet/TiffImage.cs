@@ -13,6 +13,10 @@ public sealed record TiffExtraChannel(TiffExtraChannelKind Kind);
 /// An image whose format the library does not handle (CMYK, Lab, a compression it does not read…) is still listed with the pages
 /// of its file, with its size and the reason in <see cref="UnsupportedReason"/>; its <see cref="SampleType"/>,
 /// <see cref="ColorModel"/> and pixels throw a <see cref="NotSupportedException"/> that gives the reason.
+/// <para>
+/// An image can be read from several threads at once. Changing it (<see cref="SetPixels{T}"/>, <see cref="SetExtraChannels"/>,
+/// its <see cref="Metadata"/>) must not happen while it is read.
+/// </para>
 /// </remarks>
 public sealed partial class TiffImage
 {

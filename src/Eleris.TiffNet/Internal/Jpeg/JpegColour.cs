@@ -30,7 +30,13 @@ internal static class JpegColour
     }
 
     /// <summary>The number of samples per pixel the frame gives: 1 for grey, 3 for colour.</summary>
-    public static int Channels(JpegFrame frame) => frame.Components.Length == 1 ? 1 : 3;
+    /// <exception cref="InvalidDataException">The frame has 2 components, which make no image.</exception>
+    public static int Channels(JpegFrame frame) => frame.Components.Length switch
+    {
+        1 => 1,
+        3 => 3,
+        var n => throw new InvalidDataException($"a JPEG frame of {n} components is neither grey nor colour."),
+    };
 
     /// <summary>
     /// Writes the first <paramref name="rows"/> rows of the frame as interleaved samples, <paramref name="stride"/> bytes per row.
@@ -45,6 +51,7 @@ internal static class JpegColour
     public static void ToSamples(JpegFrame frame, int rows, bool ycbcr, Span<byte> output, int stride, ResourceBudget budget)
     {
         int width = frame.Width, height = Math.Min(rows, frame.Height);
+        _ = Channels(frame);
         if (frame.Components.Length == 1)
         {
             var grey = frame.Components[0];

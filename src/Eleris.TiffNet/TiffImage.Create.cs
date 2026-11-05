@@ -23,7 +23,8 @@ public sealed partial class TiffImage
     /// <returns>An image in memory: no <see cref="Storage"/>, empty <see cref="Metadata"/>, extra channels of kind
     /// <see cref="TiffExtraChannelKind.Data"/> (see <see cref="SetExtraChannels"/>).</returns>
     /// <exception cref="ArgumentException">The sizes do not match the pixels, the colour model is missing or does not fit the
-    /// channels, or <typeparamref name="T"/> is not a sample type of TIFF.</exception>
+    /// channels, <typeparamref name="T"/> is not a sample type of TIFF, or the pixels are more bytes than an array holds (write
+    /// them with TiffImageWriter).</exception>
     /// <exception cref="ArgumentOutOfRangeException">A size is not positive.</exception>
     public static TiffImage Create<T>(ReadOnlySpan<T> pixels, int width, int height, int channels = 1, TiffColorModel? colorModel = null,
         TiffPixelOrder order = TiffPixelOrder.Interleaved) where T : unmanaged, INumber<T>
@@ -44,7 +45,9 @@ public sealed partial class TiffImage
     /// <param name="order">How <paramref name="pixels"/> is laid out.</param>
     /// <remarks>
     /// The metadata and the sub-images are kept; <see cref="Storage"/> still tells how the image was stored in its file. The
-    /// extra channels become <see cref="TiffExtraChannelKind.Data"/>.
+    /// extra channels become <see cref="TiffExtraChannelKind.Data"/>; a reason the library could not deliver the former pixels
+    /// (<see cref="UnsupportedReason"/>) no longer applies. Like the other changes of an image, it must not run while the image
+    /// is read on another thread.
     /// </remarks>
     /// <exception cref="ArgumentException">As for <see cref="Create{T}"/>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">A size is not positive.</exception>
@@ -112,6 +115,12 @@ public sealed partial class TiffImage
             throw new ArgumentException($"{width} x {height} pixels of {channels} channels are {count} samples, not {pixels.Length}.", nameof(pixels));
         }
 
+        if (count * System.Runtime.CompilerServices.Unsafe.SizeOf<T>() > Array.MaxLength)
+        {
+            throw new ArgumentException(
+                $"{count} samples of {typeof(T).Name} are more bytes than an array holds: write such an image with TiffImageWriter.", nameof(pixels));
+        }
+
         int colours = model == TiffColorModel.Rgb ? 3 : 1;
         var extras = Enumerable.Repeat(TiffExtraChannelKind.Data, channels - colours).ToList().AsReadOnly();
         var descriptor = ImageDescriptor.ForPixels(width, height, channels, type, model, extras, order == TiffPixelOrder.Planar);
@@ -125,16 +134,20 @@ public sealed partial class TiffImage
         return (descriptor, TiffSource.FromMemory(bytes, "image"));
     }
 
+    /// <summary>The sample type of <typeparamref name="T"/> (a constant for each instantiation, without reflection).</summary>
     private static TiffSampleType SampleTypeOf<T>() where T : unmanaged, INumber<T>
     {
-        foreach (var type in Enum.GetValues<TiffSampleType>())
-        {
-            if (SampleConversion.ClrType(type) == typeof(T))
-            {
-                return type;
-            }
-        }
-
+        if (typeof(T) == typeof(byte)) return TiffSampleType.UInt8;
+        if (typeof(T) == typeof(sbyte)) return TiffSampleType.Int8;
+        if (typeof(T) == typeof(ushort)) return TiffSampleType.UInt16;
+        if (typeof(T) == typeof(short)) return TiffSampleType.Int16;
+        if (typeof(T) == typeof(uint)) return TiffSampleType.UInt32;
+        if (typeof(T) == typeof(int)) return TiffSampleType.Int32;
+        if (typeof(T) == typeof(ulong)) return TiffSampleType.UInt64;
+        if (typeof(T) == typeof(long)) return TiffSampleType.Int64;
+        if (typeof(T) == typeof(Half)) return TiffSampleType.Float16;
+        if (typeof(T) == typeof(float)) return TiffSampleType.Float32;
+        if (typeof(T) == typeof(double)) return TiffSampleType.Float64;
         throw new ArgumentException($"{typeof(T).Name} is not a sample type of TIFF: use byte, sbyte, ushort, short, uint, int, ulong, long, Half, float or double.");
     }
 }

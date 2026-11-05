@@ -53,6 +53,9 @@ internal sealed class PixelPlan
     /// <summary>Whether the blocks are compressed: each is then decoded whole (up to the last row the read needs) by one worker.</summary>
     public bool Compressed { get; }
 
+    /// <summary>The JPEGTables of a JPEG image, read once for the read and shared by the decoders of its blocks, or null.</summary>
+    public JpegTables? JpegTables { get; private set; }
+
     /// <summary>The number of threads that decode (1 for a read into a span).</summary>
     public int Workers { get; private set; }
 
@@ -101,6 +104,19 @@ internal sealed class PixelPlan
             throw budget.Invalid($"JPEG {(d.Layout == TiffLayout.Tiles ? "tiles" : "strips")} of {d.BlockWidth} x {d.BlockHeight} pixels cannot hold a JPEG frame.");
         }
 
+        JpegTables? jpegTables = null;
+        if (jpeg && d.JpegTables is { } tables)
+        {
+            try
+            {
+                jpegTables = JpegTables.Read(tables, budget);
+            }
+            catch (InvalidDataException ex)
+            {
+                throw budget.Invalid($"the JPEGTables cannot be read: {ex.Message}");
+            }
+        }
+
         long rowBytes = ImageDescriptor.BytesPerRow(d.BlockWidth, SampleUnpacker.StoredSamples(d), d.BitsPerSample);
         bool compressed = d.Compression != TiffCompression.None;
         int rowsPerUnit = compressed ? (int)d.BlockHeight : (int)Math.Clamp(ChunkBytes / Math.Max(1, rowBytes), 1, d.BlockHeight);
@@ -111,6 +127,12 @@ internal sealed class PixelPlan
         foreach (var (block, _, blockY, first, end) in plan.Blocks())
         {
             // A JPEG stream is decoded whole: its rows are all decoded, whatever the read needs.
+            if (jpeg && d.Layout == TiffLayout.Strips && BlockRows(d, blockY) > ushort.MaxValue)
+            {
+                // Checked before decoding: no JPEG frame covers more than 65535 rows.
+                throw budget.Invalid($"a JPEG strip of {BlockRows(d, blockY)} rows cannot hold a JPEG frame.");
+            }
+
             long needed = (jpeg ? BlockRows(d, blockY) : end) * rowBytes;
             if (compressed)
             {
@@ -144,6 +166,7 @@ internal sealed class PixelPlan
         int degree = budget.Options.MaxDegreeOfParallelism is -1 ? Environment.ProcessorCount : budget.Options.MaxDegreeOfParallelism;
         // They are allocated once per worker, of exactly these sizes (never rounded up by a pool, never kept after the read).
         plan.Workers = parallel ? (int)Math.Max(1, Math.Min(degree, units)) : 1;
+        plan.JpegTables = jpegTables;
         plan.ReadBytes = compressed ? largestCompressed : rowsPerUnit * rowBytes;
         plan.DecodedBytes = largestDecoded;
         plan.RowSamples = d.BlockWidth * (d.SamplesPerPixel + 2);
@@ -155,10 +178,11 @@ internal sealed class PixelPlan
     /// <summary>
     /// The compressed bytes of a block read to decode <paramref name="needed"/> bytes: no codec needs more than twice what it gives
     /// (LZW at most 1.5 times, PackBits 2 bytes for a lone byte, Deflate a few bytes per stored block), with some room for headers
-    /// and for seeing data beyond the rows; JPEG at most 26 bits per sample, doubled by byte stuffing, and markers. A hostile file whose blocks all declare the whole file costs what its pixels need.
+    /// and for seeing data beyond the rows; JPEG at most 26 bits per sample, doubled by byte stuffing, and its markers (a frame
+    /// with all its tables is about 3 KB). A hostile file whose blocks all declare the whole file costs what its pixels need.
     /// </summary>
     internal static long CompressedToRead(TiffCompression compression, long byteCount, long needed) =>
-        Math.Min(byteCount, compression == TiffCompression.Jpeg ? 8 * needed + 65536 : 2 * needed + 4096);
+        Math.Min(byteCount, compression == TiffCompression.Jpeg ? 8 * needed + 16384 : 2 * needed + 4096);
 
     /// <summary>The rows of a block: the whole tile, or the rows of the strip in the image (what a JPEG frame covers).</summary>
     internal static long BlockRows(ImageDescriptor d, long blockY) =>
@@ -333,6 +357,7 @@ internal static class PixelReader
         private readonly TiffSource _source;
         private readonly ResourceBudget _budget;
         private readonly bool _compressed;
+        private readonly JpegTables? _jpegTables;
         private readonly TiffPredictor _predictor;
         private readonly PixelRequest _request;
         private readonly StoredRect _stored;
@@ -349,6 +374,7 @@ internal static class PixelReader
             _source = source;
             _budget = budget;
             _compressed = plan.Compressed;
+            _jpegTables = plan.JpegTables;
             _predictor = plan.Predictor;
             _request = plan.Request;
             _stored = plan.Stored;
@@ -476,21 +502,19 @@ internal static class PixelReader
         private void DecodeJpeg(ReadOnlySpan<byte> stream, Scratch<TD> scratch, int needed, int blockRows, bool lastStrip, string kind, int block)
         {
             // The last strip may be higher than its rows (as libtiff accepts): its planes are still counted in the budget.
-            var decoder = new JpegDecoder(_budget, (int)_d.BlockWidth, lastStrip ? ushort.MaxValue : blockRows);
+            int maxHeight = lastStrip ? ushort.MaxValue : blockRows;
+            var decoder = _jpegTables is { } tables
+                ? new JpegDecoder(tables, _budget, (int)_d.BlockWidth, maxHeight)
+                : new JpegDecoder(_budget, (int)_d.BlockWidth, maxHeight);
             try
             {
-                if (_d.JpegTables is { } tables)
-                {
-                    decoder.ReadTables(tables);
-                }
-
                 var frame = decoder.Decode(stream);
                 if (frame.Width != _d.BlockWidth || frame.Height < blockRows)
                 {
                     throw new InvalidDataException($"its frame of {frame.Width} x {frame.Height} does not cover the {_d.BlockWidth} x {blockRows} pixels of the {kind}.");
                 }
 
-                if (JpegColour.Channels(frame) != _d.SamplesPerPixel)
+                if (frame.Components.Length != _d.SamplesPerPixel)
                 {
                     throw new InvalidDataException($"its frame has {frame.Components.Length} components for {_d.SamplesPerPixel} samples per pixel.");
                 }
