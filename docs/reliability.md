@@ -45,6 +45,10 @@ Console.WriteLine($"Pixels: {untrusted.MaxPixelBytes >> 20} MB, threads: {untrus
 ```
 <!-- /example -->
 
+Every hostile file the library is tested with (crafted, and from its security review) fails with the expected error within its
+time and memory bounds, and every change to the code that reads untrusted bytes is fuzzed in continuous integration: no
+exception other than `TiffException` and `NotSupportedException` comes out of reading a file.
+
 ## Compressed data
 
 A strip or tile compressed with PackBits, LZW or Deflate is decoded into a buffer of the size the read needs, never more: data

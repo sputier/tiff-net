@@ -10,14 +10,33 @@ internal static class Targets
 {
     /// <summary>
     /// The targets by name. "none" only exercises the harness (mutations, timing, saving); "open" reads the structure of a file
-    /// from memory and every property of its pages and sub-images; the pixels become a target when they can be read.
+    /// from memory and every property of its pages and sub-images; "read" also reads their pixels; "jpeg" decodes a JPEG stream
+    /// (its seeds are the *.jpg files of the corpus, mutated byte by byte).
     /// </summary>
     public static readonly IReadOnlyDictionary<string, Action<byte[]>> All = new Dictionary<string, Action<byte[]>>
     {
         ["none"] = static _ => { },
         ["open"] = Open,
         ["read"] = Read,
+        ["jpeg"] = Jpeg,
     };
+
+    /// <summary>The seed files of a target: JPEG streams for "jpeg", TIFF files otherwise.</summary>
+    public static string PatternOf(string target) => target == "jpeg" ? "*.jpg" : "*.tif";
+
+    /// <summary>Decodes a JPEG stream, its defects reported as the TIFF reader reports them (a TiffException).</summary>
+    private static void Jpeg(byte[] input)
+    {
+        try
+        {
+            var frame = new Internal.Jpeg.JpegDecoder(new Internal.ResourceBudget(Options, "fuzz.jpg")).Decode(input);
+            _ = frame.Components[0].Plane[^1];
+        }
+        catch (InvalidDataException ex)
+        {
+            throw new TiffException(ex.Message);
+        }
+    }
 
     /// <summary>Opens the file, then reads the pixels of every page and sub-image it can, as doubles and raw.</summary>
     private static void Read(byte[] input)
@@ -27,8 +46,8 @@ internal static class Targets
         while (pending.TryPop(out var image))
         {
             // An image of more samples than an array holds is read by region: whole reads refuse it, as documented.
-            // Images whose codec or predictor is not implemented yet are refused with NotSupportedException, an expected outcome.
-            if (image.UnsupportedReason is null && image.Storage!.Compression != TiffCompression.Jpeg && image.Storage.Predictor == TiffPredictor.None
+            // JPEG is not implemented yet.
+            if (image.UnsupportedReason is null && image.Storage!.Compression != TiffCompression.Jpeg
                 && (Int128)image.Width * image.Height * image.Channels <= Array.MaxLength)
             {
                 _ = image.ReadPixels<double>(TiffPixelScale.Normalized);
@@ -151,8 +170,8 @@ internal sealed class Corpus
     public string Id { get; }
 
     /// <summary>The seed files under the given folders, in a stable order (so that an input can be produced again).</summary>
-    public static Corpus Load(IEnumerable<string> folders, long maxBytes = 2_000_000) => new(
-        [.. folders.SelectMany(f => Directory.Exists(f) ? Directory.EnumerateFiles(f, "*.tif", SearchOption.AllDirectories) : File.Exists(f) ? [f] : [])
+    public static Corpus Load(IEnumerable<string> folders, string pattern = "*.tif", long maxBytes = 2_000_000) => new(
+        [.. folders.SelectMany(f => Directory.Exists(f) ? Directory.EnumerateFiles(f, pattern, SearchOption.AllDirectories) : File.Exists(f) ? [f] : [])
             .Where(f => new FileInfo(f).Length is > 8 and var n && n <= maxBytes)
             .Order(StringComparer.Ordinal)]);
 

@@ -27,9 +27,9 @@ public class PixelTests
 
     internal static string Sha(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes));
 
-    /// <summary>Whether the codecs the library has so far decode the image (JPEG and the predictors come later).</summary>
-    internal static bool Decodable(TiffStorage storage) => storage.Predictor == TiffPredictor.None
-        && storage.Compression is TiffCompression.None or TiffCompression.Lzw or TiffCompression.Deflate or TiffCompression.PackBits;
+    /// <summary>Whether the codecs the library has so far decode the image (JPEG comes later).</summary>
+    internal static bool Decodable(TiffStorage storage) =>
+        storage.Compression is TiffCompression.None or TiffCompression.Lzw or TiffCompression.Deflate or TiffCompression.PackBits;
 
     [Fact]
     public void Every_decodable_page_of_the_domain_fixtures_gives_the_expected_samples()
@@ -61,8 +61,11 @@ public class PixelTests
         Assert.True(checkedPages > 35, $"only {checkedPages} pages checked");
     }
 
+    /// <summary>The compressions of the corpus the library refuses by design (coverage.md): their files must say so.</summary>
+    private static readonly string[] RefusedByDesign = ["lzma", "zstd"];
+
     [Fact]
-    public void Every_decodable_file_of_the_interop_corpus_gives_the_samples_of_tifffile()
+    public void Every_file_of_the_interop_corpus_gives_the_samples_of_tifffile_or_is_refused_by_design()
     {
         if (!Directory.Exists(InteropCorpus.Folder))
         {
@@ -71,21 +74,58 @@ public class PixelTests
         }
 
         var counts = new Dictionary<TiffCompression, int>();
+        var predicted = new Dictionary<TiffPredictor, int>();
+        int refused = 0;
         foreach (var f in InteropCorpus.Files)
         {
             using var file = TiffFile.Open(Path.Combine(InteropCorpus.Folder, f.Name));
-            var storage = file.Primary.Storage!;
-            if (!Decodable(storage))
+            var image = file.Primary;
+            if (RefusedByDesign.Contains(f.Compression))
             {
+                Assert.True(image.UnsupportedReason?.Contains("is not supported", StringComparison.Ordinal) == true, f.Name);
+                Assert.Throws<NotSupportedException>(() => image.ReadPixels<double>());
+                refused++;
                 continue;
             }
 
-            Assert.True(f.SamplesSha256 == Sha(RawBytes(file.Primary)), f.Name);
+            // Anything else is read, and gives exactly the samples of tifffile: nothing is skipped.
+            Assert.True(image.UnsupportedReason is null, $"{f.Name}: {image.UnsupportedReason}");
+            Assert.True(f.SamplesSha256 == Sha(RawBytes(image)), f.Name);
+            var storage = image.Storage!;
             counts[storage.Compression] = counts.GetValueOrDefault(storage.Compression) + 1;
+            predicted[storage.Predictor] = predicted.GetValueOrDefault(storage.Predictor) + 1;
         }
 
+        Assert.Equal(InteropCorpus.Files.Count, refused + counts.Values.Sum());
+        Assert.True(predicted.GetValueOrDefault(TiffPredictor.Horizontal) > 300, $"only {predicted.GetValueOrDefault(TiffPredictor.Horizontal)} horizontal");
+        Assert.True(predicted.GetValueOrDefault(TiffPredictor.FloatingPoint) > 100, $"only {predicted.GetValueOrDefault(TiffPredictor.FloatingPoint)} floating point");
         Assert.All([TiffCompression.None, TiffCompression.Lzw, TiffCompression.Deflate, TiffCompression.PackBits],
             c => Assert.True(counts.GetValueOrDefault(c) > 300, $"only {counts.GetValueOrDefault(c)} {c} files"));
+    }
+
+    [Theory]
+    [InlineData("siril_m42_grey8.tif")]
+    [InlineData("siril_m42_grey16.tif")]
+    [InlineData("siril_m42_grey16_astro.tif")]
+    [InlineData("siril_m42_grey16_deflate.tif")]
+    [InlineData("siril_m42_grey32_astro.tif")]
+    [InlineData("siril_m42_rgb8.tif")]
+    [InlineData("siril_m42_rgb16_astro.tif")]
+    [InlineData("siril_m42_rgb32_astro.tif")]
+    public void Every_Siril_file_is_read_with_its_metadata(string name)
+    {
+        using var file = TiffFile.Open(DomainFixtures.PathOf(name));
+        var image = file.Primary;
+        var page = DomainFixtures.Page(name);
+
+        Assert.Equal(page.GetProperty("storedSamplesSha256").GetString(), Sha(RawBytes(image)));
+        Assert.StartsWith("siril", image.Metadata.Software, StringComparison.Ordinal);
+        if (name.Contains("astro", StringComparison.Ordinal))
+        {
+            // The FITS header Siril writes in the description (Astro-TIFF).
+            Assert.Equal(page.GetProperty("description").GetString(), image.Metadata.Description);
+            Assert.Contains("OBJECT  = 'M42", image.Metadata.Description, StringComparison.Ordinal);
+        }
     }
 
     [Theory]
