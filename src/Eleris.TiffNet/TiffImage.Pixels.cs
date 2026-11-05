@@ -166,10 +166,6 @@ public sealed partial class TiffImage
     private long Prepare<T>(PixelRequest request, bool raw) where T : unmanaged, INumber<T>
     {
         ThrowIfUnsupported();
-        if (File is null)
-        {
-            throw new InvalidOperationException("The image is not read from a file.");
-        }
 
         SampleConversion.Check<T>(SampleType, request.Scale, raw);
         return request.Count(Channels);
@@ -193,12 +189,15 @@ public sealed partial class TiffImage
         }
     }
 
-    private ResourceBudget Budget(CancellationToken cancellationToken) => new(File!.Options, File.Source.Name, cancellationToken);
+    /// <summary>The limits of a read: those of the file, or the defaults for pixels the application gave (they are trusted).</summary>
+    private ResourceBudget Budget(CancellationToken cancellationToken) => _pixels is not null
+        ? new(TiffReadOptions.Default, "image", cancellationToken)
+        : new(File!.Options, File.Source.Name, cancellationToken);
 
     private void Dispatch<T>(PixelPlan plan, Span<T> destination, T[]? array, ResourceBudget budget) where T : unmanaged, INumber<T>
     {
-        var source = File!.Source;
-        bool little = !Storage!.BigEndian;
+        var source = _pixels ?? File!.Source;
+        bool little = _pixels is not null ? BitConverter.IsLittleEndian : !Storage!.BigEndian;
         int c = Channels;
         switch (SampleType)
         {

@@ -276,6 +276,54 @@ internal sealed record ImageDescriptor
         return descriptor;
     }
 
+    /// <summary>
+    /// The description of pixels held in memory (an image created by the application): uncompressed, one strip (one per plane
+    /// when planar), in the byte order of the machine, top-left.
+    /// </summary>
+    /// <returns>The description, whose <see cref="Unsupported"/> says why such pixels cannot be held (rows larger than an array).</returns>
+    public static ImageDescriptor ForPixels(long width, long height, int channels, TiffSampleType type, TiffColorModel model,
+        IReadOnlyList<TiffExtraChannelKind> extras, bool planar)
+    {
+        int bytes = Pixels.SampleConversion.SizeOf(type);
+        int format = type switch
+        {
+            TiffSampleType.Float16 or TiffSampleType.Float32 or TiffSampleType.Float64 => 3,
+            TiffSampleType.Int8 or TiffSampleType.Int16 or TiffSampleType.Int32 or TiffSampleType.Int64 => 2,
+            _ => 1,
+        };
+        long plane = width * height * bytes;
+        int planes = planar ? channels : 1;
+        var descriptor = new ImageDescriptor
+        {
+            Directory = new RawDirectory(0, [], 0),
+            Width = width,
+            Height = height,
+            SamplesPerPixel = channels,
+            BitsPerSample = bytes * 8,
+            SampleFormat = format,
+            Photometric = model == TiffColorModel.Rgb ? TiffPhotometric.Rgb : TiffPhotometric.MinIsBlack,
+            Compression = TiffCompression.None,
+            Predictor = TiffPredictor.None,
+            Planar = planar && channels > 1,
+            Orientation = 1,
+            Layout = TiffLayout.Strips,
+            BlockWidth = width,
+            BlockHeight = height,
+            Offsets = [.. Enumerable.Range(0, planes).Select(p => p * plane * (planar ? 1 : channels))],
+            ByteCounts = [.. Enumerable.Repeat(plane * (planar ? 1 : channels), planes)],
+            ExtraChannels = extras,
+        };
+        long[] bits = [.. Enumerable.Repeat((long)bytes * 8, channels)];
+        long[] formats = [.. Enumerable.Repeat((long)format, channels)];
+        return descriptor.WithSupport(bits, formats);
+    }
+
+    /// <summary>The same image with other kinds of extra channels.</summary>
+    public ImageDescriptor WithExtraChannels(IReadOnlyList<TiffExtraChannelKind> extras) => this with { ExtraChannels = extras };
+
+    /// <summary>The same image with the NewSubfileType bits of another (an image whose pixels are replaced stays what it was).</summary>
+    public ImageDescriptor WithSubfileType(int subfileType) => this with { SubfileType = subfileType };
+
     /// <summary>Bytes of one row of <paramref name="width"/> pixels of <paramref name="samples"/> samples, padded to a byte.</summary>
     public static long BytesPerRow(long width, int samples, int bits) => (width * samples * bits + 7) / 8;
 
