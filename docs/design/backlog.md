@@ -27,7 +27,7 @@ unless a dependency is given.
 | [#6](https://github.com/sputier/tiff-net/issues/6) | Interop corpus | `tools/make_fixtures.py` (from `research/review-2026-11/interop`) generates the tifffile corpus (≈ 2 200 files) with SHA-256 of the samples; expectations committed, files generated in CI; `TIFFNET_SKIP_INTEROP=1` skips the live tests; an `interop` CI job | MAINT-05 | M |
 | [#7](https://github.com/sputier/tiff-net/issues/7) | Siril and domain fixtures | Siril 1.4.4 files regenerated from the `siril-cli` scripts and cropped (≤ 1 MB each): 8/16/32-bit grey and RGB, Astro-TIFF header, ICC; domain cases (thumbnail in IFD0, grey with 3 samples, associated alpha, MinIsWhite, palette, 12-bit packed); provenance in `tests/Fixtures/README.md` | MAINT-10 | S |
 | [#8](https://github.com/sputier/tiff-net/issues/8) | Hostile fixtures and test helpers | the 20 files of `research/…/security/repro` plus `tools/make_hostile.py` (from `tiffcraft.py`, `craft_*.py`); a test helper asserting "fails with `TiffException` within T seconds and A bytes allocated" | SEC-01…07 | S |
-| [#9](https://github.com/sputier/tiff-net/issues/9) | Fuzz harness | `tools/Fuzz` from the review's structure-aware fuzzer, seed replay, corpus from F-06/F-07; runnable locally; wired to CI in lot 3 | MAINT-09 | M |
+| [#9](https://github.com/sputier/tiff-net/issues/9) | Fuzz harness | `tools/Fuzz` from the review's structure-aware fuzzer, seed replay, corpus from #6 and #7; runnable locally; wired to CI in lot 3 | MAINT-09 | M |
 
 ## Lot 1 — Structure and metadata (reading)
 
