@@ -22,5 +22,6 @@ Every public type of the library, by namespace. The pages are generated from the
 | [`TiffResolution`](Eleris.TiffNet.TiffResolution.md) | record | The resolution of an image: pixels per unit, horizontally and vertically. |
 | [`TiffResolutionUnit`](Eleris.TiffNet.TiffResolutionUnit.md) | enum | The unit of a resolution. |
 | [`TiffSampleType`](Eleris.TiffNet.TiffSampleType.md) | enum | The type of the samples an image delivers. |
+| [`TiffStorage`](Eleris.TiffNet.TiffStorage.md) | record | How an image is stored in the file it was read from: compression, layout, byte order… The pixels an image delivers do not depend on it (they are always top-down, in the byte order of the machine); it tells what the file holds, and lets an application write a file the same way. |
 | [`TiffTag`](Eleris.TiffNet.TiffTag.md) | class | One tag of a TIFF directory: its code, the type of its values and the values, independent of the byte order of the file. |
 | [`TiffTagType`](Eleris.TiffNet.TiffTagType.md) | enum | The field types of TIFF 6.0 and BigTIFF: how the values of a tag are stored. |

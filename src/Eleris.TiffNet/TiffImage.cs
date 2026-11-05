@@ -18,10 +18,11 @@ public sealed class TiffImage
 {
     private readonly ImageDescriptor _descriptor;
 
-    internal TiffImage(ImageDescriptor descriptor, TiffMetadata metadata, IReadOnlyList<TiffImage> subImages)
+    internal TiffImage(ImageDescriptor descriptor, TiffMetadata metadata, TiffStorage storage, IReadOnlyList<TiffImage> subImages)
     {
         _descriptor = descriptor;
         Metadata = metadata;
+        Storage = storage;
         SubImages = subImages;
         ExtraChannels = [.. descriptor.ExtraChannels.Select(k => new TiffExtraChannel(k))];
     }
@@ -59,6 +60,9 @@ public sealed class TiffImage
     /// private tags… Read with the image and kept when it is saved again.
     /// </summary>
     public TiffMetadata Metadata { get; }
+
+    /// <summary>How the image is stored in the file it was read from.</summary>
+    public TiffStorage? Storage { get; }
 
     /// <summary>Why the library cannot deliver this image, or <see langword="null"/> when it can.</summary>
     public string? UnsupportedReason => _descriptor.Unsupported;

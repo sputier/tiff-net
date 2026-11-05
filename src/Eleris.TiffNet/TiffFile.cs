@@ -154,6 +154,21 @@ public sealed class TiffFile : IReadOnlyList<TiffImage>, IDisposable
             }
         }
 
-        return new TiffImage(descriptor, MetadataReader.Read(reader, directory), subImages);
+        var storage = new TiffStorage
+        {
+            Compression = descriptor.Compression,
+            Predictor = descriptor.Predictor,
+            Layout = descriptor.Layout,
+            TileWidth = descriptor.Layout == TiffLayout.Tiles ? (int)descriptor.BlockWidth : 0,
+            TileHeight = descriptor.Layout == TiffLayout.Tiles ? (int)descriptor.BlockHeight : 0,
+            RowsPerStrip = descriptor.Layout == TiffLayout.Strips ? (int)Math.Min(descriptor.BlockHeight, int.MaxValue) : 0,
+            PlanarConfiguration = descriptor.Planar ? TiffPixelOrder.Planar : TiffPixelOrder.Interleaved,
+            BigEndian = !reader.Header.LittleEndian,
+            BigTiff = reader.Header.BigTiff,
+            Orientation = descriptor.Orientation,
+            Photometric = descriptor.Photometric,
+            BitsPerSample = descriptor.BitsPerSample,
+        };
+        return new TiffImage(descriptor, MetadataReader.Read(reader, directory), storage, subImages);
     }
 }
