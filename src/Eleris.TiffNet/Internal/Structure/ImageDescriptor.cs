@@ -391,6 +391,12 @@ internal sealed record ImageDescriptor
             return $"tiles of {BlockWidth} x {BlockHeight} pixels are not supported.";
         }
 
+        // A row of a block is read in one buffer and unpacked in another (a palette gives two samples more per pixel).
+        if (BytesPerRow(BlockWidth, Planar ? 1 : SamplesPerPixel, b0) > Array.MaxLength || BlockWidth * (SamplesPerPixel + 2L) > Array.MaxLength)
+        {
+            return $"rows of {BlockWidth} pixels of {SamplesPerPixel} samples are not supported: they are larger than an array.";
+        }
+
         return Predictor switch
         {
             TiffPredictor.None => null,

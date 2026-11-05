@@ -1,5 +1,6 @@
+using System.Globalization;
 using System.Numerics;
-using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using Eleris.TiffNet.Internal;
 using Eleris.TiffNet.Internal.Pixels;
 
@@ -40,7 +41,8 @@ public sealed partial class TiffImage
     /// <exception cref="ArgumentException"><paramref name="destination"/> is not of the size of the image.</exception>
     /// <exception cref="InvalidOperationException">The conversion could lose values.</exception>
     /// <exception cref="NotSupportedException">The library does not handle the format of the image.</exception>
-    /// <exception cref="TiffException">The pixel data is damaged.</exception>
+    /// <exception cref="TiffException">The pixel data is damaged, or the decoding buffers exceed <see cref="TiffReadOptions.MaxPixelBytes"/>.</exception>
+    /// <exception cref="ObjectDisposedException">The file is disposed.</exception>
     public void ReadPixels<T>(Span<T> destination, TiffPixelScale scale = TiffPixelScale.Stored, TiffPixelOrder order = TiffPixelOrder.Interleaved)
         where T : unmanaged, INumber<T>
     {
@@ -51,7 +53,8 @@ public sealed partial class TiffImage
             throw new ArgumentException($"The image has {count} samples, the destination {destination.Length}.", nameof(destination));
         }
 
-        Dispatch(request, destination, null, Budget(CancellationToken.None));
+        var budget = Budget(CancellationToken.None);
+        Dispatch(PixelPlan.Create(Descriptor, budget, request, SampleConversion.SizeOf(SampleType), parallel: false), destination, null, budget);
     }
 
     /// <summary>The samples of a region of the image (in the delivered orientation), converted as by <see cref="ReadPixels{T}(TiffPixelScale, TiffPixelOrder)"/>.</summary>
@@ -98,6 +101,7 @@ public sealed partial class TiffImage
     /// <exception cref="TiffException">The pixel data is damaged.</exception>
     public T[] ReadChannel<T>(int channel, TiffPixelScale scale = TiffPixelScale.Stored) where T : unmanaged, INumber<T>
     {
+        ThrowIfUnsupported();
         ArgumentOutOfRangeException.ThrowIfNegative(channel);
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(channel, Channels);
         return ReadArray<T>(Region(0, 0, Width, Height, channel, TiffPixelOrder.Interleaved, scale), raw: false, CancellationToken.None);
@@ -108,12 +112,17 @@ public sealed partial class TiffImage
     /// <param name="scale">The stored values, or values normalised to [0, 1].</param>
     /// <param name="order">Interleaved or planar.</param>
     /// <param name="cancellationToken">Stops the read between strips or tiles.</param>
-    /// <returns>A new array of <c>Width × Height × Channels</c> samples.</returns>
+    /// <returns>A new array of <c>Width × Height × Channels</c> samples. Every failure, including a type that cannot be read,
+    /// is reported by the task, never thrown by the call.</returns>
+    /// <exception cref="InvalidOperationException">The conversion could lose values, or the image holds more samples than an array can.</exception>
+    /// <exception cref="NotSupportedException">The library does not handle the format of the image (<see cref="UnsupportedReason"/>).</exception>
+    /// <exception cref="TiffException">The pixel data is damaged, or exceeds <see cref="TiffReadOptions.MaxPixelBytes"/>.</exception>
+    /// <exception cref="ObjectDisposedException">The file is disposed.</exception>
+    /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled.</exception>
     public Task<T[]> ReadPixelsAsync<T>(TiffPixelScale scale = TiffPixelScale.Stored, TiffPixelOrder order = TiffPixelOrder.Interleaved,
         CancellationToken cancellationToken = default) where T : unmanaged, INumber<T>
     {
         var request = Whole(order, scale);
-        Prepare<T>(request, raw: false);
         return Task.Run(() => ReadArray<T>(request, raw: false, cancellationToken), cancellationToken);
     }
 
@@ -125,9 +134,14 @@ public sealed partial class TiffImage
         ArgumentOutOfRangeException.ThrowIfNegative(y);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
-        if ((long)x + width > Width || (long)y + height > Height)
+        if ((long)x + width > Width)
         {
             throw new ArgumentOutOfRangeException(nameof(width), $"The region {x}, {y}, {width} x {height} is not within the image of {Width} x {Height}.");
+        }
+
+        if ((long)y + height > Height)
+        {
+            throw new ArgumentOutOfRangeException(nameof(height), $"The region {x}, {y}, {width} x {height} is not within the image of {Width} x {Height}.");
         }
 
         return new PixelRequest(x, y, width, height, channel, order, scale);
@@ -137,20 +151,19 @@ public sealed partial class TiffImage
     {
         long count = Prepare<T>(request, raw);
         var budget = Budget(cancellationToken);
-        budget.ReservePixels(count * Marshal.SizeOf<T>(), "the pixels");
+
+        // Everything is checked before the destination is allocated: its size, the blocks under it, the buffers of the workers.
+        budget.ReservePixels(count * Unsafe.SizeOf<T>(), "the pixels");
+        var plan = PixelPlan.Create(Descriptor, budget, request, SampleConversion.SizeOf(SampleType), parallel: true);
         var result = new T[count];
-        Dispatch(request, result, result, budget);
+        Dispatch(plan, result, result, budget);
         return result;
     }
 
     /// <summary>Checks what can be checked before reading: the image, the type, the size; returns the number of samples.</summary>
     private long Prepare<T>(PixelRequest request, bool raw) where T : unmanaged, INumber<T>
     {
-        if (UnsupportedReason is not null)
-        {
-            throw Unsupported();
-        }
-
+        ThrowIfUnsupported();
         if (File is null)
         {
             throw new InvalidOperationException("The image is not read from a file.");
@@ -160,31 +173,42 @@ public sealed partial class TiffImage
         long count = request.Count(Channels);
         if (count > Array.MaxLength)
         {
-            throw new InvalidOperationException($"The image holds {count} samples, more than an array can: read it by region (ReadRegion).");
+            throw new InvalidOperationException(
+                $"The read covers {(count == long.MaxValue ? "more than 2^63" : count.ToString(CultureInfo.InvariantCulture))} samples, "
+                + "more than an array can hold: read the image by region (ReadRegion).");
         }
 
         return count;
     }
 
+    private void ThrowIfUnsupported()
+    {
+        if (UnsupportedReason is not null)
+        {
+            throw Unsupported();
+        }
+    }
+
     private ResourceBudget Budget(CancellationToken cancellationToken) => new(File!.Options, File.Source.Name, cancellationToken);
 
-    private void Dispatch<T>(PixelRequest request, Span<T> destination, T[]? array, ResourceBudget budget) where T : unmanaged, INumber<T>
+    private void Dispatch<T>(PixelPlan plan, Span<T> destination, T[]? array, ResourceBudget budget) where T : unmanaged, INumber<T>
     {
         var source = File!.Source;
         bool little = !Storage!.BigEndian;
+        int c = Channels;
         switch (SampleType)
         {
-            case TiffSampleType.UInt8: PixelReader.Read<byte, T>(this, source, budget, request, destination, array, little); break;
-            case TiffSampleType.Int8: PixelReader.Read<sbyte, T>(this, source, budget, request, destination, array, little); break;
-            case TiffSampleType.UInt16: PixelReader.Read<ushort, T>(this, source, budget, request, destination, array, little); break;
-            case TiffSampleType.Int16: PixelReader.Read<short, T>(this, source, budget, request, destination, array, little); break;
-            case TiffSampleType.UInt32: PixelReader.Read<uint, T>(this, source, budget, request, destination, array, little); break;
-            case TiffSampleType.Int32: PixelReader.Read<int, T>(this, source, budget, request, destination, array, little); break;
-            case TiffSampleType.UInt64: PixelReader.Read<ulong, T>(this, source, budget, request, destination, array, little); break;
-            case TiffSampleType.Int64: PixelReader.Read<long, T>(this, source, budget, request, destination, array, little); break;
-            case TiffSampleType.Float16: PixelReader.Read<Half, T>(this, source, budget, request, destination, array, little); break;
-            case TiffSampleType.Float32: PixelReader.Read<float, T>(this, source, budget, request, destination, array, little); break;
-            default: PixelReader.Read<double, T>(this, source, budget, request, destination, array, little); break;
+            case TiffSampleType.UInt8: PixelReader.Read<byte, T>(plan, source, budget, c, little, destination, array); break;
+            case TiffSampleType.Int8: PixelReader.Read<sbyte, T>(plan, source, budget, c, little, destination, array); break;
+            case TiffSampleType.UInt16: PixelReader.Read<ushort, T>(plan, source, budget, c, little, destination, array); break;
+            case TiffSampleType.Int16: PixelReader.Read<short, T>(plan, source, budget, c, little, destination, array); break;
+            case TiffSampleType.UInt32: PixelReader.Read<uint, T>(plan, source, budget, c, little, destination, array); break;
+            case TiffSampleType.Int32: PixelReader.Read<int, T>(plan, source, budget, c, little, destination, array); break;
+            case TiffSampleType.UInt64: PixelReader.Read<ulong, T>(plan, source, budget, c, little, destination, array); break;
+            case TiffSampleType.Int64: PixelReader.Read<long, T>(plan, source, budget, c, little, destination, array); break;
+            case TiffSampleType.Float16: PixelReader.Read<Half, T>(plan, source, budget, c, little, destination, array); break;
+            case TiffSampleType.Float32: PixelReader.Read<float, T>(plan, source, budget, c, little, destination, array); break;
+            default: PixelReader.Read<double, T>(plan, source, budget, c, little, destination, array); break;
         }
     }
 }
