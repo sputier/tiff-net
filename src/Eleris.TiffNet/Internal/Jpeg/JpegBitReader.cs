@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Runtime.CompilerServices;
 
 namespace Eleris.TiffNet.Internal.Jpeg;
@@ -115,6 +116,21 @@ internal ref struct JpegBitReader
 
     private void Fill()
     {
+        // Fast path: 8 bytes at once when none of them is 0xFF (no stuffing, no marker). The whole bytes that fit are taken; the
+        // bits of the next one that come along are those it will bring again, so OR-ing it later changes nothing.
+        if (_count <= 48 && _position + 8 <= _data.Length && !_ended)
+        {
+            ulong next = BinaryPrimitives.ReadUInt64BigEndian(_data[_position..]);
+            ulong inverted = ~next;
+            if (((inverted - 0x0101010101010101UL) & ~inverted & 0x8080808080808080UL) == 0)
+            {
+                _bits |= next >> _count;
+                _position += (63 - _count) >> 3;
+                _count |= 56;
+                return;
+            }
+        }
+
         while (_count <= 56)
         {
             if (_ended)
