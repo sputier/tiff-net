@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+      - name: Build
+        run: dotnet build Eleris.TiffNet.slnx -c Release
+      - name: Test (without the tifffile corpus, which the interop job generates)
+        run: dotnet test Eleris.TiffNet.slnx -c Release --no-build
+        env:
+          TIFFNET_SKIP_INTEROP: "1"
+
+  interop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - run: pip install -r tools/requirements-interop.txt
+      - name: Generate the tifffile corpus and check it against the manifest
+        run: python -I tools/make_fixtures.py
+      - name: Build
+        run: dotnet build Eleris.TiffNet.slnx -c Release
+      - name: Test against the corpus
+        run: dotnet test tests/Eleris.TiffNet.Tests -c Release --no-build --filter "FullyQualifiedName~Interop"
+
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Text files use LF (see .gitattributes)
+        run: |
+          if git ls-files --eol | grep -E "(i|w)/(crlf|mixed)"; then
+            echo "::error::Some text files have CRLF or mixed line endings"
+            exit 1
+          fi
+
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - run: pip install -r docs/requirements.txt
+      - name: Build (the examples of the guide are compiled with the library)
+        run: dotnet build Eleris.TiffNet.slnx -c Release
+      - name: The generated pages are up to date
+        run: dotnet run -c Release --no-build --project tools/DocGen -- --check
+      - name: Run the examples of the guide
+        run: dotnet test tests/Eleris.TiffNet.Tests -c Release --no-build --filter "FullyQualifiedName~DocumentationExamplesTests"
+        env:
+          TIFFNET_SKIP_INTEROP: "1"
+      - name: Check the Markdown (format, links, anchors)
+        run: python tools/check_docs.py
+      - name: Build the site
+        run: mkdocs build --strict
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: documentation-site
+          path: site/
+          if-no-files-found: error
+
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Pack
+        run: dotnet pack src/Eleris.TiffNet -c Release -o artifacts
+      - name: Check the package and use it from a new project
+        run: python tools/verify_package.py artifacts
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: package
+          path: artifacts/
+          if-no-files-found: error
