@@ -14,7 +14,7 @@ public sealed record TiffExtraChannel(TiffExtraChannelKind Kind);
 /// of its file, with its size and the reason in <see cref="UnsupportedReason"/>; its <see cref="SampleType"/>,
 /// <see cref="ColorModel"/> and pixels throw a <see cref="NotSupportedException"/> that gives the reason.
 /// </remarks>
-public sealed class TiffImage
+public sealed partial class TiffImage
 {
     private readonly ImageDescriptor _descriptor;
 
