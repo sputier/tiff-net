@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 using Eleris.TiffNet.Internal.Codecs;
+using Eleris.TiffNet.Internal.Jpeg;
 using Eleris.TiffNet.Internal.Structure;
 
 namespace Eleris.TiffNet.Internal.Pixels;
@@ -87,9 +88,17 @@ internal sealed class PixelPlan
     /// <exception cref="TiffException">A block is truncated, or the buffers exceed <see cref="TiffReadOptions.MaxPixelBytes"/>.</exception>
     public static PixelPlan Create(ImageDescriptor d, ResourceBudget budget, PixelRequest request, int sampleBytes, bool parallel)
     {
-        if (d.Compression is not (TiffCompression.None or TiffCompression.Lzw or TiffCompression.Deflate or TiffCompression.PackBits))
+        if (d.Compression is not (TiffCompression.None or TiffCompression.Lzw or TiffCompression.Deflate or TiffCompression.PackBits
+            or TiffCompression.Jpeg))
         {
             throw new NotSupportedException($"{budget.SourceName}: reading {d.Compression} compressed images is not implemented yet.");
+        }
+
+        bool jpeg = d.Compression == TiffCompression.Jpeg;
+        if (jpeg && (d.BlockWidth > ushort.MaxValue || (d.Layout == TiffLayout.Tiles && d.BlockHeight > ushort.MaxValue)))
+        {
+            // A JPEG frame is at most 65535 x 65535: no stream can fill such a strip or tile.
+            throw budget.Invalid($"JPEG {(d.Layout == TiffLayout.Tiles ? "tiles" : "strips")} of {d.BlockWidth} x {d.BlockHeight} pixels cannot hold a JPEG frame.");
         }
 
         long rowBytes = ImageDescriptor.BytesPerRow(d.BlockWidth, SampleUnpacker.StoredSamples(d), d.BitsPerSample);
@@ -99,20 +108,22 @@ internal sealed class PixelPlan
         string kind = d.Layout == TiffLayout.Tiles ? "tile" : "strip";
 
         long units = 0, largestCompressed = 0, largestDecoded = 0;
-        foreach (var (block, _, _, first, end) in plan.Blocks())
+        foreach (var (block, _, blockY, first, end) in plan.Blocks())
         {
-            long needed = end * rowBytes;
+            // A JPEG stream is decoded whole: its rows are all decoded, whatever the read needs.
+            long needed = (jpeg ? BlockRows(d, blockY) : end) * rowBytes;
             if (compressed)
             {
                 // What a block decodes to is known once it is decoded, but no codec expands its data beyond a fixed ratio: a
-                // block too small to give the rows it must is damaged, found before the destination is allocated.
-                if (needed > MostDecoded(d.Compression, d.ByteCounts[block]))
+                // block too small to give the rows it must is damaged, found before the destination is allocated. (A JPEG
+                // stream whose data runs out decodes to grey, as libjpeg does: its size says nothing of its rows.)
+                if (!jpeg && needed > MostDecoded(d.Compression, d.ByteCounts[block]))
                 {
                     throw budget.Invalid($"{kind} {block} of {d.ByteCounts[block]} {d.Compression} bytes cannot decode to the {needed} bytes "
                         + "its rows need: the file is damaged or truncated.");
                 }
 
-                largestCompressed = Math.Max(largestCompressed, CompressedToRead(d.ByteCounts[block], needed));
+                largestCompressed = Math.Max(largestCompressed, CompressedToRead(d.Compression, d.ByteCounts[block], needed));
                 largestDecoded = Math.Max(largestDecoded, needed);
             }
             else if (needed > d.ByteCounts[block])
@@ -144,9 +155,14 @@ internal sealed class PixelPlan
     /// <summary>
     /// The compressed bytes of a block read to decode <paramref name="needed"/> bytes: no codec needs more than twice what it gives
     /// (LZW at most 1.5 times, PackBits 2 bytes for a lone byte, Deflate a few bytes per stored block), with some room for headers
-    /// and for seeing data beyond the rows. A hostile file whose blocks all declare the whole file costs what its pixels need.
+    /// and for seeing data beyond the rows; JPEG at most 26 bits per sample, doubled by byte stuffing, and markers. A hostile file whose blocks all declare the whole file costs what its pixels need.
     /// </summary>
-    internal static long CompressedToRead(long byteCount, long needed) => Math.Min(byteCount, 2 * needed + 4096);
+    internal static long CompressedToRead(TiffCompression compression, long byteCount, long needed) =>
+        Math.Min(byteCount, compression == TiffCompression.Jpeg ? 8 * needed + 65536 : 2 * needed + 4096);
+
+    /// <summary>The rows of a block: the whole tile, or the rows of the strip in the image (what a JPEG frame covers).</summary>
+    internal static long BlockRows(ImageDescriptor d, long blockY) =>
+        d.Layout == TiffLayout.Tiles ? d.BlockHeight : Math.Min(d.BlockHeight, d.Height - blockY);
 
     /// <summary>
     /// The most bytes <paramref name="count"/> compressed bytes can decode to. PackBits: 2 bytes give at most 128. Deflate: at
@@ -386,14 +402,21 @@ internal static class PixelReader
         private Span<byte> Decode(PixelUnit unit, Scratch<TD> scratch)
         {
             int block = unit.Block;
-            int needed = (int)((unit.FirstRow + unit.Rows) * _rowBytes);
-            int count = (int)PixelPlan.CompressedToRead(_d.ByteCounts[block], needed);
+            long blockRows = PixelPlan.BlockRows(_d, unit.Y0 - unit.FirstRow);
+            bool jpeg = _d.Compression == TiffCompression.Jpeg;
+            int needed = (int)((jpeg ? blockRows : unit.FirstRow + unit.Rows) * _rowBytes);
+            int count = (int)PixelPlan.CompressedToRead(_d.Compression, _d.ByteCounts[block], needed);
             string kind = _d.Layout == TiffLayout.Tiles ? "tile" : "strip";
             byte[] compressed = scratch.Read;
             _source.ReadExactly(_d.Offsets[block], compressed.AsSpan(0, count));
+            if (jpeg)
+            {
+                bool lastStrip = _d.Layout == TiffLayout.Strips && unit.Y0 - unit.FirstRow + blockRows == _d.Height;
+                DecodeJpeg(compressed.AsSpan(0, count), scratch, needed, (int)blockRows, lastStrip, kind, block);
+                return scratch.Decoded.AsSpan((int)(unit.FirstRow * _rowBytes), (int)(unit.Rows * _rowBytes));
+            }
 
             // Data beyond the block is ignored, as libtiff does, unless the read is strict and the whole block is decoded.
-            long blockRows = _d.Layout == TiffLayout.Tiles ? _d.BlockHeight : Math.Min(_d.BlockHeight, _d.Height - unit.Y0 + unit.FirstRow);
             bool whole = unit.FirstRow + unit.Rows == blockRows;
             Span<byte> output = scratch.Decoded.AsSpan(0, needed);
             int written;
@@ -443,6 +466,46 @@ internal static class PixelReader
             }
 
             return rows;
+        }
+
+        /// <summary>
+        /// Decodes the JPEG stream of a block (Technical Note 2): after the tables of JPEGTables, a frame as wide as the block and
+        /// as high as its rows (the last strip may be higher, as some writers make it, and libtiff reads it), into the stored rows.
+        /// YCbCr is converted to RGB, as libtiff and tifffile deliver it; other components are given as they are.
+        /// </summary>
+        private void DecodeJpeg(ReadOnlySpan<byte> stream, Scratch<TD> scratch, int needed, int blockRows, bool lastStrip, string kind, int block)
+        {
+            // The last strip may be higher than its rows (as libtiff accepts): its planes are still counted in the budget.
+            var decoder = new JpegDecoder(_budget, (int)_d.BlockWidth, lastStrip ? ushort.MaxValue : blockRows);
+            try
+            {
+                if (_d.JpegTables is { } tables)
+                {
+                    decoder.ReadTables(tables);
+                }
+
+                var frame = decoder.Decode(stream);
+                if (frame.Width != _d.BlockWidth || frame.Height < blockRows)
+                {
+                    throw new InvalidDataException($"its frame of {frame.Width} x {frame.Height} does not cover the {_d.BlockWidth} x {blockRows} pixels of the {kind}.");
+                }
+
+                if (JpegColour.Channels(frame) != _d.SamplesPerPixel)
+                {
+                    throw new InvalidDataException($"its frame has {frame.Components.Length} components for {_d.SamplesPerPixel} samples per pixel.");
+                }
+
+                // The buffer of the rows is taken once the stream is decoded: a stream refused in its scans never costs it.
+                JpegColour.ToSamples(frame, blockRows, _d.Photometric == TiffPhotometric.YCbCr, scratch.Decoded.AsSpan(0, needed), (int)_rowBytes, _budget);
+            }
+            catch (InvalidDataException ex)
+            {
+                throw _budget.Invalid($"{kind} {block} cannot be decoded (JPEG): {ex.Message}");
+            }
+            finally
+            {
+                decoder.Release();
+            }
         }
 
         /// <summary>

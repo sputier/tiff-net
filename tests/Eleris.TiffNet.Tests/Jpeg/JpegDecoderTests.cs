@@ -94,7 +94,7 @@ public class JpegDecoderTests
         var frame = JpegFixtures.Decode(JpegFixtures.Bytes(name));
         byte[] rgb = new byte[frame.Width * frame.Height * 3];
 
-        JpegColour.ToSamples(frame, ycbcr: true, rgb, frame.Width * 3, new ResourceBudget(TiffReadOptions.Default, "test"));
+        JpegColour.ToSamples(frame, frame.Height, ycbcr: true, rgb, frame.Width * 3, new ResourceBudget(TiffReadOptions.Default, "test"));
 
         Assert.Equal(JpegFixtures.Entry(name).GetProperty("rgb").GetString(), Convert.ToHexString(SHA256.HashData(rgb)));
     }
@@ -105,7 +105,7 @@ public class JpegDecoderTests
         var frame = JpegFixtures.Decode(JpegFixtures.Bytes("ycc444_q90_37x29.jpg"));
         byte[] samples = new byte[37 * 29 * 3 + 5];
 
-        JpegColour.ToSamples(frame, ycbcr: false, samples, 37 * 3, new ResourceBudget(TiffReadOptions.Default, "test"));
+        JpegColour.ToSamples(frame, frame.Height, ycbcr: false, samples, 37 * 3, new ResourceBudget(TiffReadOptions.Default, "test"));
 
         for (int c = 0; c < 3; c++)
         {

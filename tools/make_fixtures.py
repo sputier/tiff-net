@@ -37,7 +37,10 @@ DTYPES = [np.uint8, np.int8, np.uint16, np.int16, np.uint32, np.int32, np.uint64
 CHANNELS = [1, 2, 3, 4]  # 2 = grey + extra channel, 4 = RGB + extra channel
 # None, then the codecs this library reads, then two it refuses by design (the tests expect NotSupportedException).
 COMPRESSIONS = [None, "packbits", "lzw", "zlib", "zstd", "lzma"]
-SUPPORTED_COMPRESSIONS = {None, "packbits", "lzw", "zlib"}
+SUPPORTED_COMPRESSIONS = {None, "packbits", "lzw", "zlib", "jpeg", "jpegycc", "jpeg422", "jpeg420"}
+# JPEG (lossy, 8-bit): grey, and RGB stored as YCbCr (as tifffile writes it) with chroma at full, half-width or half resolution.
+# Each file has its own samples, those tifffile decodes (libjpeg-turbo through imagecodecs), kept by file in the manifest.
+JPEG_CASES = {"jpeg": (1, None), "jpegycc": (3, (1, 1)), "jpeg422": (3, (2, 1)), "jpeg420": (3, (2, 2))}
 # Kind of the extra channel (ExtraSamples): unspecified data, associated (premultiplied) alpha, unassociated alpha.
 EXTRA_KINDS = {"u": "unspecified", "a": "assocalpha", "s": "unassalpha"}
 # Mantissa bits used by the floating point samples, so that the integer-to-float conversion is exact.
@@ -148,6 +151,31 @@ def write_file(path: Path, data: np.ndarray, channels, extra, compression, predi
     tifffile.imwrite(path, stored, **kwargs)
 
 
+def jpeg_cases():
+    """(compression token, tiled, bigtiff, byte order) of the JPEG files."""
+    return itertools.product(JPEG_CASES, [False, True], [False, True], ["<", ">"])
+
+
+def write_jpeg(folder: Path) -> dict[str, str]:
+    """The JPEG files, and the hash of the samples tifffile decodes from each."""
+    hashes = {}
+    for token, tiled, bigtiff, order in jpeg_cases():
+        channels, subsampling = JPEG_CASES[token]
+        data = samples(np.uint8, channels, seed=2000 + channels)
+        name = name_of(np.uint8, channels, "", token, False, tiled, False, bigtiff, order)
+        kwargs = dict(compression="jpeg", compressionargs={"level": 90}, bigtiff=bigtiff, byteorder=order, metadata=None,
+                      photometric="ycbcr" if channels == 3 else "minisblack")
+        if subsampling:
+            kwargs["subsampling"] = subsampling
+        if tiled:
+            kwargs["tile"] = TILE
+        else:
+            kwargs["rowsperstrip"] = 16
+        tifffile.imwrite(folder / name, data, **kwargs)
+        hashes[name] = sample_hash(tifffile.imread(folder / name))
+    return hashes
+
+
 def write(folder: Path) -> list[dict]:
     folder.mkdir(parents=True, exist_ok=True)
     all_cases = list(cases())
@@ -185,6 +213,7 @@ def main() -> int:
     update = "--update" in sys.argv
     folder = Path(args[0]) if args else DEFAULT_OUTPUT
     entries = write(folder)
+    jpeg = write_jpeg(folder)
 
     # Every storage variant of a dataset (type x channels) holds the same samples: the manifest keeps one hash per dataset and
     # the list of files, whose names encode their parameters (see name_of; the tests parse them).
@@ -202,24 +231,25 @@ def main() -> int:
         "height": HEIGHT,
         "supportedCompressions": sorted(c or "none" for c in SUPPORTED_COMPRESSIONS),
         "datasets": dict(sorted(datasets.items())),
-        "files": sorted(e["file"] for e in entries),
+        "jpeg": dict(sorted(jpeg.items())),
+        "files": sorted([e["file"] for e in entries] + list(jpeg)),
     }
     if update or not MANIFEST.exists():
         MANIFEST.parent.mkdir(parents=True, exist_ok=True)
         MANIFEST.write_text(json.dumps(document, indent=1) + "\n", encoding="utf-8", newline="\n")
-        print(f"{len(entries)} files written to {folder}; manifest updated: {MANIFEST.relative_to(ROOT)}")
+        print(f"{len(entries) + len(jpeg)} files written to {folder}; manifest updated: {MANIFEST.relative_to(ROOT)}")
         return 0
 
     expected = json.loads(MANIFEST.read_text(encoding="utf-8"))
     problems = []
-    for key in ("width", "height", "supportedCompressions", "datasets"):
+    for key in ("width", "height", "supportedCompressions", "datasets", "jpeg"):
         if expected.get(key) != document[key]:
             problems.append(f"{key} differs from the manifest")
     problems += [f"{name}: missing from the generated corpus" for name in sorted(set(expected["files"]) - set(document["files"]))]
     problems += [f"{name}: not in the manifest" for name in sorted(set(document["files"]) - set(expected["files"]))]
     for p in problems[:50]:
         print("error:", p)
-    print(f"{len(entries)} files written to {folder}; {len(problems)} difference(s) with the manifest")
+    print(f"{len(entries) + len(jpeg)} files written to {folder}; {len(problems)} difference(s) with the manifest")
     return 1 if problems else 0
 
 
