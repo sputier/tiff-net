@@ -23,6 +23,7 @@ An image whose format the library does not handle (CMYK, Lab, a compression it d
 | [`ExtraChannels`](#eleris-tiffnet-tiffimage-extrachannels) | The channels after the colour channels, with what they hold. |
 | [`Height`](#eleris-tiffnet-tiffimage-height) | The height, in pixels. |
 | [`IsReducedResolution`](#eleris-tiffnet-tiffimage-isreducedresolution) | Whether the image is a reduced-resolution version of another (a thumbnail, a level of a pyramid). |
+| [`Metadata`](#eleris-tiffnet-tiffimage-metadata) | The tags of the image other than its structure: description (the FITS header of an Astro-TIFF file), ICC profile, resolution, private tags… Read with the image and kept when it is saved again. |
 | [`SampleType`](#eleris-tiffnet-tiffimage-sampletype) | The type of the samples the image delivers. |
 | [`SubImages`](#eleris-tiffnet-tiffimage-subimages) | The images of the sub-directories (`SubIFDs`) of this one, usually reduced-resolution versions of it. |
 | [`UnsupportedReason`](#eleris-tiffnet-tiffimage-unsupportedreason) | Why the library cannot deliver this image, or `null` when it can. |
@@ -81,6 +82,15 @@ Whether the image is a reduced-resolution version of another (a thumbnail, a lev
 
 ```csharp
 public bool IsReducedResolution { get; }
+```
+
+<a id="eleris-tiffnet-tiffimage-metadata"></a>
+### `Metadata`
+
+The tags of the image other than its structure: description (the FITS header of an Astro-TIFF file), ICC profile, resolution, private tags… Read with the image and kept when it is saved again.
+
+```csharp
+public TiffMetadata Metadata { get; }
 ```
 
 <a id="eleris-tiffnet-tiffimage-sampletype"></a>
