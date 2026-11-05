@@ -27,8 +27,12 @@ public class PixelTests
 
     internal static string Sha(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes));
 
+    /// <summary>Whether the codecs the library has so far decode the image (JPEG and the predictors come later).</summary>
+    internal static bool Decodable(TiffStorage storage) => storage.Predictor == TiffPredictor.None
+        && storage.Compression is TiffCompression.None or TiffCompression.Lzw or TiffCompression.Deflate or TiffCompression.PackBits;
+
     [Fact]
-    public void Every_uncompressed_page_of_the_domain_fixtures_gives_the_expected_samples()
+    public void Every_decodable_page_of_the_domain_fixtures_gives_the_expected_samples()
     {
         int checkedPages = 0;
         foreach (var (name, entry) in DomainFixtures.Files)
@@ -37,7 +41,7 @@ public class PixelTests
             for (int i = 0; i < file.Count; i++)
             {
                 var image = file[i];
-                if (image.UnsupportedReason is not null || image.Storage!.Compression != TiffCompression.None)
+                if (image.UnsupportedReason is not null || !Decodable(image.Storage!))
                 {
                     continue;
                 }
@@ -58,7 +62,7 @@ public class PixelTests
     }
 
     [Fact]
-    public void Every_uncompressed_file_of_the_interop_corpus_gives_the_samples_of_tifffile()
+    public void Every_decodable_file_of_the_interop_corpus_gives_the_samples_of_tifffile()
     {
         if (!Directory.Exists(InteropCorpus.Folder))
         {
@@ -66,15 +70,22 @@ public class PixelTests
             return;
         }
 
-        int count = 0;
-        foreach (var f in InteropCorpus.Files.Where(f => f.Compression == "none"))
+        var counts = new Dictionary<TiffCompression, int>();
+        foreach (var f in InteropCorpus.Files)
         {
             using var file = TiffFile.Open(Path.Combine(InteropCorpus.Folder, f.Name));
+            var storage = file.Primary.Storage!;
+            if (!Decodable(storage))
+            {
+                continue;
+            }
+
             Assert.True(f.SamplesSha256 == Sha(RawBytes(file.Primary)), f.Name);
-            count++;
+            counts[storage.Compression] = counts.GetValueOrDefault(storage.Compression) + 1;
         }
 
-        Assert.True(count > 700, $"only {count} files");
+        Assert.All([TiffCompression.None, TiffCompression.Lzw, TiffCompression.Deflate, TiffCompression.PackBits],
+            c => Assert.True(counts.GetValueOrDefault(c) > 300, $"only {counts.GetValueOrDefault(c)} {c} files"));
     }
 
     [Theory]
