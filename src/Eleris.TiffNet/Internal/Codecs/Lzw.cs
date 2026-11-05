@@ -177,6 +177,12 @@ internal static class Lzw
                 {
                     destination.Slice(from, size).CopyTo(destination.Slice(written));
                 }
+                else if (from + size == written + 1 && size > 16)
+                {
+                    // The string being defined (a run): the previous string, which does not overlap, then its own first byte.
+                    destination.Slice(from, size - 1).CopyTo(destination.Slice(written));
+                    Unsafe.Add(ref output, written + size - 1) = Unsafe.Add(ref output, from);
+                }
                 else
                 {
                     // Short or overlapping (a string repeating its own start): byte by byte, forwards.

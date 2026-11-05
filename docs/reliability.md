@@ -50,7 +50,10 @@ Console.WriteLine($"Pixels: {untrusted.MaxPixelBytes >> 20} MB, threads: {untrus
 A strip or tile compressed with PackBits, LZW or Deflate is decoded into a buffer of the size the read needs, never more: data
 that would decode to gigabytes (a "compression bomb") costs the rows the image declares, and a region decodes each strip or
 tile only up to its last row. A strip that decodes to fewer bytes than its rows need is a damaged file. Data beyond the rows of
-a strip is ignored, as libtiff does, unless `Strict` is set, which reports it as a damaged file.
+a strip is ignored, as libtiff does, unless `Strict` is set, which reports it as a damaged file. A strip or tile is read
+only up to the compressed bytes its rows can need, whatever byte count it declares, so that blocks sharing their data cost no
+more than their pixels. An LZW stream that goes on once its table is full, without a clear code, is decoded with the table as
+it is, where libtiff refuses it: the codes stay defined, and the decoding stays bounded.
 
 This page grows with the library: the memory used by reads and writes, and the rules for threads, are described with the
 features that bring them.
