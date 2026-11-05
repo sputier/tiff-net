@@ -51,6 +51,55 @@ public class FuzzHarnessTests
     }
 
     [Fact]
+    public void The_input_being_run_is_written_before_it_runs()
+    {
+        string output = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        try
+        {
+            var corpus = new Corpus(Seeds);
+            string? seen = null;
+            // The fuzzer holds the file open for writing: read it as another process would, sharing it.
+            string Current()
+            {
+                using var stream = new FileStream(Path.Combine(output, "current.txt"), FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                return new StreamReader(stream).ReadToEnd();
+            }
+
+            var campaign = new Campaign(corpus, _ => seen ??= Current(), MutationMode.Mixed, 9, output);
+
+            campaign.Run(TimeSpan.FromSeconds(30), maxIterations: 1);
+
+            Assert.StartsWith($"seed=9 iteration=0 mode=Mixed corpus={corpus.Id} ({corpus.Count} files): running", seen, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(output, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void The_corpus_is_identified_by_its_content()
+    {
+        Assert.Equal(new Corpus(Seeds).Id, new Corpus(Seeds).Id);
+        Assert.NotEqual(new Corpus(Seeds).Id, new Corpus(Seeds[1..]).Id);
+        Assert.Throws<InvalidOperationException>(() => new Corpus([]).Input(1, 0, MutationMode.Mixed));
+    }
+
+    [Fact]
+    public void Inputs_do_not_repeat_over_long_campaigns()
+    {
+        var corpus = new Corpus(Seeds);
+        var seen = new HashSet<string>();
+        // Iterations far apart, where a linear seed formula wrapped and repeated inputs.
+        foreach (long i in Enumerable.Range(0, 400).Select(k => 271_000L + k * 1_000L))
+        {
+            seen.Add(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(corpus.Input(1, i, MutationMode.Havoc))));
+        }
+
+        Assert.True(seen.Count > 390, $"only {seen.Count} distinct inputs out of 400");
+    }
+
+    [Fact]
     public void Outcomes_are_classified()
     {
         string output = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
@@ -81,7 +130,7 @@ public class FuzzHarnessTests
             string[] saved = Directory.GetFiles(Path.Combine(output, "crash"), "*.tif");
             Assert.NotEmpty(saved);
             string note = File.ReadAllText(saved[0] + ".txt");
-            var match = System.Text.RegularExpressions.Regex.Match(note, @"seed=5 iteration=(\d+) mode=Havoc");
+            var match = System.Text.RegularExpressions.Regex.Match(note, @"seed=5 iteration=(\d+) mode=Havoc corpus=" + corpus.Id);
             Assert.True(match.Success, note);
             Assert.Equal(File.ReadAllBytes(saved[0]), corpus.Input(5, long.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture), MutationMode.Havoc));
         }

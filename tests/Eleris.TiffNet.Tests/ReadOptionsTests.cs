@@ -58,7 +58,7 @@ public class ResourceBudgetTests
         var ex = Assert.Throws<TiffException>(() => budget.ReservePixels(1, "one more byte"));
 
         Assert.Equal("MaxPixelBytes", ex.Limit);
-        Assert.StartsWith("m42.tif: one more byte needs 1 bytes", ex.Message, StringComparison.Ordinal);
+        Assert.StartsWith("m42.tif: one more byte needs 1 bytes, beyond the 0 bytes left", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -71,7 +71,7 @@ public class ResourceBudgetTests
             var budget = Budget(TiffReadOptions.Default with { MaxPixelBytes = 1L << 30 });
             var ex = Assert.Throws<TiffException>(() => budget.ReservePixels(3L << 29, "the image"));
 
-            Assert.Contains("needs 1.5 GB, beyond the 1 GB allowed", ex.Message, StringComparison.Ordinal);
+            Assert.Contains("needs 1.5 GB (1610612736 bytes), beyond the 1 GB (1073741824 bytes) left", ex.Message, StringComparison.Ordinal);
         }
         finally
         {
@@ -95,6 +95,30 @@ public class ResourceBudgetTests
 
         budget.ReservePixels(1L << 30, "half");
         Assert.Throws<TiffException>(() => budget.ReservePixels(long.MaxValue, "everything"));
+    }
+
+    [Fact]
+    public void A_refused_reservation_does_not_make_a_concurrent_one_fail()
+    {
+        var budget = Budget(TiffReadOptions.Default with { MaxPixelBytes = 1_000_000 });
+        int refusedSmall = 0;
+
+        Parallel.For(0, 20_000, new ParallelOptions { MaxDegreeOfParallelism = 8 }, i =>
+        {
+            try
+            {
+                budget.ReservePixels(i % 2 == 0 ? 10_000_000 : 1, i % 2 == 0 ? "a huge image" : "a byte");
+            }
+            catch (TiffException) when (i % 2 == 1)
+            {
+                Interlocked.Increment(ref refusedSmall);
+            }
+            catch (TiffException)
+            {
+            }
+        });
+
+        Assert.Equal(0, refusedSmall);   // 10 000 single bytes always fit in 1 000 000, whatever the huge ones do
     }
 
     [Fact]
@@ -161,5 +185,7 @@ public class ResourceBudgetTests
         Assert.DoesNotContain("private", ex.Message, StringComparison.Ordinal);
         Assert.Null(ex.Limit);
         Assert.Equal("stream", ResourceBudget.NameOf(null));
+        // A path given by a caller (FileStream.Name, for example) is reduced to the file name too.
+        Assert.Equal("m42.tif", new ResourceBudget(TiffReadOptions.Default, path).SourceName);
     }
 }

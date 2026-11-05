@@ -18,6 +18,19 @@ public class HostileAssertTests
             Second, Megabytes64, "case");
         HostileAssert.FailsWithinBounds(() => throw new NotSupportedException("palette"), "NotSupportedException", Second, Megabytes64,
             "case");
+        HostileAssert.FailsWithinBounds(() => throw new TiffException("big", "MaxJpegScans"), "TiffException:*", Second, Megabytes64, "case");
+        HostileAssert.FailsWithinBounds(() => throw new TiffException("damaged"), "TiffException:*", Second, Megabytes64, "case");
+        HostileAssert.FailsWithinBounds(() => throw new NotSupportedException("CMYK"), "TiffException:*|NotSupportedException", Second,
+            Megabytes64, "case");
+    }
+
+    [Fact]
+    public void A_damaged_file_is_not_a_file_too_large()
+    {
+        // "TiffException" alone means damaged: a refusal for a limit is a different outcome.
+        var ex = Assert.Throws<XunitException>(() => HostileAssert.FailsWithinBounds(
+            () => throw new TiffException("big", "MaxPixelBytes"), "TiffException", Second, Megabytes64, "case"));
+        Assert.Contains("TiffException:MaxPixelBytes", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -76,7 +89,7 @@ public class HostileAssertTests
         {
             Assert.True(File.Exists(c.Path), $"{c} is missing");
             Assert.Matches("^SEC-0[1-6]$", c.Finding);
-            Assert.Matches("^(TiffException(:Max[A-Za-z]+)?|NotSupportedException)$", c.Outcome);
+            Assert.All(c.Outcome.Split('|'), o => Assert.Matches(@"^(TiffException(:(Max[A-Za-z]+|\*))?|NotSupportedException)$", o));
             Assert.InRange(c.MaxTime, TimeSpan.FromMilliseconds(100), TimeSpan.FromSeconds(10));
             Assert.InRange(c.MaxAllocatedBytes, 1L << 20, 256L << 20);
         });
@@ -84,5 +97,9 @@ public class HostileAssertTests
         {
             Assert.Contains(cases, c => c.Finding == finding);
         }
+
+        // Files that are only too large for a small device are read with its limit; the default limit is tested too.
+        Assert.Contains(cases, c => c.Outcome == "TiffException:MaxPixelBytes" && c.Options.MaxPixelBytes == 64L << 20);
+        Assert.Contains(cases, c => c.Outcome == "TiffException:MaxPixelBytes" && c.Options == TiffReadOptions.Default);
     }
 }

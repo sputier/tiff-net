@@ -1,4 +1,3 @@
-using System.Buffers;
 using Microsoft.Win32.SafeHandles;
 
 namespace Eleris.TiffNet.Internal;
@@ -14,15 +13,16 @@ namespace Eleris.TiffNet.Internal;
 /// </remarks>
 internal abstract class TiffSource : IDisposable
 {
-    private const int ChunkSize = 1 << 20;
+    /// <summary>The size of the segments a stream is held in: no segment is a large object, and nothing is copied twice.</summary>
+    private const int SegmentSize = 64 * 1024;
 
     protected TiffSource(string name, long length)
     {
-        Name = name;
+        Name = ResourceBudget.NameOf(name);
         Length = length;
     }
 
-    /// <summary>The name of the file in messages: its file name, or "stream".</summary>
+    /// <summary>The name of the file in messages: its file name, never a path.</summary>
     public string Name { get; }
 
     /// <summary>The number of bytes of the TIFF data.</summary>
@@ -67,17 +67,35 @@ internal abstract class TiffSource : IDisposable
     }
 
     /// <summary>Opens a file for reading at explicit offsets.</summary>
+    /// <remarks>
+    /// The file is shared for reading, writing and deletion, so that an application can save over a file it has open (the save
+    /// replaces it through a temporary file) and other programs can read it meanwhile.
+    /// </remarks>
     public static TiffSource Open(string path)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
-        return new FileSource(path);
+        var handle = File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, FileOptions.RandomAccess);
+        try
+        {
+            return new FileSource(handle, path, RandomAccess.GetLength(handle));
+        }
+        catch
+        {
+            // GetLength fails on what is not a regular file (a pipe, a device): the handle must not wait for its finalizer.
+            handle.Dispose();
+            throw;
+        }
     }
+
+    /// <summary>A source over bytes already in memory.</summary>
+    public static TiffSource FromMemory(ReadOnlyMemory<byte> data, string name = "memory") => new MemorySource(data, name);
 
     /// <summary>
     /// The remaining bytes of a stream, held in memory: from the current position of a seekable stream, or everything a stream
-    /// that cannot seek gives. At most <see cref="TiffReadOptions.MaxInputBytes"/> bytes are taken.
+    /// that cannot seek gives. At most <see cref="TiffReadOptions.MaxInputBytes"/> bytes are taken, and never more than one .NET
+    /// array can hold.
     /// </summary>
-    /// <exception cref="TiffException">The stream holds more than <see cref="TiffReadOptions.MaxInputBytes"/> (with that limit named).</exception>
+    /// <exception cref="TiffException">The stream holds more than the limit (with <c>MaxInputBytes</c> named).</exception>
     public static TiffSource FromStream(Stream stream, TiffReadOptions options, string name = "stream")
     {
         ArgumentNullException.ThrowIfNull(stream);
@@ -89,28 +107,22 @@ internal abstract class TiffSource : IDisposable
             return new MemorySource(data, name);
         }
 
-        var chunks = new List<byte[]>();
-        try
+        var segments = new List<byte[]>();
+        long total = 0;
+        while (true)
         {
-            long total = 0;
-            while (true)
+            byte[] segment = new byte[SegmentSize];
+            int filled = stream.ReadAtLeast(segment, SegmentSize, throwOnEndOfStream: false);
+            total += filled;
+            CheckInput(total, options, name);
+            if (filled > 0)
             {
-                byte[] chunk = ArrayPool<byte>.Shared.Rent(ChunkSize);
-                chunks.Add(chunk);
-                int filled = stream.ReadAtLeast(chunk.AsSpan(0, ChunkSize), ChunkSize, throwOnEndOfStream: false);
-                total += filled;
-                CheckInput(total, options, name);
-                if (filled < ChunkSize)
-                {
-                    return new MemorySource(Concatenate(chunks, total), name);
-                }
+                segments.Add(segment);
             }
-        }
-        finally
-        {
-            foreach (byte[] chunk in chunks)
+
+            if (filled < SegmentSize)
             {
-                ArrayPool<byte>.Shared.Return(chunk);
+                return new SegmentedSource(segments, total, name);
             }
         }
     }
@@ -128,32 +140,30 @@ internal abstract class TiffSource : IDisposable
             return new MemorySource(data, name);
         }
 
-        var chunks = new List<byte[]>();
-        try
+        var segments = new List<byte[]>();
+        long total = 0;
+        while (true)
         {
-            long total = 0;
-            while (true)
+            // A stream that ignores the token must still stop when the caller cancels.
+            cancellationToken.ThrowIfCancellationRequested();
+            byte[] segment = new byte[SegmentSize];
+            int filled = await stream.ReadAtLeastAsync(segment, SegmentSize, throwOnEndOfStream: false, cancellationToken).ConfigureAwait(false);
+            total += filled;
+            CheckInput(total, options, name);
+            if (filled > 0)
             {
-                byte[] chunk = ArrayPool<byte>.Shared.Rent(ChunkSize);
-                chunks.Add(chunk);
-                int filled = await stream.ReadAtLeastAsync(chunk.AsMemory(0, ChunkSize), ChunkSize, throwOnEndOfStream: false,
-                    cancellationToken).ConfigureAwait(false);
-                total += filled;
-                CheckInput(total, options, name);
-                if (filled < ChunkSize)
-                {
-                    return new MemorySource(Concatenate(chunks, total), name);
-                }
+                segments.Add(segment);
             }
-        }
-        finally
-        {
-            foreach (byte[] chunk in chunks)
+
+            if (filled < SegmentSize)
             {
-                ArrayPool<byte>.Shared.Return(chunk);
+                return new SegmentedSource(segments, total, name);
             }
         }
     }
+
+    /// <summary>The limit of a stream held in memory: the option, and never more than one .NET array.</summary>
+    private static long InputLimit(TiffReadOptions options) => Math.Min(options.MaxInputBytes, Array.MaxLength);
 
     private static long RemainingLength(Stream stream, TiffReadOptions options, string name)
     {
@@ -164,45 +174,22 @@ internal abstract class TiffSource : IDisposable
 
     private static void CheckInput(long total, TiffReadOptions options, string name)
     {
-        if (total > options.MaxInputBytes)
+        long limit = InputLimit(options);
+        if (total > limit)
         {
             throw new TiffException(
-                $"{name}: the stream holds more than the {options.MaxInputBytes} bytes allowed by MaxInputBytes.", nameof(TiffReadOptions.MaxInputBytes));
+                $"{ResourceBudget.NameOf(name)}: the stream holds more than the {limit} bytes allowed by MaxInputBytes.",
+                nameof(TiffReadOptions.MaxInputBytes));
         }
     }
 
-    private static byte[] Concatenate(List<byte[]> chunks, long total)
+    private sealed class FileSource(SafeFileHandle handle, string path, long length) : TiffSource(path, length)
     {
-        byte[] data = new byte[total];
-        long at = 0;
-        foreach (byte[] chunk in chunks)
-        {
-            int count = (int)Math.Min(ChunkSize, total - at);
-            chunk.AsSpan(0, count).CopyTo(data.AsSpan((int)at));
-            at += count;
-        }
-
-        return data;
-    }
-
-    private sealed class FileSource : TiffSource
-    {
-        private readonly SafeFileHandle _handle;
-
-        public FileSource(string path) : this(File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.Read, FileOptions.RandomAccess), path)
-        {
-        }
-
-        private FileSource(SafeFileHandle handle, string path) : base(ResourceBudget.NameOf(path), RandomAccess.GetLength(handle))
-        {
-            _handle = handle;
-        }
-
         protected override void ReadCore(long offset, Span<byte> destination)
         {
             while (destination.Length > 0)
             {
-                int read = RandomAccess.Read(_handle, destination, offset);
+                int read = RandomAccess.Read(handle, destination, offset);
                 if (read == 0)
                 {
                     // Within the length measured at opening: the file has been shortened by someone else since.
@@ -218,7 +205,7 @@ internal abstract class TiffSource : IDisposable
         {
             if (disposing)
             {
-                _handle.Dispose();
+                handle.Dispose();
             }
 
             base.Dispose(disposing);
@@ -231,6 +218,20 @@ internal abstract class TiffSource : IDisposable
             data.Span.Slice((int)offset, destination.Length).CopyTo(destination);
     }
 
-    /// <summary>A source over bytes already in memory (tests, and images built in memory).</summary>
-    public static TiffSource FromMemory(ReadOnlyMemory<byte> data, string name = "memory") => new MemorySource(data, name);
+    /// <summary>A stream that could not seek, held in the segments it was read into: no copy into one large array.</summary>
+    private sealed class SegmentedSource(List<byte[]> segments, long length, string name) : TiffSource(name, length)
+    {
+        protected override void ReadCore(long offset, Span<byte> destination)
+        {
+            while (destination.Length > 0)
+            {
+                int index = (int)(offset / SegmentSize);
+                int within = (int)(offset % SegmentSize);
+                int count = Math.Min(destination.Length, SegmentSize - within);
+                segments[index].AsSpan(within, count).CopyTo(destination);
+                destination = destination[count..];
+                offset += count;
+            }
+        }
+    }
 }
