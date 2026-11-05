@@ -11,14 +11,22 @@ internal static class Deflate
     /// <param name="destination">The decoded bytes wanted: the inflation stops when it is full.</param>
     /// <param name="checkOverflow">Whether to look for data beyond the destination (one more byte inflated).</param>
     /// <param name="overflow">Whether the stream goes on beyond the destination (always false unless checked).</param>
-    /// <exception cref="InvalidDataException">The stream is damaged.</exception>
+    /// <exception cref="InvalidDataException">The stream is damaged (whether zlib reports it as invalid data or as an error).</exception>
     public static int Decode(byte[] source, int length, Span<byte> destination, bool checkOverflow, out bool overflow)
     {
         using var compressed = new MemoryStream(source, 0, length, writable: false);
         using var zlib = new ZLibStream(compressed, CompressionMode.Decompress);
-        int written = zlib.ReadAtLeast(destination, destination.Length, throwOnEndOfStream: false);
-        Span<byte> one = stackalloc byte[1];
-        overflow = checkOverflow && written == destination.Length && zlib.Read(one) > 0;
-        return written;
+        try
+        {
+            int written = zlib.ReadAtLeast(destination, destination.Length, throwOnEndOfStream: false);
+            Span<byte> one = stackalloc byte[1];
+            overflow = checkOverflow && written == destination.Length && zlib.Read(one) > 0;
+            return written;
+        }
+        catch (IOException ex)
+        {
+            // zlib reports some damaged streams as a ZLibException (an IOException): the data is in memory, it is damaged data.
+            throw new InvalidDataException(ex.Message, ex);
+        }
     }
 }

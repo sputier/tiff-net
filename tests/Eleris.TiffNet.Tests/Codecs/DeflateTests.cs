@@ -49,4 +49,13 @@ public class DeflateTests
 
         Assert.Throws<InvalidDataException>(() => Deflate.Decode(compressed, compressed.Length, new byte[50_000], false, out _));
     }
+
+    [Fact]
+    public void A_stream_that_zlib_reports_as_an_error_is_invalid_data()
+    {
+        // A header asking for a preset dictionary (FDICT), which TIFF never uses: zlib reports an error, not invalid data.
+        byte[] compressed = [0x78, 0xBB, 0, 0, 0, 1, 0x63, 0, 0];
+
+        Assert.Throws<InvalidDataException>(() => Deflate.Decode(compressed, compressed.Length, new byte[100], false, out _));
+    }
 }
