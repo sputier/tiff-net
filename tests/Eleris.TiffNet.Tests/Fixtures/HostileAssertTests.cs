@@ -65,7 +65,7 @@ public class HostileAssertTests
             Thread.Sleep(200);
             throw new TiffException("damaged");
         }, "TiffException", TimeSpan.FromMilliseconds(50), Megabytes64, "case"));
-        Assert.Contains("failed after", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("took", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]

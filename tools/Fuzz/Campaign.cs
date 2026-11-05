@@ -9,13 +9,41 @@ namespace Eleris.TiffNet.Fuzz;
 internal static class Targets
 {
     /// <summary>
-    /// The targets by name. "none" only exercises the harness (mutations, timing, saving); the readers become targets as they are
-    /// written ("read": open the file from memory and read the pixels of every page).
+    /// The targets by name. "none" only exercises the harness (mutations, timing, saving); "open" reads the structure of a file
+    /// from memory and every property of its pages and sub-images; the pixels become a target when they can be read.
     /// </summary>
     public static readonly IReadOnlyDictionary<string, Action<byte[]>> All = new Dictionary<string, Action<byte[]>>
     {
         ["none"] = static _ => { },
+        ["open"] = Open,
     };
+
+    private static void Open(byte[] input)
+    {
+        using var file = TiffFile.Read(new MemoryStream(input, writable: false), Options);
+        _ = file.Primary;
+        foreach (var image in file)
+        {
+            Touch(image);
+        }
+    }
+
+    private static void Touch(TiffImage image)
+    {
+        _ = (image.Width, image.Height, image.Channels, image.ExtraChannels.Count, image.IsReducedResolution, image.UnsupportedReason);
+        if (image.UnsupportedReason is null)
+        {
+            _ = (image.SampleType, image.ColorModel);
+        }
+
+        foreach (var sub in image.SubImages)
+        {
+            Touch(sub);
+        }
+    }
+
+    /// <summary>The limits of a campaign: those of a small device, so that a valid but large input is not a finding.</summary>
+    private static readonly TiffReadOptions Options = TiffReadOptions.Default with { MaxPixelBytes = 256L << 20, MaxInputBytes = 16L << 20 };
 }
 
 /// <summary>The seed files of a campaign; an input is a pure function of the campaign seed, its iteration and this corpus.</summary>
