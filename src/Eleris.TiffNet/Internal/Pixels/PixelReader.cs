@@ -92,7 +92,14 @@ internal sealed class PixelPlan
             long needed = end * rowBytes;
             if (compressed)
             {
-                // What a block decodes to is known once it is decoded; what it needs is bounded by its rows.
+                // What a block decodes to is known once it is decoded, but no codec expands its data beyond a fixed ratio: a
+                // block too small to give the rows it must is damaged, found before the destination is allocated.
+                if (needed > MostDecoded(d.Compression, d.ByteCounts[block]))
+                {
+                    throw budget.Invalid($"{kind} {block} of {d.ByteCounts[block]} {d.Compression} bytes cannot decode to the {needed} bytes "
+                        + "its rows need: the file is damaged or truncated.");
+                }
+
                 largestCompressed = Math.Max(largestCompressed, d.ByteCounts[block]);
                 largestDecoded = Math.Max(largestDecoded, needed);
             }
@@ -118,6 +125,18 @@ internal sealed class PixelPlan
         budget.ReservePixels(plan.Workers * scratch, "the decoding buffers");
         return plan;
     }
+
+    /// <summary>
+    /// The most bytes <paramref name="count"/> compressed bytes can decode to. PackBits: 2 bytes give at most 128. Deflate: at
+    /// most 1032 bytes per byte (258 bytes per match of at least 2 bits), plus the zlib header and checksum. LZW: a code of at least
+    /// 9 bits gives at most a string of 4096 bytes.
+    /// </summary>
+    internal static long MostDecoded(TiffCompression compression, long count) => compression switch
+    {
+        TiffCompression.PackBits => count * 64,
+        TiffCompression.Deflate => count * 1032 + 1024,
+        _ => count * 8 / 9 * 4096 + 4096,
+    };
 
     /// <summary>The units of work covering the stored rectangle, block after block (plane by plane for planar images).</summary>
     public IEnumerable<PixelUnit> Units()
