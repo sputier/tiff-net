@@ -242,7 +242,8 @@ public void ReadPixels<T>(Span<T> destination, TiffPixelScale scale = TiffPixelS
 - [`ArgumentException`](https://learn.microsoft.com/dotnet/api/system.argumentexception) — `destination` is not of the size of the image.
 - [`InvalidOperationException`](https://learn.microsoft.com/dotnet/api/system.invalidoperationexception) — The conversion could lose values.
 - [`NotSupportedException`](https://learn.microsoft.com/dotnet/api/system.notsupportedexception) — The library does not handle the format of the image.
-- [`TiffException`](Eleris.TiffNet.TiffException.md) — The pixel data is damaged.
+- [`TiffException`](Eleris.TiffNet.TiffException.md) — The pixel data is damaged, or the decoding buffers exceed [`TiffReadOptions.MaxPixelBytes`](Eleris.TiffNet.TiffReadOptions.md#eleris-tiffnet-tiffreadoptions-maxpixelbytes).
+- [`ObjectDisposedException`](https://learn.microsoft.com/dotnet/api/system.objectdisposedexception) — The file is disposed.
 
 <a id="eleris-tiffnet-tiffimage-readpixelsasync-1-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder-system-threading-cancellationtoken"></a>
 ### `ReadPixelsAsync<T>(TiffPixelScale, TiffPixelOrder, CancellationToken)`
@@ -265,7 +266,15 @@ public Task<T[]> ReadPixelsAsync<T>(TiffPixelScale scale = TiffPixelScale.Stored
 
 **Returns**
 
-A new array of `Width × Height × Channels` samples.
+A new array of `Width × Height × Channels` samples. Every failure, including a type that cannot be read, is reported by the task, never thrown by the call.
+
+**Exceptions**
+
+- [`InvalidOperationException`](https://learn.microsoft.com/dotnet/api/system.invalidoperationexception) — The conversion could lose values, or the image holds more samples than an array can.
+- [`NotSupportedException`](https://learn.microsoft.com/dotnet/api/system.notsupportedexception) — The library does not handle the format of the image ([`TiffImage.UnsupportedReason`](#eleris-tiffnet-tiffimage-unsupportedreason)).
+- [`TiffException`](Eleris.TiffNet.TiffException.md) — The pixel data is damaged, or exceeds [`TiffReadOptions.MaxPixelBytes`](Eleris.TiffNet.TiffReadOptions.md#eleris-tiffnet-tiffreadoptions-maxpixelbytes).
+- [`ObjectDisposedException`](https://learn.microsoft.com/dotnet/api/system.objectdisposedexception) — The file is disposed.
+- [`OperationCanceledException`](https://learn.microsoft.com/dotnet/api/system.operationcanceledexception) — `cancellationToken` was cancelled.
 
 <a id="eleris-tiffnet-tiffimage-readrawpixels-1-eleris-tiffnet-tiffpixelorder"></a>
 ### `ReadRawPixels<T>(TiffPixelOrder)`

@@ -21,6 +21,15 @@ internal static class SampleConversion
         _ => typeof(double),
     };
 
+    /// <summary>The size in bytes of a sample of a type.</summary>
+    public static int SizeOf(TiffSampleType type) => type switch
+    {
+        TiffSampleType.UInt8 or TiffSampleType.Int8 => 1,
+        TiffSampleType.UInt16 or TiffSampleType.Int16 or TiffSampleType.Float16 => 2,
+        TiffSampleType.UInt32 or TiffSampleType.Int32 or TiffSampleType.Float32 => 4,
+        _ => 8,
+    };
+
     /// <exception cref="InvalidOperationException">The samples cannot be read as <typeparamref name="T"/> that way.</exception>
     public static void Check<T>(TiffSampleType stored, TiffPixelScale scale, bool raw) where T : unmanaged, INumber<T>
     {

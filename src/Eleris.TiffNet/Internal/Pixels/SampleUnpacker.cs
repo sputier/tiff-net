@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Eleris.TiffNet.Internal.Structure;
 
@@ -36,7 +37,7 @@ internal static class SampleUnpacker
         int bits = d.BitsPerSample;
         bool palette = d.Photometric == TiffPhotometric.Palette;
 
-        if (!palette && bits == Marshal.SizeOf<TD>() * 8)
+        if (!palette && bits == Unsafe.SizeOf<TD>() * 8)
         {
             // Whole bytes per sample, the delivered type: a copy, swapped when the file is big endian.
             Span<TD> values = MemoryMarshal.Cast<byte, TD>(raw[..(count * (bits / 8))]);
@@ -55,9 +56,10 @@ internal static class SampleUnpacker
             }
         }
 
-        if (d.Photometric == TiffPhotometric.MinIsWhite)
+        if (d.Photometric == TiffPhotometric.MinIsWhite && (!d.Planar || plane == 0))
         {
-            Invert(d, destination[..count]);
+            // Only the grey samples: the extra samples (alpha) keep their meaning.
+            Invert(d, destination[..count], stored);
         }
 
         if (palette)
@@ -90,11 +92,13 @@ internal static class SampleUnpacker
         return value;
     }
 
-    private static void Invert<TD>(ImageDescriptor d, Span<TD> values) where TD : unmanaged, INumber<TD>
+    /// <summary>Inverts every <paramref name="stride"/>-th value, starting with the first: the grey samples of the row.</summary>
+    private static void Invert<TD>(ImageDescriptor d, Span<TD> values, int stride) where TD : unmanaged, INumber<TD>
     {
-        if (d.SampleFormat == 3)
+        if (d.SampleFormat is 2 or 3)
         {
-            for (int i = 0; i < values.Length; i++)
+            // Floating point, and signed grey with 0 as white (not defined well by TIFF): negated.
+            for (int i = 0; i < values.Length; i += stride)
             {
                 values[i] = -values[i];
             }
@@ -104,18 +108,7 @@ internal static class SampleUnpacker
 
         // max − value, max being the largest value of the stored depth (1 for a bilevel mask).
         TD max = TD.CreateTruncating(d.BitsPerSample >= 64 ? ulong.MaxValue : (1UL << d.BitsPerSample) - 1);
-        if (d.SampleFormat == 2)
-        {
-            // Signed grey with 0 as white is not defined well by TIFF; negate as for floating point.
-            for (int i = 0; i < values.Length; i++)
-            {
-                values[i] = -values[i];
-            }
-
-            return;
-        }
-
-        for (int i = 0; i < values.Length; i++)
+        for (int i = 0; i < values.Length; i += stride)
         {
             values[i] = max - values[i];
         }
