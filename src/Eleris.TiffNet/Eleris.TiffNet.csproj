@@ -5,6 +5,8 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <IsTrimmable>true</IsTrimmable>
     <IsAotCompatible>true</IsAotCompatible>
+    <!-- SkipLocalsInit only: the tables of the LZW decoder (24 KB) are not cleared for every strip or tile. No unsafe code. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Description>Pure managed .NET library to read and write TIFF images, made for astronomy and scientific data.</Description>
   </PropertyGroup>
 
@@ -34,6 +36,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Eleris.TiffNet.Tests" />
+    <InternalsVisibleTo Include="Eleris.TiffNet.Benchmarks" />
   </ItemGroup>
 
 </Project>
