@@ -145,6 +145,57 @@ public class MetadataTests
     }
 
     [Fact]
+    public void Hostile_resolutions_are_no_resolution()
+    {
+        TiffResolution? Of(long xNum, long xDen, long unit)
+        {
+            var builder = new TiffBuilder { Data = new byte[12] };
+            builder.AddDirectory().Image(4, 3).Add(282, TiffTagType.Rational, xNum, xDen).Add(283, TiffTagType.Rational, 72, 1)
+                .Add(296, TiffTagType.Short, unit);
+            using var file = TiffFile.Read(new MemoryStream(builder.Build()));
+            return file.Primary.Metadata.Resolution;
+        }
+
+        Assert.Null(Of(1, 0, 2));   // infinite
+        Assert.Null(Of(0, 0, 2));   // not a number
+        Assert.Null(Of(0, 1, 2));   // zero
+        Assert.Equal(new TiffResolution(72, 72, TiffResolutionUnit.Inch), Of(72, 1, 77));   // unknown unit: inches, as libtiff
+        Assert.Throws<ArgumentOutOfRangeException>(() => new TiffMetadata { Resolution = new TiffResolution(72, 72, (TiffResolutionUnit)77) });
+    }
+
+    [Theory]
+    [InlineData(300.0, 300u, 1u)]
+    [InlineData(72.5, 145u, 2u)]
+    [InlineData(0.00004, 1u, 25000u)]
+    [InlineData(118.11023622047244, 3000u, 25u + 0u)]
+    public void Resolutions_are_stored_as_the_closest_fraction(double value, uint numerator, uint denominator)
+    {
+        var (n, d) = TiffMetadata.Rational(value);
+
+        Assert.Equal(value, (double)n / d, 1e-9);
+        if (denominator != 25)
+        {
+            Assert.Equal((numerator, denominator), (n, d));
+        }
+    }
+
+    [Fact]
+    public void Reading_the_first_string_of_a_huge_tag_does_not_decode_the_others()
+    {
+        byte[] values = new byte[8_000_000];
+        for (int i = 0; i < values.Length; i += 2)
+        {
+            values[i] = (byte)'x';
+        }
+
+        var tag = TiffTag.FromBytes(270, values, TiffTagType.Ascii);
+        long before = GC.GetAllocatedBytesForCurrentThread();
+
+        Assert.Equal("x", tag.AsString());
+        Assert.True(GC.GetAllocatedBytesForCurrentThread() - before < 10_000);
+    }
+
+    [Fact]
     public void Metadata_can_be_edited()
     {
         var m = new TiffMetadata

@@ -86,10 +86,15 @@ internal sealed class TiffBuilder(bool bigTiff = false, bool littleEndian = true
     }
 
     /// <summary>The offset at which directory <paramref name="index"/> is written (its place in the file, whatever the links).</summary>
-    public long OffsetOf(int index)
+    /// <remarks>Compute it before changing a directory: <c>d.Remove(t).Add(t, type, OffsetOf(i))</c> evaluates the offset after the
+    /// removal, when the directory is shorter.</remarks>
+    public long OffsetOf(int index) => Offsets()[index];
+
+    /// <summary>The offsets of every directory, from one build.</summary>
+    public IReadOnlyList<long> Offsets()
     {
         Build();
-        return _laidOut[index];
+        return [.. _laidOut];
     }
 
     private static void Align(List<byte> output)

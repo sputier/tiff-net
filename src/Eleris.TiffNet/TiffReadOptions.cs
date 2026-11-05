@@ -19,6 +19,7 @@ public sealed record TiffReadOptions
     private readonly int _maxDirectories = 10_000;
     private readonly int _maxTagsPerDirectory = 4_096;
     private readonly long _maxTagBytes = 64L << 20;
+    private readonly long _maxMetadataBytes = 256L << 20;
     private readonly int _maxJpegScans = 100;
     private readonly int _maxDegreeOfParallelism = -1;
 
@@ -74,12 +75,28 @@ public sealed record TiffReadOptions
         init => _maxTagsPerDirectory = (int)Positive(value);
     }
 
-    /// <summary>The size of the values of one tag. 64 MB by default, which ICC profiles and XMP packets fit in.</summary>
+    /// <summary>
+    /// The size of the values of one tag. 64 MB by default, which ICC profiles and XMP packets fit in. A larger metadata tag is
+    /// left out of <see cref="TiffImage.Metadata"/> (refused with <see cref="Strict"/>); a larger table of strips or tiles is a
+    /// <see cref="TiffException"/>.
+    /// </summary>
     /// <exception cref="ArgumentOutOfRangeException">The value is not positive.</exception>
     public long MaxTagBytes
     {
         get => _maxTagBytes;
         init => _maxTagBytes = Positive(value);
+    }
+
+    /// <summary>
+    /// The memory that opening a file may use for what its directories hold: the entries, the values of the tags (metadata,
+    /// EXIF, ICC profiles…) and the tables of strips and tiles, all pages together. 256 MB by default. Tags can share their values
+    /// in a file, so this is what bounds a small file that declares many large tags.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">The value is not positive.</exception>
+    public long MaxMetadataBytes
+    {
+        get => _maxMetadataBytes;
+        init => _maxMetadataBytes = Positive(value);
     }
 
     /// <summary>The number of scans of a progressive JPEG image. 100 by default; a normal image has about 10.</summary>

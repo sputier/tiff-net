@@ -18,7 +18,7 @@ namespace Eleris.TiffNet;
 public sealed class TiffFile : IReadOnlyList<TiffImage>, IDisposable
 {
     private readonly List<TiffImage> _images;
-    private readonly TiffSource? _source;
+    private readonly TiffSource _source;
 
     private TiffFile(TiffSource source, TiffReadOptions options, List<TiffImage> images)
     {
@@ -43,7 +43,7 @@ public sealed class TiffFile : IReadOnlyList<TiffImage>, IDisposable
     /// <summary>The options the file was read with.</summary>
     public TiffReadOptions Options { get; }
 
-    internal TiffSource Source => _source ?? throw new InvalidOperationException("The file has no source.");
+    internal TiffSource Source => _source;
 
     /// <summary>Opens a file and reads its directories; the pixels are read on demand, until the file is disposed.</summary>
     /// <param name="path">The path of the file.</param>
@@ -97,9 +97,12 @@ public sealed class TiffFile : IReadOnlyList<TiffImage>, IDisposable
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     /// <summary>Closes the file opened by <see cref="Open"/>; its pixels can no longer be read. The metadata stays available.</summary>
-    public void Dispose() => _source?.Dispose();
+    public void Dispose() => _source.Dispose();
 
     private static string NameOf(Stream stream) => stream is FileStream file ? file.Name : "stream";
+
+    /// <summary>How deep sub-directories are read: a pyramid needs one level; deeper chains are cut, never followed recursively.</summary>
+    internal const int MaxSubImageDepth = 8;
 
     private static TiffFile Load(TiffSource source, TiffReadOptions options, CancellationToken cancellationToken = default)
     {
@@ -112,18 +115,21 @@ public sealed class TiffFile : IReadOnlyList<TiffImage>, IDisposable
                 throw budget.Invalid("the file has no image.");
             }
 
-            var images = new List<TiffImage>();
+            // The pages first, so that a sub-directory pointing to a page cannot take it out of the chain.
+            var pages = new List<RawDirectory>();
             for (var directory = reader.ReadDirectory(reader.Header.FirstDirectory); directory is not null;
                  directory = directory.Next == 0 ? null : reader.ReadDirectory(directory.Next))
             {
-                images.Add(ReadImage(reader, directory));
+                pages.Add(directory);
             }
 
-            if (images.Count == 0)
+            if (pages.Count == 0)
             {
                 throw budget.Invalid($"the first directory (offset {reader.Header.FirstDirectory}) is outside the file.");
             }
 
+            var images = pages.Select(p => ReadImage(reader, p)).ToList();
+            ReadSubImages(reader, pages, images);
             var file = new TiffFile(source, options, images);
             foreach (var image in images)
             {
@@ -139,29 +145,76 @@ public sealed class TiffFile : IReadOnlyList<TiffImage>, IDisposable
         }
     }
 
+    /// <summary>
+    /// Reads the sub-directories (SubIFDs) of the pages, level after level with a work list: the depth of a hostile chain cannot
+    /// exhaust the stack. A damaged sub-image is left out (refused with Strict): it must not hide the page it belongs to.
+    /// </summary>
+    private static void ReadSubImages(StructureReader reader, List<RawDirectory> pages, List<TiffImage> images)
+    {
+        var level = pages.Zip(images).ToList();
+        for (int depth = 1; depth <= MaxSubImageDepth && level.Count > 0; depth++)
+        {
+            var next = new List<(RawDirectory, TiffImage)>();
+            foreach (var (directory, image) in level)
+            {
+                if (!directory.TryGet(ImageDescriptor.SubIfdsTag, out var entry))
+                {
+                    continue;
+                }
+
+                if (!entry.Valid || !TagTypes.IsInteger(entry.Type))
+                {
+                    if (reader.Budget.Options.Strict)
+                    {
+                        reader.Ensure(entry);
+                        throw reader.Budget.Invalid($"the SubIFDs tag holds {entry.Type} values.");
+                    }
+
+                    continue;
+                }
+
+                foreach (long offset in reader.ReadIntegers(entry))
+                {
+                    if (reader.ReadDirectory(offset) is not { } sub)
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        var subImage = ReadImage(reader, sub);
+                        image.AddSubImage(subImage);
+                        next.Add((sub, subImage));
+                    }
+                    catch (TiffException ex) when (!reader.Budget.Options.Strict && ex.Limit is null)
+                    {
+                        // A damaged sub-image (a thumbnail without its size, for example): left out.
+                    }
+                }
+            }
+
+            level = next;
+        }
+
+        if (level.Count > 0 && reader.Budget.Options.Strict && level.Any(l => l.Item1.TryGet(ImageDescriptor.SubIfdsTag, out _)))
+        {
+            throw reader.Budget.Invalid($"the sub-directories are nested more than {MaxSubImageDepth} levels deep.");
+        }
+    }
+
     private static TiffImage ReadImage(StructureReader reader, RawDirectory directory)
     {
         var descriptor = ImageDescriptor.Read(reader, directory);
-        var subImages = new List<TiffImage>();
-        if (directory.TryGet(ImageDescriptor.SubIfdsTag, out var entry) && entry.Valid)
-        {
-            foreach (long offset in reader.ReadIntegers(entry))
-            {
-                if (reader.ReadDirectory(offset) is { } sub)
-                {
-                    subImages.Add(ReadImage(reader, sub));
-                }
-            }
-        }
-
+        bool tiles = descriptor.Layout == TiffLayout.Tiles;
         var storage = new TiffStorage
         {
             Compression = descriptor.Compression,
             Predictor = descriptor.Predictor,
             Layout = descriptor.Layout,
-            TileWidth = descriptor.Layout == TiffLayout.Tiles ? (int)descriptor.BlockWidth : 0,
-            TileHeight = descriptor.Layout == TiffLayout.Tiles ? (int)descriptor.BlockHeight : 0,
-            RowsPerStrip = descriptor.Layout == TiffLayout.Strips ? (int)Math.Min(descriptor.BlockHeight, int.MaxValue) : 0,
+            // Tiles larger than an int make the image unsupported; their size is reported as the largest int.
+            TileWidth = tiles ? (int)Math.Min(descriptor.BlockWidth, int.MaxValue) : 0,
+            TileHeight = tiles ? (int)Math.Min(descriptor.BlockHeight, int.MaxValue) : 0,
+            RowsPerStrip = tiles ? 0 : (int)Math.Min(descriptor.BlockHeight, int.MaxValue),
             PlanarConfiguration = descriptor.Planar ? TiffPixelOrder.Planar : TiffPixelOrder.Interleaved,
             BigEndian = !reader.Header.LittleEndian,
             BigTiff = reader.Header.BigTiff,
@@ -169,6 +222,6 @@ public sealed class TiffFile : IReadOnlyList<TiffImage>, IDisposable
             Photometric = descriptor.Photometric,
             BitsPerSample = descriptor.BitsPerSample,
         };
-        return new TiffImage(descriptor, MetadataReader.Read(reader, directory), storage, subImages);
+        return new TiffImage(descriptor, MetadataReader.Read(reader, directory), storage);
     }
 }

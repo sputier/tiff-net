@@ -9,8 +9,6 @@ namespace Eleris.TiffNet;
 /// <remarks>Two tags are equal when their code, type and values are.</remarks>
 public sealed class TiffTag : IEquatable<TiffTag>
 {
-    private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
-
     // The values, little endian.
     private readonly byte[] _values;
 
@@ -116,16 +114,18 @@ public sealed class TiffTag : IEquatable<TiffTag>
 
     /// <summary>The text of the tag: up to the first NUL byte, decoded as UTF-8 when it is valid UTF-8 (ASCII is), as Latin-1 otherwise.</summary>
     /// <exception cref="InvalidOperationException">The tag holds numbers.</exception>
-    public string AsString() => AsStrings() is [var first, ..] ? first : "";
+    public string AsString()
+    {
+        EnsureText();
+        int end = _values.AsSpan().IndexOf((byte)0);
+        return Decode(end < 0 ? _values : _values.AsSpan(0, end));
+    }
 
     /// <summary>The texts of a tag that holds several, separated by NUL bytes.</summary>
     /// <exception cref="InvalidOperationException">The tag holds numbers.</exception>
     public IReadOnlyList<string> AsStrings()
     {
-        if (TagTypes.Size(Type) != 1)
-        {
-            throw new InvalidOperationException($"Tag {Code} holds {Type} values, not text.");
-        }
+        EnsureText();
 
         var texts = new List<string>();
         ReadOnlySpan<byte> rest = _values;
@@ -206,15 +206,14 @@ public sealed class TiffTag : IEquatable<TiffTag>
     /// <summary>The code, type and count of the tag.</summary>
     public override string ToString() => $"Tag {Code}: {Count} x {Type}";
 
-    private static string Decode(ReadOnlySpan<byte> text)
+    private void EnsureText()
     {
-        try
+        if (TagTypes.Size(Type) != 1)
         {
-            return StrictUtf8.GetString(text);
-        }
-        catch (DecoderFallbackException)
-        {
-            return Encoding.Latin1.GetString(text);
+            throw new InvalidOperationException($"Tag {Code} holds {Type} values, not text.");
         }
     }
+
+    private static string Decode(ReadOnlySpan<byte> text) =>
+        System.Text.Unicode.Utf8.IsValid(text) ? Encoding.UTF8.GetString(text) : Encoding.Latin1.GetString(text);
 }

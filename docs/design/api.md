@@ -221,7 +221,7 @@ public sealed class TiffMetadata : IEnumerable<TiffTag>
     public int Count { get; }
 }
 
-public sealed record TiffTag
+public sealed class TiffTag : IEquatable<TiffTag>     // equal when code, type and values are
 {
     public int Code { get; }
     public TiffTagType Type { get; }                       // Byte, Ascii, Short, Long, Rational, …, Long8, Ifd8
@@ -309,6 +309,7 @@ public sealed record TiffReadOptions
     public int MaxDirectories { get; init; }                // pages + sub-directories. Default 10 000
     public int MaxTagsPerDirectory { get; init; }           // Default 4 096
     public long MaxTagBytes { get; init; }                  // per tag. Default 64 MB (ICC profiles and XMP fit)
+    public long MaxMetadataBytes { get; init; }             // all that opening reads: entries, tag values, tables. Default 256 MB
     public int MaxJpegScans { get; init; }                  // progressive JPEG. Default 100
     public int MaxDegreeOfParallelism { get; init; }        // Default -1 (all cores); 1 for single-threaded
 }

@@ -18,22 +18,25 @@ public sealed class TiffImage
 {
     private readonly ImageDescriptor _descriptor;
 
-    internal TiffImage(ImageDescriptor descriptor, TiffMetadata metadata, TiffStorage storage, IReadOnlyList<TiffImage> subImages)
+    private readonly List<TiffImage> _subImages = [];
+
+    internal TiffImage(ImageDescriptor descriptor, TiffMetadata metadata, TiffStorage storage)
     {
         _descriptor = descriptor;
         Metadata = metadata;
         Storage = storage;
-        SubImages = subImages;
-        ExtraChannels = [.. descriptor.ExtraChannels.Select(k => new TiffExtraChannel(k))];
+        SubImages = _subImages.AsReadOnly();
+        ExtraChannels = descriptor.ExtraChannels.Select(k => new TiffExtraChannel(k)).ToList().AsReadOnly();
     }
 
-    /// <summary>The width, in pixels.</summary>
+    /// <summary>The width of the delivered image, in pixels: with its orientation applied (an image stored on its side, Orientation 5
+    /// to 8, has the stored height as its width).</summary>
     /// <exception cref="NotSupportedException">The image is wider than an <see cref="int"/> can count.</exception>
-    public int Width => _descriptor.Width <= int.MaxValue ? (int)_descriptor.Width : throw Unsupported();
+    public int Width => Dimension(Transposed ? _descriptor.Height : _descriptor.Width);
 
-    /// <summary>The height, in pixels.</summary>
+    /// <summary>The height of the delivered image, in pixels, with its orientation applied.</summary>
     /// <exception cref="NotSupportedException">The image is taller than an <see cref="int"/> can count.</exception>
-    public int Height => _descriptor.Height <= int.MaxValue ? (int)_descriptor.Height : throw Unsupported();
+    public int Height => Dimension(Transposed ? _descriptor.Width : _descriptor.Height);
 
     /// <summary>The number of channels: the colour channels (1 for grey, 3 for RGB), then the extra channels.</summary>
     public int Channels => _descriptor.Channels;
@@ -74,14 +77,26 @@ public sealed class TiffImage
 
     internal bool IsFullResolution => !_descriptor.IsReducedResolution && !_descriptor.IsMask;
 
+    /// <summary>Whether the orientation swaps rows and columns (Orientation 5 to 8).</summary>
+    private bool Transposed => _descriptor.Orientation >= 5;
+
+    internal void AddSubImage(TiffImage image) => _subImages.Add(image);
+
+    /// <summary>Links the image and its sub-images, at any depth, to their file, without recursion.</summary>
     internal void Attach(TiffFile file)
     {
-        File = file;
-        foreach (var sub in SubImages)
+        var pending = new Stack<TiffImage>([this]);
+        while (pending.TryPop(out var image))
         {
-            sub.Attach(file);
+            image.File = file;
+            foreach (var sub in image._subImages)
+            {
+                pending.Push(sub);
+            }
         }
     }
+
+    private int Dimension(long value) => value <= int.MaxValue ? (int)value : throw Unsupported();
 
     private NotSupportedException Unsupported() =>
         new($"{File?.Source.Name ?? "image"}: {_descriptor.Unsupported ?? $"images of {_descriptor.Width} x {_descriptor.Height} pixels are not supported."}");
