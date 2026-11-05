@@ -15,4 +15,15 @@ public static class ReliabilityExamples
         Console.WriteLine(Explain(new TiffException("The image needs 3 GB.", "MaxPixelBytes")));
         #endregion
     }
+
+    /// <summary>Limits for files that come from anywhere.</summary>
+    public static void UntrustedFiles()
+    {
+        #region Example:ReliabilityExamples.UntrustedFiles
+        // On a phone: at most 256 MB for the pixels of an image, two decoding threads.
+        var untrusted = TiffReadOptions.Default with { MaxPixelBytes = 256L << 20, MaxDegreeOfParallelism = 2 };
+
+        Console.WriteLine($"Pixels: {untrusted.MaxPixelBytes >> 20} MB, threads: {untrusted.MaxDegreeOfParallelism}");
+        #endregion
+    }
 }

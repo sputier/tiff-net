@@ -37,4 +37,5 @@ nav:
     - Overview: api/index.md
     - Eleris.TiffNet:
       - "TiffException": api/Eleris.TiffNet.TiffException.md
+      - "TiffReadOptions": api/Eleris.TiffNet.TiffReadOptions.md
   # END API NAVIGATION
