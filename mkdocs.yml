@@ -1,0 +1,40 @@
+site_name: Eleris.TiffNet
+site_description: A .NET library to read and write TIFF images, made for astronomy and scientific data.
+repo_url: https://github.com/sputier/tiff-net
+docs_dir: docs
+site_dir: site
+strict: true
+
+theme:
+  name: readthedocs
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+markdown_extensions:
+  - toc:
+      permalink: false
+
+exclude_docs: |
+  examples/
+  requirements.txt
+
+nav:
+  - Home: index.md
+  - Guide:
+    - Reliability and limits: reliability.md
+  - Design:
+    - Public API: design/api.md
+    - TIFF coverage: design/coverage.md
+    - Architecture: design/architecture.md
+    - Backlog: design/backlog.md
+    - Review of the first implementation: review-2026-11-05.md
+  # BEGIN API NAVIGATION
+  - API reference:
+    - Overview: api/index.md
+    - Eleris.TiffNet:
+      - "TiffException": api/Eleris.TiffNet.TiffException.md
+  # END API NAVIGATION

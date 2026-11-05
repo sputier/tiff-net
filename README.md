@@ -9,3 +9,14 @@ multi-core encoding and decoding, and bounded resources on hostile files. The si
 [review of the first implementation](docs/review-2026-11-05.md) (in French).
 
 Targets: net10.0 on Windows, Linux and .NET MAUI (Android, iOS), trimming and NativeAOT compatible, no dependency.
+
+## Build, test, documentation
+
+```shell
+dotnet test Eleris.TiffNet.slnx
+dotnet run -c Release --project tools/DocGen              # regenerate the API pages and the samples in the pages
+dotnet run -c Release --project tools/DocGen -- --check   # fail if they are not up to date (CI)
+pip install -r docs/requirements.txt
+python tools/check_docs.py                                # format, links and anchors of the Markdown
+mkdocs build --strict                                     # the site, in site/
+```
