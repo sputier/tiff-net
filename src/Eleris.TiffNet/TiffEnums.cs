@@ -64,6 +64,19 @@ public enum TiffExtraChannelKind
     UnassociatedAlpha = 2,
 }
 
+/// <summary>How <see cref="TiffImage.ReadPixels{T}(TiffPixelScale, TiffPixelOrder)"/> scales the values it returns.</summary>
+public enum TiffPixelScale
+{
+    /// <summary>The values as stored, converted to the requested type.</summary>
+    Stored = 0,
+
+    /// <summary>
+    /// Floating point values in [0, 1]: unsigned integers divided by the largest value of their stored depth (255, 4095 for 12 bits,
+    /// 65535…), signed integers by the largest value of their type (to [-1, 1]); floating point values unchanged.
+    /// </summary>
+    Normalized = 1,
+}
+
 /// <summary>The order of the samples in an array of pixels.</summary>
 public enum TiffPixelOrder
 {
