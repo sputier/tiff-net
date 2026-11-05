@@ -4,11 +4,21 @@ using System.Text.RegularExpressions;
 
 namespace Eleris.TiffNet.Tests.Interop;
 
+/// <summary>The kind of the extra channel of a file with 2 or 4 channels (ExtraSamples).</summary>
+internal enum InteropExtraKind
+{
+    None,
+    Unspecified,
+    AssociatedAlpha,
+    UnassociatedAlpha,
+}
+
 /// <summary>One file of the tifffile corpus, with the parameters encoded in its name by tools/make_fixtures.py.</summary>
 internal sealed record InteropFile(
     string Name,
     string SampleType,
     int Channels,
+    InteropExtraKind ExtraKind,
     string Compression,
     bool Predictor,
     bool Tiled,
@@ -55,7 +65,14 @@ internal static partial class InteropCorpus
         string type = m.Groups["type"].Value;
         int channels = int.Parse(m.Groups["channels"].Value, CultureInfo.InvariantCulture);
         string compression = m.Groups["compression"].Value;
-        return new InteropFile(name, type, channels, compression,
+        var extra = m.Groups["extra"].Value switch
+        {
+            "" => InteropExtraKind.None,
+            "u" => InteropExtraKind.Unspecified,
+            "a" => InteropExtraKind.AssociatedAlpha,
+            _ => InteropExtraKind.UnassociatedAlpha,
+        };
+        return new InteropFile(name, type, channels, extra, compression,
             Predictor: m.Groups["p"].Value == "1", Tiled: m.Groups["t"].Value == "1", Planar: m.Groups["pl"].Value == "1",
             BigTiff: m.Groups["b"].Value == "1", BigEndian: m.Groups["order"].Value == "be",
             Supported: supported.Contains(compression),
@@ -86,7 +103,7 @@ internal static partial class InteropCorpus
         throw new DirectoryNotFoundException("Eleris.TiffNet.slnx was not found above " + AppContext.BaseDirectory);
     }
 
-    [GeneratedRegex(@"^(?<type>[a-z0-9]+)-c(?<channels>\d)-(?<compression>[a-z]+)-p(?<p>[01])-t(?<t>[01])-pl(?<pl>[01])-b(?<b>[01])-(?<order>le|be)\.tif$")]
+    [GeneratedRegex(@"^(?<type>[a-z0-9]+)-c(?<channels>\d)(?<extra>[uas]?)-(?<compression>[a-z]+)-p(?<p>[01])-t(?<t>[01])-pl(?<pl>[01])-b(?<b>[01])-(?<order>le|be)\.tif$")]
     private static partial Regex FileName();
 
     private sealed record Manifest(int Width, int Height, Dictionary<string, string> Datasets, List<InteropFile> Files);
