@@ -32,7 +32,8 @@ memory is allocated or the work is done: a hostile file of a few bytes cannot ma
 | `MaxPixelBytes` | 2 147 483 591 bytes | An image, or a decoding buffer, larger than the device can hold |
 | `MaxDirectories` | 10 000 | Millions of pages or chains of sub-directories |
 | `MaxTagsPerDirectory` | 4 096 | Directories of thousands of entries, which cost time to read |
-| `MaxTagBytes` | 64 MB | A tag announcing more data than any profile or packet needs |
+| `MaxTagBytes` | 64 MB | A tag announcing more data than any profile or packet needs (a larger metadata tag is left out) |
+| `MaxMetadataBytes` | 256 MB | Many tags, or many directories, sharing the same bytes of a small file |
 | `MaxJpegScans` | 100 | Progressive JPEG images made of thousands of cheap scans, which cost minutes to decode |
 
 <!-- example: ReliabilityExamples.UntrustedFiles -->

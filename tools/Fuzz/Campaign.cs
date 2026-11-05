@@ -9,13 +9,69 @@ namespace Eleris.TiffNet.Fuzz;
 internal static class Targets
 {
     /// <summary>
-    /// The targets by name. "none" only exercises the harness (mutations, timing, saving); the readers become targets as they are
-    /// written ("read": open the file from memory and read the pixels of every page).
+    /// The targets by name. "none" only exercises the harness (mutations, timing, saving); "open" reads the structure of a file
+    /// from memory and every property of its pages and sub-images; the pixels become a target when they can be read.
     /// </summary>
     public static readonly IReadOnlyDictionary<string, Action<byte[]>> All = new Dictionary<string, Action<byte[]>>
     {
         ["none"] = static _ => { },
+        ["open"] = Open,
     };
+
+    private static void Open(byte[] input)
+    {
+        using var file = TiffFile.Read(new MemoryStream(input, writable: false), Options);
+        _ = file.Primary;
+        foreach (var image in file)
+        {
+            Touch(image);
+        }
+    }
+
+    /// <summary>Every property of an image and of its sub-images, without recursion (a hostile chain could be deep).</summary>
+    private static void Touch(TiffImage first)
+    {
+        var pending = new Stack<TiffImage>([first]);
+        while (pending.TryPop(out var image))
+        {
+            _ = (image.Width, image.Height, image.Channels, image.ExtraChannels.Count, image.IsReducedResolution, image.UnsupportedReason);
+            if (image.UnsupportedReason is null)
+            {
+                _ = (image.SampleType, image.ColorModel);
+            }
+
+            _ = image.Storage;
+            var m = image.Metadata;
+            _ = (m.Description, m.Software, m.DateTime, m.Resolution, m.SampleRange, m.IccProfile, m.Xmp, m.Iptc, m.Artist, m.Copyright);
+            foreach (var tag in m.Concat(m.Exif).Concat(m.Gps))
+            {
+                TouchTag(tag);
+            }
+
+            foreach (var sub in image.SubImages)
+            {
+                pending.Push(sub);
+            }
+        }
+    }
+
+    private static void TouchTag(TiffTag tag)
+    {
+        _ = (tag.Count, tag.AsBytes().Length, tag.ToString());
+        try
+        {
+            _ = tag.Type is TiffTagType.Ascii or TiffTagType.Undefined or TiffTagType.Byte or TiffTagType.SByte
+                ? tag.AsStrings().Count
+                : tag.AsNumbers<double>().Length;
+        }
+        catch (InvalidOperationException)
+        {
+            // A conversion the tag does not allow: documented, not a finding.
+        }
+    }
+
+    /// <summary>The limits of a campaign: those of a small device, so that a valid but large input is not a finding.</summary>
+    private static readonly TiffReadOptions Options = TiffReadOptions.Default with { MaxPixelBytes = 256L << 20, MaxInputBytes = 16L << 20 };
 }
 
 /// <summary>The seed files of a campaign; an input is a pure function of the campaign seed, its iteration and this corpus.</summary>
