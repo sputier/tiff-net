@@ -58,7 +58,6 @@ public class JpegMarkerTests
         Assert.Throws<InvalidDataException>(() => JpegFixtures.Decode(Keep(JpegFixtures.Bytes("grey_q90_37x29.jpg"), m => m != 0xDB)));
 
     [Theory]
-    [InlineData(0xC2)]   // progressive (#32)
     [InlineData(0xC3)]   // lossless
     [InlineData(0xC5)]   // hierarchical
     [InlineData(0xC9)]   // arithmetic
@@ -139,5 +138,18 @@ public class JpegMarkerTests
         var frame = JpegFixtures.Decode(single);
 
         Assert.All(frame.Components.Skip(1), c => Assert.All(c.Plane, b => Assert.Equal(128, b)));
+    }
+
+    [Fact]
+    public void A_progressive_stream_cut_anywhere_after_its_first_scan_gives_what_it_holds()
+    {
+        // libjpeg also smooths the blocks of an incomplete progressive image; the library gives the coefficients as they are.
+        byte[] data = JpegFixtures.Bytes("prog_ycc420_restart_256x192.jpg");
+        int firstScan = Segments(data).Single(s => s.Marker == 0xDA).Offset;
+        for (int length = firstScan + 20; length < data.Length; length += 97)
+        {
+            var frame = JpegFixtures.Decode(data[..length]);
+            Assert.Equal((256, 192), (frame.Width, frame.Height));
+        }
     }
 }
