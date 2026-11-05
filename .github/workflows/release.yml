@@ -34,7 +34,10 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Build
         run: dotnet build Eleris.TiffNet.slnx -c Release
-      - name: Test
+      - run: pip install -r tools/requirements-interop.txt
+      - name: Generate the tifffile corpus
+        run: python -I tools/make_fixtures.py
+      - name: Test (with the corpus)
         run: dotnet test Eleris.TiffNet.slnx -c Release --no-build
       - name: Pack
         run: dotnet pack src/Eleris.TiffNet -c Release --no-build -o artifacts
