@@ -16,6 +16,7 @@ internal sealed class ResourceBudget
     private readonly TiffReadOptions _options;
     private readonly CancellationToken _cancellation;
     private long _pixelBytes;
+    private long _metadataBytes;
     private int _directories;
 
     public ResourceBudget(TiffReadOptions options, string sourceName, CancellationToken cancellation = default)
@@ -56,6 +57,37 @@ internal sealed class ResourceBudget
         }
     }
 
+    /// <summary>
+    /// Counts memory that reading the directories needs (entries, tag values, tables), before it is allocated: everything opening
+    /// a file reads, so that tags sharing their values cannot multiply what a small file costs.
+    /// </summary>
+    /// <exception cref="TiffException">The total would exceed <see cref="TiffReadOptions.MaxMetadataBytes"/>.</exception>
+    public void ReserveMetadata(long bytes, string what)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(bytes);
+        long current = Interlocked.Read(ref _metadataBytes);
+        while (true)
+        {
+            if (bytes > _options.MaxMetadataBytes - current)
+            {
+                throw Limit(nameof(TiffReadOptions.MaxMetadataBytes),
+                    $"{what} needs {Describe(bytes)}, beyond the {Describe(_options.MaxMetadataBytes - current)} left of the "
+                    + $"{Describe(_options.MaxMetadataBytes)} allowed by MaxMetadataBytes.");
+            }
+
+            long seen = Interlocked.CompareExchange(ref _metadataBytes, current + bytes, current);
+            if (seen == current)
+            {
+                return;
+            }
+
+            current = seen;
+        }
+    }
+
+    /// <summary>Whether the values of a tag fit within <see cref="TiffReadOptions.MaxTagBytes"/> (and within one array).</summary>
+    public bool TagFits(long bytes) => bytes <= Math.Min(_options.MaxTagBytes, Array.MaxLength);
+
     /// <summary>Counts one more directory (page or sub-directory).</summary>
     /// <exception cref="TiffException">The file has more than <see cref="TiffReadOptions.MaxDirectories"/>.</exception>
     public void CountDirectory()
@@ -79,7 +111,7 @@ internal sealed class ResourceBudget
     /// <exception cref="TiffException">The values of a tag are larger than <see cref="TiffReadOptions.MaxTagBytes"/>.</exception>
     public void CheckTagBytes(int tag, long bytes)
     {
-        if (bytes > _options.MaxTagBytes)
+        if (!TagFits(bytes))
         {
             throw Limit(nameof(TiffReadOptions.MaxTagBytes),
                 $"the values of tag {tag} take {Describe(bytes)}, beyond the {Describe(_options.MaxTagBytes)} allowed by MaxTagBytes.");
