@@ -49,7 +49,7 @@ static int Run(string[] args)
     {
         case "run":
         {
-            var corpus = LoadCorpus(options);
+            var corpus = LoadCorpus(options, targetName);
             var duration = TimeSpan.FromSeconds(double.Parse(options.Get("seconds", "60"), CultureInfo.InvariantCulture));
             var campaign = new Campaign(corpus, target, mode, seed, options.Get("out", "fuzz-out"));
             long iterations = campaign.Run(duration);
@@ -64,7 +64,7 @@ static int Run(string[] args)
 
         case "reproduce":
         {
-            var corpus = LoadCorpus(options);
+            var corpus = LoadCorpus(options, targetName);
             long iteration = long.Parse(options.Get("iteration", "0"), CultureInfo.InvariantCulture);
             string output = options.Get("out", "input.tif");
             File.WriteAllBytes(output, corpus.Input(seed, iteration, mode));
@@ -74,7 +74,7 @@ static int Run(string[] args)
 
         case "replay":
         {
-            string[] files = [.. options.Positional.SelectMany(p => Directory.Exists(p) ? Directory.GetFiles(p, "*.tif") : [p])];
+            string[] files = [.. options.Positional.SelectMany(p => Directory.Exists(p) ? Directory.GetFiles(p, Targets.PatternOf(targetName)) : [p])];
             if (files.Length == 0)
             {
                 throw new ArgumentException("No file to replay.");
@@ -94,10 +94,11 @@ static int Run(string[] args)
     }
 }
 
-static Corpus LoadCorpus(Options options)
+static Corpus LoadCorpus(Options options, string target)
 {
-    var corpus = Corpus.Load(options.Corpus);
-    return corpus.Count > 0 ? corpus : throw new ArgumentException($"No seed file (*.tif) in {string.Join(", ", options.Corpus)}.");
+    string pattern = Targets.PatternOf(target);
+    var corpus = Corpus.Load(options.Corpus, pattern);
+    return corpus.Count > 0 ? corpus : throw new ArgumentException($"No seed file ({pattern}) in {string.Join(", ", options.Corpus)}.");
 }
 
 /// <summary>"--name value" options and positional arguments.</summary>
@@ -143,7 +144,7 @@ internal sealed class Options
             if (File.Exists(Path.Combine(dir.FullName, "Eleris.TiffNet.slnx")))
             {
                 string fixtures = Path.Combine(dir.FullName, "tests", "Fixtures");
-                return [Path.Combine(fixtures, "domain"), Path.Combine(fixtures, "hostile"), Path.Combine(fixtures, "interop", "generated")];
+                return [Path.Combine(fixtures, "domain"), Path.Combine(fixtures, "hostile"), Path.Combine(fixtures, "jpeg"), Path.Combine(fixtures, "interop", "generated")];
             }
         }
 

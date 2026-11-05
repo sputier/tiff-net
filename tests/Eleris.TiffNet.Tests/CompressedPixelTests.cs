@@ -123,7 +123,7 @@ public class CompressedPixelTests
         }
 
         int checkedFiles = 0;
-        foreach (var f in InteropCorpus.Files.Where(f => f.Tiled && !f.Predictor && f.Compression is "lzw" or "zlib" or "packbits").Take(60))
+        foreach (var f in InteropCorpus.Files.Where(f => f.Tiled && f.Compression is "lzw" or "zlib" or "packbits").Take(60))
         {
             using var file = TiffFile.Open(Path.Combine(InteropCorpus.Folder, f.Name));
             var image = file.Primary;
@@ -139,18 +139,6 @@ public class CompressedPixelTests
         }
 
         Assert.True(checkedFiles > 50, $"only {checkedFiles} files");
-    }
-
-    [Fact]
-    public void Images_with_a_predictor_are_not_read_yet()
-    {
-        byte[] strip = Zlib(new byte[100]);
-        var builder = new TiffBuilder { Data = strip };
-        builder.AddDirectory().Image(10, 10).Remove(259).Add(259, TiffTagType.Short, 8).Remove(279).Add(279, TiffTagType.Long, strip.Length)
-            .Add(317, TiffTagType.Short, 2);
-        using var file = Open(builder);
-
-        Assert.Contains("predictor", Assert.Throws<NotSupportedException>(() => file.Primary.ReadPixels<float>()).Message, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -186,6 +174,30 @@ public class CompressedPixelTests
         Assert.Equal(one.Primary.ReadPixels<byte>(), many.Primary.ReadPixels<byte>());
         Assert.Equal(one.Primary.ReadRegion<float>(7, 21, 60, 100, order: TiffPixelOrder.Planar),
             many.Primary.ReadRegion<float>(7, 21, 60, 100, order: TiffPixelOrder.Planar));
+    }
+
+    [Fact]
+    public void A_predictor_is_ignored_without_LZW_or_Deflate_and_horizontal_applies_to_floating_point()
+    {
+        // Uncompressed 12-bit samples with a stray predictor tag: libtiff ignores the tag, and so does the library.
+        var stray = new TiffBuilder { Data = [0xAB, 0xC1, 0x23] };
+        stray.AddDirectory().Image(2, 1, bits: 12).Add(317, TiffTagType.Short, 2);
+        using (var file = Open(stray))
+        {
+            Assert.Null(file.Primary.UnsupportedReason);
+            Assert.Equal(new ushort[] { 0xABC, 0x123 }, file.Primary.ReadRawPixels<ushort>());
+        }
+
+        // Horizontal differencing on 32-bit floating point samples, as libtiff writes it: on the bits of the samples.
+        float[] values = [1.5f, -2.25f, 1e30f];
+        uint[] bits = [.. values.Select(BitConverter.SingleToUInt32Bits)];
+        byte[] differenced = [.. bits.Select((b, i) => i == 0 ? b : b - bits[i - 1]).SelectMany(BitConverter.GetBytes)];
+        byte[] strip = Zlib(differenced);
+        var builder = new TiffBuilder { Data = strip };
+        builder.AddDirectory().Image(3, 1, bits: 32).Remove(259).Add(259, TiffTagType.Short, 8).Remove(279).Add(279, TiffTagType.Long, strip.Length)
+            .Add(317, TiffTagType.Short, 2).Add(339, TiffTagType.Short, 3);
+        using var floats = Open(builder);
+        Assert.Equal(values, floats.Primary.ReadRawPixels<float>());
     }
 }
 

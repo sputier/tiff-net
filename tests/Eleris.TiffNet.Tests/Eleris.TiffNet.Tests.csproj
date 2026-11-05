@@ -26,6 +26,7 @@
     <None Include="..\Fixtures\interop\manifest.json" Link="Fixtures\interop\manifest.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\Fixtures\domain\**" LinkBase="Fixtures\domain" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\Fixtures\hostile\**" LinkBase="Fixtures\hostile" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Fixtures\jpeg\**" LinkBase="Fixtures\jpeg" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

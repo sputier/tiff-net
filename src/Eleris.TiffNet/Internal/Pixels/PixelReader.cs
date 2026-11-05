@@ -65,6 +65,15 @@ internal sealed class PixelPlan
     public long RowSamples { get; private set; }
 
     /// <summary>
+    /// The predictor to undo on the decoded rows. As libtiff does, only LZW and Deflate data is predicted: the tag is ignored with
+    /// other compressions.
+    /// </summary>
+    public TiffPredictor Predictor => Descriptor.Compression is TiffCompression.Lzw or TiffCompression.Deflate ? Descriptor.Predictor : TiffPredictor.None;
+
+    /// <summary>The bytes of the row a worker rearranges the bytes of a floating point predictor in (0 without that predictor).</summary>
+    public long PredictorBytes => Predictor == TiffPredictor.FloatingPoint ? RowBytes : 0;
+
+    /// <summary>
     /// Checks the blocks under the request and reserves the buffers of the workers. Neither the destination nor any buffer is
     /// allocated yet: a small file declaring a huge image fails here, at the cost of its tables.
     /// </summary>
@@ -81,11 +90,6 @@ internal sealed class PixelPlan
         if (d.Compression is not (TiffCompression.None or TiffCompression.Lzw or TiffCompression.Deflate or TiffCompression.PackBits))
         {
             throw new NotSupportedException($"{budget.SourceName}: reading {d.Compression} compressed images is not implemented yet.");
-        }
-
-        if (d.Predictor != TiffPredictor.None)
-        {
-            throw new NotSupportedException($"{budget.SourceName}: reading images with the {d.Predictor} predictor is not implemented yet.");
         }
 
         long rowBytes = ImageDescriptor.BytesPerRow(d.BlockWidth, SampleUnpacker.StoredSamples(d), d.BitsPerSample);
@@ -132,7 +136,7 @@ internal sealed class PixelPlan
         plan.ReadBytes = compressed ? largestCompressed : rowsPerUnit * rowBytes;
         plan.DecodedBytes = largestDecoded;
         plan.RowSamples = d.BlockWidth * (d.SamplesPerPixel + 2);
-        long scratch = plan.ReadBytes + plan.DecodedBytes + plan.RowSamples * sampleBytes;
+        long scratch = plan.ReadBytes + plan.DecodedBytes + plan.RowSamples * sampleBytes + plan.PredictorBytes;
         budget.ReservePixels(plan.Workers * scratch, "the decoding buffers");
         return plan;
     }
@@ -293,12 +297,15 @@ internal static class PixelReader
         private byte[]? _read;
         private byte[]? _decoded;
         private TD[]? _row;
+        private byte[]? _predictor;
 
         public byte[] Read => _read ??= GC.AllocateUninitializedArray<byte>((int)plan.ReadBytes);
 
         public byte[] Decoded => _decoded ??= GC.AllocateUninitializedArray<byte>((int)plan.DecodedBytes);
 
         public TD[] Row => _row ??= GC.AllocateUninitializedArray<TD>((int)plan.RowSamples);
+
+        public byte[] Predictor => _predictor ??= GC.AllocateUninitializedArray<byte>((int)plan.PredictorBytes);
     }
 
     /// <summary>The state of one read, shared by its workers (read only).</summary>
@@ -310,6 +317,7 @@ internal static class PixelReader
         private readonly TiffSource _source;
         private readonly ResourceBudget _budget;
         private readonly bool _compressed;
+        private readonly TiffPredictor _predictor;
         private readonly PixelRequest _request;
         private readonly StoredRect _stored;
         private readonly int _channels;
@@ -325,6 +333,7 @@ internal static class PixelReader
             _source = source;
             _budget = budget;
             _compressed = plan.Compressed;
+            _predictor = plan.Predictor;
             _request = plan.Request;
             _stored = plan.Stored;
             _channels = channels;
@@ -413,7 +422,27 @@ internal static class PixelReader
                 throw _budget.Invalid($"{kind} {block} holds more data than its {blockRows} rows of {_rowBytes} bytes.");
             }
 
-            return output.Slice((int)(unit.FirstRow * _rowBytes), (int)(unit.Rows * _rowBytes));
+            Span<byte> rows = output.Slice((int)(unit.FirstRow * _rowBytes), (int)(unit.Rows * _rowBytes));
+            if (_predictor != TiffPredictor.None)
+            {
+                // Rows are predicted independently: only the rows of the unit are undone.
+                int bytesPerSample = _d.BitsPerSample / 8;
+                int stride = SampleUnpacker.StoredSamples(_d);
+                for (int r = 0; r < unit.Rows; r++)
+                {
+                    Span<byte> row = rows.Slice((int)(r * _rowBytes), (int)_rowBytes);
+                    if (_predictor == TiffPredictor.Horizontal)
+                    {
+                        Predictors.UndoHorizontal(row, bytesPerSample, stride, _little);
+                    }
+                    else
+                    {
+                        Predictors.UndoFloatingPoint(row, scratch.Predictor, bytesPerSample, stride, _little);
+                    }
+                }
+            }
+
+            return rows;
         }
 
         /// <summary>
