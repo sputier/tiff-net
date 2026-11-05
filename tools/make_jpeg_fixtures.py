@@ -77,7 +77,9 @@ def expectations(path: Path, channels: int, subsampled: bool) -> dict:
         im.draft("YCbCr", im.size)
         ycc = np.asarray(im.convert("YCbCr") if im.mode != "YCbCr" else im, dtype=np.uint8)
         planes = [sha(np.ascontiguousarray(ycc[..., c]).tobytes()) for c in range(3)]
-        return {"planes": planes[:1] if subsampled else planes}
+    with Image.open(path) as im:
+        rgb = sha(np.asarray(im.convert("RGB"), dtype=np.uint8).tobytes())   # upsampled and converted by libjpeg-turbo
+    return {"planes": planes[:1] if subsampled else planes, "rgb": rgb}
 
 
 def main() -> int:
