@@ -344,8 +344,9 @@ internal sealed class JpegDecoder(ResourceBudget budget, int maxWidth = ushort.M
                 throw new InvalidDataException("a JPEG Huffman table is cut.");
             }
 
-            var table = HuffmanTable.Create(counts, s.Slice(17, total), dc: kind == 0);
-            (kind == 0 ? _dc : _ac)[id] = table;
+            // Defined into the table of that slot (built when a scan uses it): redefinitions cost their bytes only.
+            var tables = kind == 0 ? _dc : _ac;
+            (tables[id] ??= new HuffmanTable()).Define(counts, s.Slice(17, total), dc: kind == 0);
             s = s[(17 + total)..];
         }
     }
@@ -515,8 +516,8 @@ internal sealed class JpegDecoder(ResourceBudget budget, int maxWidth = ushort.M
             }
 
             // A stream without Huffman tables (motion JPEG) uses those of annex K, as libjpeg-turbo does.
-            _dc[component.DcTable] ??= HuffmanTable.Standard(dc: true, luminance: component.DcTable == 0);
-            _ac[component.AcTable] ??= HuffmanTable.Standard(dc: false, luminance: component.AcTable == 0);
+            (_dc[component.DcTable] ??= HuffmanTable.Standard(dc: true, luminance: component.DcTable == 0)).Build();
+            (_ac[component.AcTable] ??= HuffmanTable.Standard(dc: false, luminance: component.AcTable == 0)).Build();
             component.Scanned = true;
             component.Prediction = 0;
             component.Quantization ??= (ushort[])_quantization[component.QuantizationTable]!.Clone();
@@ -626,10 +627,35 @@ internal sealed class JpegDecoder(ResourceBudget budget, int maxWidth = ushort.M
         c.Prediction += reader.ReadDifference(size);
         block[0] = (short)c.Prediction;
 
+        // AC: one lookup gives most coefficients whole; otherwise the code, then the bits of its value.
         ReadOnlySpan<byte> natural = Natural;
-        for (int k = 1; k < 64; k++)
+        ReadOnlySpan<ushort> lookup = ac.Lookup;
+        ReadOnlySpan<int> fast = ac.FastAc;
+        int k = 1;
+        for (; k < 64; k++)
         {
-            int rs = ac.Decode(reader.Peek16(), out length);
+            int next = reader.Peek16();
+            int whole = fast[next >> (16 - HuffmanTable.LookupBits)];
+            if (whole != 0)
+            {
+                k += (whole >> 4) & 15;
+                block[natural[k]] = (short)(whole >> 16);
+                reader.Skip(whole & 15);
+                continue;
+            }
+
+            int entry = lookup[next >> (16 - HuffmanTable.LookupBits)];
+            int rs;
+            if (entry != 0)
+            {
+                length = entry >> 8;
+                rs = entry & 0xFF;
+            }
+            else
+            {
+                rs = ac.DecodeLong(next, out length);
+            }
+
             reader.Skip(length);
             int run = rs >> 4, bits = rs & 15;
             if (bits != 0)
@@ -647,7 +673,16 @@ internal sealed class JpegDecoder(ResourceBudget budget, int maxWidth = ushort.M
             }
         }
 
-        JpegIdct.Transform(block, _quantization[c.QuantizationTable], c.Plane.AsSpan(by * 8 * c.Stride + bx * 8), c.Stride);
+        var quantization = _quantization[c.QuantizationTable]!;
+        var output = c.Plane.AsSpan(by * 8 * c.Stride + bx * 8);
+        if (k == 1 && block[1] == 0)
+        {
+            // The first AC code was the end of the block: only DC (a flat block, common in smooth areas).
+            JpegIdct.TransformDcOnly(block[0] * quantization[0], output, c.Stride);
+            return;
+        }
+
+        JpegIdct.Transform(block, quantization, output, c.Stride);
     }
 
     /// <summary>
