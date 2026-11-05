@@ -21,7 +21,11 @@ internal sealed class JpegComponent
     public required int Height { get; init; }
 
     /// <summary>The samples, row after row; the plane covers whole MCUs, beyond <see cref="Width"/> x <see cref="Height"/>.</summary>
-    public required byte[] Plane { get; init; }
+    /// <remarks>Allocated with the frame for a sequential image, after the last scan for a progressive one.</remarks>
+    public byte[] Plane { get; internal set; } = [];
+
+    /// <summary>The rows of <see cref="Plane"/> (whole MCUs).</summary>
+    internal int PlaneRows { get; init; }
 
     /// <summary>The bytes of a row of <see cref="Plane"/>.</summary>
     public required int Stride { get; init; }
@@ -80,7 +84,7 @@ internal sealed class JpegFrame
 /// in the budget before they are allocated) until its last scan; its scans are limited by MaxJpegScans, each costs at most one
 /// pass over the blocks of its components, and a scan that refines no coefficient is refused.
 /// </remarks>
-internal sealed class JpegDecoder(ResourceBudget budget)
+internal sealed class JpegDecoder(ResourceBudget budget, int maxWidth = ushort.MaxValue, int maxHeight = ushort.MaxValue)
 {
     /// <summary>The natural (row by row) index of the k-th coefficient in zig-zag order, with 16 more entries that absorb a run
     /// past the end of a damaged block, as in libjpeg.</summary>
@@ -100,6 +104,14 @@ internal sealed class JpegDecoder(ResourceBudget budget)
     private int? _adobeTransform;
     private bool _jfif;
     private int _endOfBands;
+    private long _reserved;
+
+    /// <summary>Gives back to the budget what the frame counted, once its samples are no longer needed.</summary>
+    public void Release()
+    {
+        budget.ReleasePixels(_reserved);
+        _reserved = 0;
+    }
 
     /// <summary>Reads the tables of an abbreviated table-specification stream (SOI, DQT and DHT, EOI), as TIFF's JPEGTables holds.</summary>
     /// <exception cref="InvalidDataException">The stream is damaged.</exception>
@@ -210,11 +222,17 @@ internal sealed class JpegDecoder(ResourceBudget budget)
 
         foreach (var c in _frame.Components)
         {
+            if (_frame.Progressive)
+            {
+                // Counted with the frame: allocated only now, so that a stream refused in its scans never costs its planes.
+                c.Plane = new byte[c.Stride * c.PlaneRows];
+            }
+
             if (_frame.Progressive && c.Quantization is { } quantization)
             {
                 // The coefficients are complete: each block is transformed once.
                 var coefficients = c.Coefficients!;
-                int across = c.BlocksAcross, down = c.Plane.Length / c.Stride / 8;
+                int across = c.BlocksAcross, down = c.PlaneRows / 8;
                 for (int by = 0; by < down; by++)
                 {
                     budget.ThrowIfCancelled();
@@ -379,6 +397,12 @@ internal sealed class JpegDecoder(ResourceBudget budget)
             throw new InvalidDataException("a JPEG frame has a width of 0.");
         }
 
+        if (width > maxWidth || height > maxHeight)
+        {
+            // Checked before anything is allocated: a stream cannot declare more than its strip or tile holds.
+            throw new InvalidDataException($"a JPEG frame of {width} x {height} exceeds its strip or tile of {maxWidth} x {maxHeight}.");
+        }
+
         if (count is 0 or > 4 || s.Length < 6 + 3 * count)
         {
             throw new InvalidDataException($"a JPEG frame declares {count} components.");
@@ -423,6 +447,7 @@ internal sealed class JpegDecoder(ResourceBudget budget)
         }
 
         budget.ReservePixels(bytes, progressive ? "the JPEG planes and coefficients" : "the JPEG planes");
+        _reserved += bytes;
         foreach (var p in parts)
         {
             if (mcusAcross * p.H * 8 * mcusDown * p.V * 8 > Array.MaxLength)
@@ -444,7 +469,8 @@ internal sealed class JpegDecoder(ResourceBudget budget)
                 QuantizationTable = p.Tq,
                 Width = (int)((width * (long)p.H + hMax - 1) / hMax),
                 Height = (int)((height * (long)p.V + vMax - 1) / vMax),
-                Plane = new byte[(int)(stride * mcusDown * p.V * 8)],
+                Plane = progressive ? [] : new byte[(int)(stride * mcusDown * p.V * 8)],
+                PlaneRows = (int)(mcusDown * p.V * 8),
                 Stride = stride,
                 Coefficients = progressive ? new short[(int)(stride * mcusDown * p.V * 8)] : null,
                 KnownBits = progressive ? [.. Enumerable.Repeat(-1, 64)] : null,

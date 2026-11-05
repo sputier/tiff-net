@@ -58,7 +58,10 @@ public class StorageTests
         {
             using var file = TiffFile.Open(Path.Combine(InteropCorpus.Folder, f.Name));
             var s = file.Primary.Storage!;
-            int code = f.Compression switch { "none" => 1, "lzw" => 5, "zlib" => 8, "packbits" => 32773, "zstd" => 50000, _ => 34925 };
+            int code = f.Compression switch
+            {
+                "none" => 1, "lzw" => 5, "zlib" => 8, "packbits" => 32773, "zstd" => 50000, _ when f.Compression.StartsWith("jpeg", StringComparison.Ordinal) => 7, _ => 34925,
+            };
             string what = f.Name;
             Assert.True((int)s.Compression == code, what);
             Assert.True((s.Predictor != TiffPredictor.None) == f.Predictor, what);

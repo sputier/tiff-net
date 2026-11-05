@@ -30,17 +30,18 @@ internal static class JpegColour
     public static int Channels(JpegFrame frame) => frame.Components.Length == 1 ? 1 : 3;
 
     /// <summary>
-    /// Writes the frame as interleaved samples, <paramref name="stride"/> bytes per row, the frame's width and height.
+    /// Writes the first <paramref name="rows"/> rows of the frame as interleaved samples, <paramref name="stride"/> bytes per row.
     /// </summary>
     /// <param name="frame">A decoded frame of 1 or 3 components.</param>
+    /// <param name="rows">The rows to write, at most the height of the frame.</param>
     /// <param name="ycbcr">Whether 3 components are YCbCr, converted to RGB; otherwise they are given as they are.</param>
     /// <param name="output">At least <c>Height × stride</c> bytes.</param>
     /// <param name="stride">The bytes of a row of <paramref name="output"/>, at least <c>Width × Channels</c>.</param>
     /// <param name="budget">Counts the upsampled components and checks cancellation.</param>
     /// <exception cref="NotSupportedException">The sampling factors are not whole multiples of each other.</exception>
-    public static void ToSamples(JpegFrame frame, bool ycbcr, Span<byte> output, int stride, ResourceBudget budget)
+    public static void ToSamples(JpegFrame frame, int rows, bool ycbcr, Span<byte> output, int stride, ResourceBudget budget)
     {
-        int width = frame.Width, height = frame.Height;
+        int width = frame.Width, height = Math.Min(rows, frame.Height);
         if (frame.Components.Length == 1)
         {
             var grey = frame.Components[0];
@@ -54,13 +55,26 @@ internal static class JpegColour
 
         // Each component at the size of the frame, then the three are interleaved (and converted).
         int hMax = frame.Components.Max(c => c.H), vMax = frame.Components.Max(c => c.V);
-        budget.ReservePixels(3L * width * height, "the upsampled JPEG components");
-        var full = new byte[3][];
-        for (int i = 0; i < 3; i++)
+        long reserved = 3L * width * height;
+        budget.ReservePixels(reserved, "the upsampled JPEG components");
+        try
         {
-            full[i] = Upsample(frame.Components[i], hMax, vMax, width, height);
-        }
+            var full = new byte[3][];
+            for (int i = 0; i < 3; i++)
+            {
+                full[i] = Upsample(frame.Components[i], hMax, vMax, width, height);
+            }
 
+            Interleave(full, width, height, ycbcr, output, stride, budget);
+        }
+        finally
+        {
+            budget.ReleasePixels(reserved);
+        }
+    }
+
+    private static void Interleave(byte[][] full, int width, int height, bool ycbcr, Span<byte> output, int stride, ResourceBudget budget)
+    {
         byte[] y0 = full[0], cb0 = full[1], cr0 = full[2];
         for (int y = 0; y < height; y++)
         {

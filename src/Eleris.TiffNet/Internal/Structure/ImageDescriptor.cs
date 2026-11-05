@@ -70,6 +70,9 @@ internal sealed record ImageDescriptor
     /// <summary>The colour map of a palette image: red, then green, then blue, 2^bits values each.</summary>
     public ushort[]? ColorMap { get; private init; }
 
+    /// <summary>The JPEGTables of a JPEG image: an abbreviated stream of the tables its strips or tiles share, or null.</summary>
+    public byte[]? JpegTables { get; private init; }
+
     /// <summary>Why the library cannot deliver the pixels of this image, or <see langword="null"/>.</summary>
     public string? Unsupported { get; private init; }
 
@@ -262,6 +265,12 @@ internal sealed record ImageDescriptor
         if (descriptor.Photometric == TiffPhotometric.Palette && descriptor.Unsupported is null)
         {
             descriptor = descriptor with { ColorMap = ReadColorMap(reader, directory, descriptor.BitsPerSample) };
+        }
+
+        // The tables shared by the JPEG streams of the strips or tiles (Technical Note 2), read only when they can be used.
+        if (descriptor.Compression == TiffCompression.Jpeg && descriptor.Unsupported is null && directory.TryGet(JpegTablesTag, out var tables))
+        {
+            descriptor = descriptor with { JpegTables = reader.ReadBytes(tables) };
         }
 
         return descriptor;

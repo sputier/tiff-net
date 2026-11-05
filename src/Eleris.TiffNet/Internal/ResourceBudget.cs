@@ -57,6 +57,13 @@ internal sealed class ResourceBudget
         }
     }
 
+    /// <summary>Gives back memory counted by <see cref="ReservePixels"/> once it is no longer held (the buffers of a JPEG tile).</summary>
+    public void ReleasePixels(long bytes)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(bytes);
+        Interlocked.Add(ref _pixelBytes, -bytes);
+    }
+
     /// <summary>
     /// Counts memory that reading the directories needs (entries, tag values, tables), before it is allocated: everything opening
     /// a file reads, so that tags sharing their values cannot multiply what a small file costs.

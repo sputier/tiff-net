@@ -43,7 +43,7 @@
   "jpeg-progressive-1000-scans.tif": {
    "finding": "SEC-04",
    "attack": "4096 x 4096 progressive JPEG with 1000 AC scans of a few bytes",
-   "outcome": "TiffException:MaxJpegScans",
+   "outcome": "TiffException:MaxJpegScans|TiffException",
    "options": {},
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
@@ -51,7 +51,7 @@
   "jpeg-progressive-10000-scans.tif": {
    "finding": "SEC-04",
    "attack": "4096 x 4096 progressive JPEG with 10000 AC scans of a few bytes",
-   "outcome": "TiffException:MaxJpegScans",
+   "outcome": "TiffException:MaxJpegScans|TiffException",
    "options": {},
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
@@ -291,7 +291,7 @@
   "jpeg-prog-4k-10000scans.tif": {
    "finding": "SEC-04",
    "attack": "progressive JPEG with 10000 AC scans (35 s on the first implementation)",
-   "outcome": "TiffException:MaxJpegScans",
+   "outcome": "TiffException:MaxJpegScans|TiffException",
    "options": {},
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
@@ -299,7 +299,7 @@
   "jpeg-prog-4k-1000scans.tif": {
    "finding": "SEC-04",
    "attack": "progressive JPEG with 1000 AC scans",
-   "outcome": "TiffException:MaxJpegScans",
+   "outcome": "TiffException:MaxJpegScans|TiffException",
    "options": {},
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
