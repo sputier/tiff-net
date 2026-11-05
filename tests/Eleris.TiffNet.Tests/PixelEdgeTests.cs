@@ -240,9 +240,22 @@ public class HostilePixelTests
     [Fact]
     public void An_image_of_more_samples_than_an_array_is_refused_without_allocating()
     {
+        // Within the limit of the application, beyond what an array holds (with the default limit, MaxPixelBytes refuses first).
+        var limited = new TiffBuilder { Data = new byte[16] };
+        limited.AddDirectory().Image(1 << 20, 1 << 20);
+        using (var defaults = TiffFile.Read(new MemoryStream(limited.Build())))
+        {
+            Assert.Equal("MaxPixelBytes", Assert.Throws<TiffException>(() => defaults.Primary.ReadPixels<byte>()).Limit);
+        }
+
+        AnImageBeyondAnArray();
+    }
+
+    private static void AnImageBeyondAnArray()
+    {
         var builder = new TiffBuilder { Data = new byte[16] };
         builder.AddDirectory().Image(1 << 20, 1 << 20);
-        using var file = TiffFile.Read(new MemoryStream(builder.Build()));
+        using var file = TiffFile.Read(new MemoryStream(builder.Build()), TiffReadOptions.Default with { MaxPixelBytes = long.MaxValue });
 
         HostileAssert.FailsWithinBounds(() => file.Primary.ReadPixels<byte>(), "InvalidOperationException", TimeSpan.FromSeconds(1), 1 << 20, "2^40 samples");
     }

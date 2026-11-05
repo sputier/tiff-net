@@ -152,8 +152,10 @@ public sealed partial class TiffImage
         long count = Prepare<T>(request, raw);
         var budget = Budget(cancellationToken);
 
-        // Everything is checked before the destination is allocated: its size, the blocks under it, the buffers of the workers.
-        budget.ReservePixels(count * Unsafe.SizeOf<T>(), "the pixels");
+        // Everything is checked before the destination is allocated: its size (the limit of the application first, then what an
+        // array can hold), the blocks under it, the buffers of the workers.
+        budget.ReservePixels(count > long.MaxValue / Unsafe.SizeOf<T>() ? long.MaxValue : count * Unsafe.SizeOf<T>(), "the pixels");
+        ThrowIfLargerThanAnArray(count);
         var plan = PixelPlan.Create(Descriptor, budget, request, SampleConversion.SizeOf(SampleType), parallel: true);
         var result = new T[count];
         Dispatch(plan, result, result, budget);
@@ -170,15 +172,17 @@ public sealed partial class TiffImage
         }
 
         SampleConversion.Check<T>(SampleType, request.Scale, raw);
-        long count = request.Count(Channels);
+        return request.Count(Channels);
+    }
+
+    private static void ThrowIfLargerThanAnArray(long count)
+    {
         if (count > Array.MaxLength)
         {
             throw new InvalidOperationException(
                 $"The read covers {(count == long.MaxValue ? "more than 2^63" : count.ToString(CultureInfo.InvariantCulture))} samples, "
                 + "more than an array can hold: read the image by region (ReadRegion).");
         }
-
-        return count;
     }
 
     private void ThrowIfUnsupported()
