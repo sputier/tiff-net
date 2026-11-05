@@ -20,3 +20,11 @@ pip install -r docs/requirements.txt
 python tools/check_docs.py                                # format, links and anchors of the Markdown
 mkdocs build --strict                                     # the site, in site/
 ```
+
+The fixtures of the tests are described in [tests/Fixtures/README.md](tests/Fixtures/README.md). The fuzzer mutates them
+structurally and saves every input that crashes, hangs or allocates too much, with the seed and iteration that reproduce it:
+
+```shell
+dotnet run -c Release --project tools/Fuzz -- run --seconds 600 --seed 1       # a campaign (see tools/Fuzz/Program.cs)
+dotnet run -c Release --project tools/Fuzz -- reproduce --seed 1 --iteration 1234
+```
