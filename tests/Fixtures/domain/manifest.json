@@ -1,0 +1,2011 @@
+{
+ "generator": "tools/make_domain_fixtures.py",
+ "files": {
+  "complex64.tif": {
+   "fileSha256": "E520F9549CD374851EFAA7E09B63FFD95A1E10A965CFB1995AC7320466800C26",
+   "bytes": 736,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 8,
+     "height": 8,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 64,
+     "sampleFormat": 6,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "software": "tifffile.py",
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      277,
+      278,
+      279,
+      282,
+      283,
+      296,
+      305,
+      339
+     ],
+     "storedSamplesSha256": "BD1494B42AEC6229C5E82F57E428A8B73841E2D7952A0E6BC7A1B9EED6FB449E"
+    }
+   ],
+   "expect": {
+    "refused": "NotSupportedException"
+   }
+  },
+  "description_utf8.tif": {
+   "fileSha256": "2EABD289236E1212C7E86C30847C991C9FDE389D24D0750176D16DFB68EB3942",
+   "bytes": 384,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 8,
+     "height": 8,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 16,
+     "sampleFormat": 1,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "description": "Nébuleuse d'Orion — M42 ✨",
+     "software": "tifffile.py",
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      270,
+      273,
+      277,
+      278,
+      279,
+      282,
+      283,
+      296,
+      305
+     ],
+     "storedSamplesSha256": "D8E7112B681D644146915D6CE304B3045A08F130C9830B752467E206A6426897"
+    }
+   ],
+   "expect": {
+    "description": "Nébuleuse d'Orion — M42 ✨"
+   }
+  },
+  "float16.tif": {
+   "fileSha256": "3BC76ACD6C5D1E482D75A80E3C8841794AA62546438F6840E7B46F207E74F95A",
+   "bytes": 4146,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 53,
+     "height": 37,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 16,
+     "sampleFormat": 3,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "software": "tifffile.py",
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      277,
+      278,
+      279,
+      282,
+      283,
+      296,
+      305,
+      339
+     ],
+     "storedSamplesSha256": "AD2DE440AF6119672EB1769EB0E17972D4540CB381FC31C8E4F21096A1951BC3"
+    }
+   ]
+  },
+  "grey_12bit_packed.tif": {
+   "fileSha256": "E98EC5E684C2A6C413FFEF2E9164E88D4C1B3EE8851661D83A69068377B0B4E5",
+   "bytes": 3168,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 53,
+     "height": 37,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 12,
+     "sampleFormat": 1,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "software": "tifffile.py",
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      277,
+      278,
+      279,
+      282,
+      283,
+      296,
+      305
+     ],
+     "storedSamplesSha256": "CC0D023CC9F1D289C5DA4990373EFFBF5E505E4282992A43F7FCC79C00955FC5"
+    }
+   ]
+  },
+  "grey_14bit_packed.tif": {
+   "fileSha256": "6E2913F64BBC545F7E995BCE0BC5AC75FAB5F1390E4CB19AFF8FFE15F1D3088B",
+   "bytes": 3649,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 53,
+     "height": 37,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 14,
+     "sampleFormat": 1,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "software": "tifffile.py",
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      277,
+      278,
+      279,
+      282,
+      283,
+      296,
+      305
+     ],
+     "storedSamplesSha256": "4F7A33D2D7CCF19FE6DE0896DA5382D7FC4F411FA401C40235AD032F692BFF28"
+    }
+   ]
+  },
+  "grey_1bit.tif": {
+   "fileSha256": "4E7EC5A504FE6D19A9B9D92706487004A8133D6570852664911884C4088EA5D1",
+   "bytes": 467,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 53,
+     "height": 37,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 1,
+     "sampleFormat": 1,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "software": "tifffile.py",
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      277,
+      278,
+      279,
+      282,
+      283,
+      296,
+      305
+     ],
+     "storedSamplesSha256": "E790A8C34292137EE8C8B9312A6D64289E134735253B0EA373891548EDF7F99C"
+    }
+   ]
+  },
+  "grey_2bit.tif": {
+   "fileSha256": "E021FC36ABE005A8215E8F096C3B5902345FF035F354E689B5888468FEAC79C1",
+   "bytes": 726,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 53,
+     "height": 37,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 2,
+     "sampleFormat": 1,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "software": "tifffile.py",
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      277,
+      278,
+      279,
+      282,
+      283,
+      296,
+      305
+     ],
+     "storedSamplesSha256": "81F8B0B1567C8F5EB7A7516BE5B1DF3FDD8B93B536CE54F495826017DC7D5774"
+    }
+   ]
+  },
+  "grey_3_planes.tif": {
+   "fileSha256": "06C510BBB1253F880A7B7C1114B0E419AFF94011D778CDCF35989D3F4D7D68A9",
+   "bytes": 7456,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 30,
+     "height": 40,
+     "samplesPerPixel": 3,
+     "bitsPerSample": 16,
+     "sampleFormat": 1,
+     "photometric": 1,
+     "compression": 1,
+     "planar": true,
+     "subfileType": 0,
+     "extraSamples": [
+      0,
+      0
+     ],
+     "orientation": 1,
+     "subIfds": 0,
+     "software": "tifffile.py",
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      277,
+      278,
+      279,
+      282,
+      283,
+      284,
+      296,
+      305,
+      338
+     ],
+     "storedSamplesSha256": "9CFD649EF868FA9A5A3D9057CF4EA15D25A75E8F4E218C74EE3985B4D7F27E0E"
+    }
+   ],
+   "expect": {
+    "colorModel": "grey"
+   }
+  },
+  "grey_3_samples.tif": {
+   "fileSha256": "448469C28DA5EF445D12306F9B9F96AA1007EB94611BEE5601FF55DA5672D938",
+   "bytes": 7440,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 30,
+     "height": 40,
+     "samplesPerPixel": 3,
+     "bitsPerSample": 16,
+     "sampleFormat": 1,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [
+      0,
+      0
+     ],
+     "orientation": 1,
+     "subIfds": 0,
+     "software": "tifffile.py",
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      277,
+      278,
+      279,
+      282,
+      283,
+      284,
+      296,
+      305,
+      338
+     ],
+     "storedSamplesSha256": "CFAAE57C56D4E75BA858F57A185DD535021AC67A5DB1C3C54FE98ADFD385341A"
+    }
+   ],
+   "expect": {
+    "colorModel": "grey"
+   }
+  },
+  "grey_4bit.tif": {
+   "fileSha256": "825B5F3561D59EF81185E9418720C08F008085A181188FD7AF7C4DBEE7AC32A0",
+   "bytes": 1207,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 53,
+     "height": 37,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 4,
+     "sampleFormat": 1,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "software": "tifffile.py",
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      277,
+      278,
+      279,
+      282,
+      283,
+      296,
+      305
+     ],
+     "storedSamplesSha256": "8B2E4EBD05A212CC15585507E278B497B1D05A199480C9348C6DC67FBDB48123"
+    }
+   ]
+  },
+  "grey_alpha_assocalpha.tif": {
+   "fileSha256": "041555E8FDBFBA7C88DDE19118095BAEBC1CE859A1BBBBE2930413804B248750",
+   "bytes": 2624,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 30,
+     "height": 40,
+     "samplesPerPixel": 2,
+     "bitsPerSample": 8,
+     "sampleFormat": 1,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [
+      1
+     ],
+     "orientation": 1,
+     "subIfds": 0,
+     "software": "tifffile.py",
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      277,
+      278,
+      279,
+      282,
+      283,
+      284,
+      296,
+      305,
+      338
+     ],
+     "storedSamplesSha256": "EB13954069992B835E0C57B42EA50538D56F375BFD75A9AA0F04C3FAFAA1098E"
+    }
+   ]
+  },
+  "grey_alpha_unassalpha.tif": {
+   "fileSha256": "9EC8FC867B6A1EC9C99A5100274F8DCB7B027853C11FC4DA0F8575E258A65C4A",
+   "bytes": 2624,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 30,
+     "height": 40,
+     "samplesPerPixel": 2,
+     "bitsPerSample": 8,
+     "sampleFormat": 1,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [
+      2
+     ],
+     "orientation": 1,
+     "subIfds": 0,
+     "software": "tifffile.py",
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      277,
+      278,
+      279,
+      282,
+      283,
+      284,
+      296,
+      305,
+      338
+     ],
+     "storedSamplesSha256": "D12608465257C96110167D5DB58318058F4142354F2AA313CAF87756551DE64D"
+    }
+   ]
+  },
+  "metadata.tif": {
+   "fileSha256": "44EEB7DD614028FBB705469F5D93D12187F5C05776ABD292735B596546545AD0",
+   "bytes": 5010,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 53,
+     "height": 37,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 16,
+     "sampleFormat": 1,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "description": "OBJECT  = 'M42'",
+     "software": "make_domain_fixtures",
+     "dateTime": "2026:11:05 12:00:00",
+     "artist": "An astronomer",
+     "copyright": "CC0",
+     "iccBytes": 588,
+     "xmpBytes": 114,
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      270,
+      273,
+      277,
+      278,
+      279,
+      282,
+      283,
+      296,
+      305,
+      306,
+      315,
+      340,
+      341,
+      700,
+      33432,
+      34675,
+      42113,
+      65000
+     ],
+     "storedSamplesSha256": "E60D6F1EF23BA7BE8E664A752BF7D9BFF0CEF47AB14CBDEC105ED1313BB5487C"
+    }
+   ]
+  },
+  "miniswhite_16bit.tif": {
+   "fileSha256": "BD269136178BA2F5DF29220C058F8939384168291A80D5915FE401086EF65F67",
+   "bytes": 4130,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 53,
+     "height": 37,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 16,
+     "sampleFormat": 1,
+     "photometric": 0,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "software": "tifffile.py",
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      277,
+      278,
+      279,
+      282,
+      283,
+      296,
+      305
+     ],
+     "storedSamplesSha256": "DDDD967B38EC970B2D5179BE4524CEA6BB0EBFB960F6933147F88101992E1EC7"
+    }
+   ],
+   "expect": {
+    "delivered": "FC4BB3C7E2E93CD5B97B03B53867F231D74B5535A588A32A8AD2BAD619EAB706"
+   }
+  },
+  "miniswhite_1bit.tif": {
+   "fileSha256": "4A518CA379D1E55D31952BB2CC3CB4143C01A54C322EB7B08C0CBBBD95BA10DC",
+   "bytes": 467,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 53,
+     "height": 37,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 1,
+     "sampleFormat": 1,
+     "photometric": 0,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "software": "tifffile.py",
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      277,
+      278,
+      279,
+      282,
+      283,
+      296,
+      305
+     ],
+     "storedSamplesSha256": "3BDA5C225585EEE9C61A31BEB3CAFD59A5F14C7DD7D2E09F5A6156FD8FE87510"
+    }
+   ],
+   "expect": {
+    "delivered": "C071B4C2B00F1429E2BF7D6506D036948087F89BE910EA7EA4C90D70F46AAC3B"
+   }
+  },
+  "multipage.tif": {
+   "fileSha256": "7DD7F7A29C0FB6868EAAEE1A663DE6523CD14CCBEBA622137727AC49180A7A68",
+   "bytes": 14528,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 48,
+     "height": 64,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 16,
+     "sampleFormat": 1,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "description": "page 0",
+     "software": "tifffile.py",
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      270,
+      273,
+      277,
+      278,
+      279,
+      282,
+      283,
+      296,
+      305
+     ],
+     "storedSamplesSha256": "1FDF108A34AE6993692F7240130A377B3092801513215B6BF2CC9794C7ADC636"
+    },
+    {
+     "width": 24,
+     "height": 32,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 16,
+     "sampleFormat": 1,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 1,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "description": "page 1, reduced resolution",
+     "software": "tifffile.py",
+     "tagCodes": [
+      254,
+      256,
+      257,
+      258,
+      259,
+      262,
+      270,
+      273,
+      277,
+      278,
+      279,
+      282,
+      283,
+      296,
+      305
+     ],
+     "storedSamplesSha256": "328BC469CBA2B7A8F9F0EEE6D83E97FB2E7D2462D46AD2DC0B959B9EDCE7BFEB"
+    },
+    {
+     "width": 48,
+     "height": 64,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 16,
+     "sampleFormat": 1,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "description": "page 2",
+     "software": "tifffile.py",
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      270,
+      273,
+      277,
+      278,
+      279,
+      282,
+      283,
+      296,
+      305
+     ],
+     "storedSamplesSha256": "08A91A503B5A4E57E3E37878E6ACEF7D02E793C3ED0625967F8A8AE147E232D4"
+    }
+   ],
+   "expect": {
+    "primary": 0
+   }
+  },
+  "orientation_1.tif": {
+   "fileSha256": "9B6B7AAD06995A06A04EBE43BEB935079AF100CBD0340169A4FF37C715CE467D",
+   "bytes": 236,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 3,
+     "height": 2,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 16,
+     "sampleFormat": 1,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "software": "tifffile.py",
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      274,
+      277,
+      278,
+      279,
+      282,
+      283,
+      296,
+      305
+     ],
+     "storedSamplesSha256": "B1CD5BF03B9488553472B7264C8D53326D8D6B2AA42AB53E2D0F27387DB492D5"
+    }
+   ],
+   "expect": {
+    "delivered": "B1CD5BF03B9488553472B7264C8D53326D8D6B2AA42AB53E2D0F27387DB492D5",
+    "deliveredShape": [
+     2,
+     3
+    ]
+   }
+  },
+  "orientation_2.tif": {
+   "fileSha256": "8D8BB26FA55BAF9153B4CB2FEEC99472EA807927E13AE85370130E0E4DE0C8E8",
+   "bytes": 236,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 3,
+     "height": 2,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 16,
+     "sampleFormat": 1,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 2,
+     "subIfds": 0,
+     "software": "tifffile.py",
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      274,
+      277,
+      278,
+      279,
+      282,
+      283,
+      296,
+      305
+     ],
+     "storedSamplesSha256": "B1CD5BF03B9488553472B7264C8D53326D8D6B2AA42AB53E2D0F27387DB492D5"
+    }
+   ],
+   "expect": {
+    "delivered": "5DC68C5B0E0ECABABC95F229DF928B62DEBF4DA193731B8C8B433D0E3538BEFD",
+    "deliveredShape": [
+     2,
+     3
+    ]
+   }
+  },
+  "orientation_3.tif": {
+   "fileSha256": "07E7621EBF1581F759E9D15AA0B548D3342C693A15AF2B244AA64FA6890512C2",
+   "bytes": 236,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 3,
+     "height": 2,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 16,
+     "sampleFormat": 1,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 3,
+     "subIfds": 0,
+     "software": "tifffile.py",
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      274,
+      277,
+      278,
+      279,
+      282,
+      283,
+      296,
+      305
+     ],
+     "storedSamplesSha256": "B1CD5BF03B9488553472B7264C8D53326D8D6B2AA42AB53E2D0F27387DB492D5"
+    }
+   ],
+   "expect": {
+    "delivered": "7DB26CBBEFAC0CFD1280F75CE3E4F20A51C0D2F32F07CC53918C42C76254310B",
+    "deliveredShape": [
+     2,
+     3
+    ]
+   }
+  },
+  "orientation_4.tif": {
+   "fileSha256": "A0792CFA10F7DD061A07B5D70530C21EC94FD8B4363A03C77F78431D9CAE682D",
+   "bytes": 236,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 3,
+     "height": 2,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 16,
+     "sampleFormat": 1,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 4,
+     "subIfds": 0,
+     "software": "tifffile.py",
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      274,
+      277,
+      278,
+      279,
+      282,
+      283,
+      296,
+      305
+     ],
+     "storedSamplesSha256": "B1CD5BF03B9488553472B7264C8D53326D8D6B2AA42AB53E2D0F27387DB492D5"
+    }
+   ],
+   "expect": {
+    "delivered": "E0A3D2628DB3E98427723A6D8DB8A74105ED8AA67192F61F4B7D226B680E84C8",
+    "deliveredShape": [
+     2,
+     3
+    ]
+   }
+  },
+  "orientation_5.tif": {
+   "fileSha256": "0B3408C9C843231801397F1946772CD5A0CBAD3FF2DDF2B12E05805FEC86C09E",
+   "bytes": 236,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 3,
+     "height": 2,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 16,
+     "sampleFormat": 1,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 5,
+     "subIfds": 0,
+     "software": "tifffile.py",
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      274,
+      277,
+      278,
+      279,
+      282,
+      283,
+      296,
+      305
+     ],
+     "storedSamplesSha256": "B1CD5BF03B9488553472B7264C8D53326D8D6B2AA42AB53E2D0F27387DB492D5"
+    }
+   ],
+   "expect": {
+    "delivered": "4D8BA6C168C073FDAE8528472FEDBB36A753D0AE845DB54770E8A3C81EE1C5C7",
+    "deliveredShape": [
+     3,
+     2
+    ]
+   }
+  },
+  "orientation_6.tif": {
+   "fileSha256": "365603908157A3A10CE1DE64CCAFB2DB98338EA57B4F45AE29D8E71F2997817D",
+   "bytes": 236,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 3,
+     "height": 2,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 16,
+     "sampleFormat": 1,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 6,
+     "subIfds": 0,
+     "software": "tifffile.py",
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      274,
+      277,
+      278,
+      279,
+      282,
+      283,
+      296,
+      305
+     ],
+     "storedSamplesSha256": "B1CD5BF03B9488553472B7264C8D53326D8D6B2AA42AB53E2D0F27387DB492D5"
+    }
+   ],
+   "expect": {
+    "delivered": "836DFCBA496F38C6550045AFF4F1B95654ADB7023AE70131DA68181D95AD7DAA",
+    "deliveredShape": [
+     3,
+     2
+    ]
+   }
+  },
+  "orientation_7.tif": {
+   "fileSha256": "7536F65C0BE6D0301F910F83BCC31178A1DD40D7AA3EFEDD46805E404C3311ED",
+   "bytes": 236,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 3,
+     "height": 2,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 16,
+     "sampleFormat": 1,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 7,
+     "subIfds": 0,
+     "software": "tifffile.py",
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      274,
+      277,
+      278,
+      279,
+      282,
+      283,
+      296,
+      305
+     ],
+     "storedSamplesSha256": "B1CD5BF03B9488553472B7264C8D53326D8D6B2AA42AB53E2D0F27387DB492D5"
+    }
+   ],
+   "expect": {
+    "delivered": "E1CEB8833CE8E5F4C633592517E4692017FBABE9523D92D28CAACA463F65C0BD",
+    "deliveredShape": [
+     3,
+     2
+    ]
+   }
+  },
+  "orientation_8.tif": {
+   "fileSha256": "8890549A930C8D35F73DE17E0802B3D939A9758DEE477D09ECCC7F6B48A38115",
+   "bytes": 236,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 3,
+     "height": 2,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 16,
+     "sampleFormat": 1,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 8,
+     "subIfds": 0,
+     "software": "tifffile.py",
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      274,
+      277,
+      278,
+      279,
+      282,
+      283,
+      296,
+      305
+     ],
+     "storedSamplesSha256": "B1CD5BF03B9488553472B7264C8D53326D8D6B2AA42AB53E2D0F27387DB492D5"
+    }
+   ],
+   "expect": {
+    "delivered": "0D794552E81B54321A5D6EED11B715029BC9D2FFD14E7B09A10B1FE114C38F97",
+    "deliveredShape": [
+     3,
+     2
+    ]
+   }
+  },
+  "palette_8bit.tif": {
+   "fileSha256": "4CBFAAF744BA5BEE0F61F37E683231DDEDAA5CB75E40875E68EE7950DA5289CD",
+   "bytes": 3721,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 53,
+     "height": 37,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 8,
+     "sampleFormat": 1,
+     "photometric": 3,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "software": "tifffile.py",
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      277,
+      278,
+      279,
+      282,
+      283,
+      296,
+      305,
+      320
+     ],
+     "storedSamplesSha256": "262459874E0024CAA608E2AF9A7E2B1234521FEA4723612E6B3A78EAE96FC85E"
+    }
+   ],
+   "expect": {
+    "delivered": "0A2E07576400D4C9BD8EBA895B0D91E3881B4ECA90767664A5B61F9BD21007CB",
+    "colorModel": "rgb"
+   }
+  },
+  "pillow_float32.tif": {
+   "fileSha256": "0DCAE713133BB45E55CFEBF7498D9F7A77D804C9C43F7F912EFEF411F37F4B11",
+   "bytes": 12422,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 64,
+     "height": 48,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 32,
+     "sampleFormat": 3,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      278,
+      279,
+      284,
+      339
+     ],
+     "storedSamplesSha256": "DA67E572FD603072D616E01FE3B2C28FF21A76F07254D9190037AE58F557AEDE"
+    }
+   ]
+  },
+  "pillow_grey16.tif": {
+   "fileSha256": "CB0F4D0CC0C15DDF71D201E23F8BDD47ADD8D8F9EAC2677DD9F13A4AEF7330BC",
+   "bytes": 6266,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 64,
+     "height": 48,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 16,
+     "sampleFormat": 1,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      278,
+      279,
+      284
+     ],
+     "storedSamplesSha256": "DFF32240ADE29B3E4291D8CAD84DB17AE5C3E19C1D3279DCE38501FA859789C2"
+    }
+   ]
+  },
+  "pillow_grey8_jpeg.tif": {
+   "fileSha256": "8A3792EDE571DABBE8B50CD0AE333BE41E64A2EE94A21DD116102DB42F5D91D3",
+   "bytes": 2539,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 64,
+     "height": 48,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 8,
+     "sampleFormat": 1,
+     "photometric": 1,
+     "compression": 7,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      278,
+      279,
+      284,
+      347
+     ],
+     "storedSamplesSha256": "9F71EF24299C1A0F402182BE48490185C0B9998080400579127128CB4D8D726B"
+    }
+   ]
+  },
+  "pillow_palette.tif": {
+   "fileSha256": "FCCD40A8D6BB95F6ED329DABCB97450508975D875624DA145280A8663619A1F7",
+   "bytes": 4742,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 64,
+     "height": 48,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 8,
+     "sampleFormat": 1,
+     "photometric": 3,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      278,
+      279,
+      284,
+      320
+     ],
+     "storedSamplesSha256": "19C3CCEA0B0D41500BC5C961F8324AA210A0E78627F266FF4D0AC09CF5833A8C"
+    }
+   ]
+  },
+  "pillow_rgb8_deflate.tif": {
+   "fileSha256": "A2FA92D16DA021A0625F60002D5175F8D58FC438D66AD20146EBEC6F7F4F4E89",
+   "bytes": 9368,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 64,
+     "height": 48,
+     "samplesPerPixel": 3,
+     "bitsPerSample": 8,
+     "sampleFormat": 1,
+     "photometric": 2,
+     "compression": 8,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      277,
+      278,
+      279,
+      284
+     ],
+     "storedSamplesSha256": "FAD580265036615FD2328227D1819024E96157FDEBC8B3E4419C3D9C66FD7CB6"
+    }
+   ]
+  },
+  "pillow_rgb8_icc.tif": {
+   "fileSha256": "37DE49AAA407BBBA16FADBB11313577A044F03D8D933462AA84BF5CC5379239E",
+   "bytes": 10038,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 64,
+     "height": 48,
+     "samplesPerPixel": 3,
+     "bitsPerSample": 8,
+     "sampleFormat": 1,
+     "photometric": 2,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "description": "written by Pillow",
+     "iccBytes": 588,
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      270,
+      273,
+      277,
+      278,
+      279,
+      282,
+      283,
+      284,
+      296,
+      34675
+     ],
+     "storedSamplesSha256": "FAD580265036615FD2328227D1819024E96157FDEBC8B3E4419C3D9C66FD7CB6"
+    }
+   ]
+  },
+  "pillow_rgb8_jpeg.tif": {
+   "fileSha256": "7E8FF6422BE614DAA85012BF805C48ED427737FB32E0EFC6170A757BC7331FC8",
+   "bytes": 7697,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 64,
+     "height": 48,
+     "samplesPerPixel": 3,
+     "bitsPerSample": 8,
+     "sampleFormat": 1,
+     "photometric": 2,
+     "compression": 7,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      277,
+      278,
+      279,
+      284,
+      347
+     ],
+     "storedSamplesSha256": "4128E339805C0E6FA63D812F6C122385CE5F4B5FD5A17C70F39562103B36B78B"
+    }
+   ]
+  },
+  "pyramid_subifds.tif": {
+   "fileSha256": "100874768D7F0F563D0E0E2765CF71E8C632D8EAD646ADD42E809F83E32DF66A",
+   "bytes": 8736,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 48,
+     "height": 64,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 16,
+     "sampleFormat": 1,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 2,
+     "description": "full resolution",
+     "software": "tifffile.py",
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      270,
+      273,
+      277,
+      278,
+      279,
+      282,
+      283,
+      296,
+      305,
+      330
+     ],
+     "storedSamplesSha256": "1FDF108A34AE6993692F7240130A377B3092801513215B6BF2CC9794C7ADC636"
+    }
+   ],
+   "expect": {
+    "primary": 0,
+    "subImages": 2
+   }
+  },
+  "rgb_12bit_packed.tif": {
+   "fileSha256": "8634BA18313C8A3D2FF68B0EE564D62DCB961CA9BFB3E8D73A47212E9F13EDDC",
+   "bytes": 2030,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 19,
+     "height": 21,
+     "samplesPerPixel": 3,
+     "bitsPerSample": 12,
+     "sampleFormat": 1,
+     "photometric": 2,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "software": "tifffile.py",
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      277,
+      278,
+      279,
+      282,
+      283,
+      284,
+      296,
+      305
+     ],
+     "storedSamplesSha256": "1D928E7A3975E25964B0FF17B7E989F737434BBEF8C9290A72FEA0986EEB0A9F"
+    }
+   ]
+  },
+  "rgba_assocalpha.tif": {
+   "fileSha256": "4BFDC4319F567891E668A70EC939B141A5EC2974CBDB9760D149BE9BF4CC7B43",
+   "bytes": 9840,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 30,
+     "height": 40,
+     "samplesPerPixel": 4,
+     "bitsPerSample": 16,
+     "sampleFormat": 1,
+     "photometric": 2,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [
+      1
+     ],
+     "orientation": 1,
+     "subIfds": 0,
+     "software": "tifffile.py",
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      277,
+      278,
+      279,
+      282,
+      283,
+      284,
+      296,
+      305,
+      338
+     ],
+     "storedSamplesSha256": "24ADA62FE131A2CD2422A92B1B363407791AAEDFF6603739C353FB257F8738D7"
+    }
+   ]
+  },
+  "rgba_unassalpha.tif": {
+   "fileSha256": "DB96643F9908FEC1DFDEEF0EF6CBD7A0D9A3622463E734F95B6F971B33C323F7",
+   "bytes": 9840,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 30,
+     "height": 40,
+     "samplesPerPixel": 4,
+     "bitsPerSample": 16,
+     "sampleFormat": 1,
+     "photometric": 2,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [
+      2
+     ],
+     "orientation": 1,
+     "subIfds": 0,
+     "software": "tifffile.py",
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      277,
+      278,
+      279,
+      282,
+      283,
+      284,
+      296,
+      305,
+      338
+     ],
+     "storedSamplesSha256": "23B1B6FC22224D287072FAB50FFD75246AFDD4F681E127539E717609E1EED87C"
+    }
+   ]
+  },
+  "siril_m42_grey16.tif": {
+   "fileSha256": "D2E34BE465520F1388BCFF929FE3185009901372622C7BE23B217410873BCEE9",
+   "bytes": 85852,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 240,
+     "height": 160,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 16,
+     "sampleFormat": 1,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "software": "siril v1.4.4",
+     "dateTime": "2026:11:05 21:00:00",
+     "iccBytes": 8764,
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      274,
+      277,
+      278,
+      279,
+      284,
+      305,
+      306,
+      339,
+      34675
+     ],
+     "storedSamplesSha256": "0CA144BAD696077EB2E8FA9C5F25AAE51C2755CE937B880111CF26D465BF8D5B"
+    }
+   ],
+   "expect": {
+    "writer": "Siril 1.4.4"
+   }
+  },
+  "siril_m42_grey16_astro.tif": {
+   "fileSha256": "84C52350D4F8F699C89716234CF752C08AD77E6B29D0F5C92E1D37FA8DCBC90B",
+   "bytes": 87008,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 240,
+     "height": 160,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 16,
+     "sampleFormat": 1,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "description": "SIMPLE  =                    T / file does conform to FITS standard\nBITPIX  =                   16 / number of bits per data pixel\nNAXIS   =                    2 / number of data axes\nNAXIS1  =                  240 / length of data axis 1\nNAXIS2  =                  160 / length of data axis 2\nEXTEND  =                    T / FITS dataset may contain extensions\nCOMMENT   FITS (Flexible Image Transport System) format is defined in 'Astronomy\nCOMMENT   and Astrophysics', volume 376, page 359; bibcode: 2001A&A...376..359H\nBZERO   =                   0. / Offset data range to that of unsigned short\nBSCALE  =                   1. / Default scaling factor\nPROGRAM = 'Siril 1.4.4'        / Software that created this HDU\nDATE    = '2026-11-05T18:14:15' / UTC date that FITS file was created\nDATE-OBS= '2026-11-05T21:00:00' / YYYY-MM-DDThh:mm:ss observation start, UT\nEXPTIME =                  30. / [s]  Exposure time duration\nINSTRUME= 'Synthetic camera'   / Instrument name\nGAIN    =                  100 / Sensor gain\nBAYERPAT= 'RGGB    '           / Bayer color pattern\nOBJECT  = 'M42     '           / Name of the object of interest\nEND",
+     "software": "siril v1.4.4",
+     "dateTime": "2026:11:05 21:00:00",
+     "iccBytes": 8764,
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      270,
+      273,
+      274,
+      277,
+      278,
+      279,
+      284,
+      305,
+      306,
+      339,
+      34675
+     ],
+     "storedSamplesSha256": "0CA144BAD696077EB2E8FA9C5F25AAE51C2755CE937B880111CF26D465BF8D5B"
+    }
+   ],
+   "expect": {
+    "writer": "Siril 1.4.4"
+   }
+  },
+  "siril_m42_grey16_deflate.tif": {
+   "fileSha256": "E646B36FA76055137A757D3E3850CB0FE5C7FAC65C9E787B36B7057CCC526FB9",
+   "bytes": 64112,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 240,
+     "height": 160,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 16,
+     "sampleFormat": 1,
+     "photometric": 1,
+     "compression": 8,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "description": "SIMPLE  =                    T / file does conform to FITS standard\nBITPIX  =                   16 / number of bits per data pixel\nNAXIS   =                    2 / number of data axes\nNAXIS1  =                  240 / length of data axis 1\nNAXIS2  =                  160 / length of data axis 2\nEXTEND  =                    T / FITS dataset may contain extensions\nCOMMENT   FITS (Flexible Image Transport System) format is defined in 'Astronomy\nCOMMENT   and Astrophysics', volume 376, page 359; bibcode: 2001A&A...376..359H\nBZERO   =                   0. / Offset data range to that of unsigned short\nBSCALE  =                   1. / Default scaling factor\nPROGRAM = 'Siril 1.4.4'        / Software that created this HDU\nDATE    = '2026-11-05T18:14:15' / UTC date that FITS file was created\nDATE-OBS= '2026-11-05T21:00:00' / YYYY-MM-DDThh:mm:ss observation start, UT\nEXPTIME =                  30. / [s]  Exposure time duration\nINSTRUME= 'Synthetic camera'   / Instrument name\nGAIN    =                  100 / Sensor gain\nBAYERPAT= 'RGGB    '           / Bayer color pattern\nOBJECT  = 'M42     '           / Name of the object of interest\nEND",
+     "software": "siril v1.4.4",
+     "dateTime": "2026:11:05 21:00:00",
+     "iccBytes": 8764,
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      270,
+      273,
+      274,
+      277,
+      278,
+      279,
+      284,
+      305,
+      306,
+      339,
+      34675
+     ],
+     "storedSamplesSha256": "0CA144BAD696077EB2E8FA9C5F25AAE51C2755CE937B880111CF26D465BF8D5B"
+    }
+   ],
+   "expect": {
+    "writer": "Siril 1.4.4"
+   }
+  },
+  "siril_m42_grey32_astro.tif": {
+   "fileSha256": "0FEAA28BE51150528E041E709F6D4DE2025E4FFE391F396F6AF8AE8AD60EABE2",
+   "bytes": 163868,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 240,
+     "height": 160,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 32,
+     "sampleFormat": 3,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "description": "SIMPLE  =                    T / file does conform to FITS standard\nBITPIX  =                   16 / number of bits per data pixel\nNAXIS   =                    2 / number of data axes\nNAXIS1  =                  240 / length of data axis 1\nNAXIS2  =                  160 / length of data axis 2\nEXTEND  =                    T / FITS dataset may contain extensions\nCOMMENT   FITS (Flexible Image Transport System) format is defined in 'Astronomy\nCOMMENT   and Astrophysics', volume 376, page 359; bibcode: 2001A&A...376..359H\nBZERO   =                   0. / Offset data range to that of unsigned short\nBSCALE  =                   1. / Default scaling factor\nPROGRAM = 'Siril 1.4.4'        / Software that created this HDU\nDATE    = '2026-11-05T18:14:15' / UTC date that FITS file was created\nDATE-OBS= '2026-11-05T21:00:00' / YYYY-MM-DDThh:mm:ss observation start, UT\nEXPTIME =                  30. / [s]  Exposure time duration\nINSTRUME= 'Synthetic camera'   / Instrument name\nGAIN    =                  100 / Sensor gain\nBAYERPAT= 'RGGB    '           / Bayer color pattern\nOBJECT  = 'M42     '           / Name of the object of interest\nEND",
+     "software": "siril v1.4.4",
+     "dateTime": "2026:11:05 21:00:00",
+     "iccBytes": 8764,
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      270,
+      273,
+      274,
+      277,
+      278,
+      279,
+      284,
+      305,
+      306,
+      339,
+      34675
+     ],
+     "storedSamplesSha256": "0FBA250CC1F5FC19F2B273D52DDEEAE425228280A73931CF88CD8557CEB32FC1"
+    }
+   ],
+   "expect": {
+    "writer": "Siril 1.4.4"
+   }
+  },
+  "siril_m42_grey8.tif": {
+   "fileSha256": "7DBAE86CAFF6C565E8BCAFBB7B449E37A39ACE993998D3DCE1B56F255485D394",
+   "bytes": 47422,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 240,
+     "height": 160,
+     "samplesPerPixel": 1,
+     "bitsPerSample": 8,
+     "sampleFormat": 1,
+     "photometric": 1,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "software": "siril v1.4.4",
+     "dateTime": "2026:11:05 21:00:00",
+     "iccBytes": 8764,
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      274,
+      277,
+      278,
+      279,
+      284,
+      305,
+      306,
+      339,
+      34675
+     ],
+     "storedSamplesSha256": "A5BEF9F3DA133D1CCB25120A9FBBA20F2CD7F5DE4D8FBF8D2034953B6E62FDB4"
+    }
+   ],
+   "expect": {
+    "writer": "Siril 1.4.4"
+   }
+  },
+  "siril_m42_rgb16_astro.tif": {
+   "fileSha256": "127906E1C90EE8EDC2F8949ADA0231AB6A054C7F11185A2A61B586B4A81CC5A9",
+   "bytes": 241586,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 240,
+     "height": 160,
+     "samplesPerPixel": 3,
+     "bitsPerSample": 16,
+     "sampleFormat": 1,
+     "photometric": 2,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "description": "SIMPLE  =                    T / file does conform to FITS standard\nBITPIX  =                  -32 / number of bits per data pixel\nNAXIS   =                    3 / number of data axes\nNAXIS1  =                  240 / length of data axis 1\nNAXIS2  =                  160 / length of data axis 2\nNAXIS3  =                    3 / length of data axis 3\nEXTEND  =                    T / FITS dataset may contain extensions\nCOMMENT   FITS (Flexible Image Transport System) format is defined in 'Astronomy\nCOMMENT   and Astrophysics', volume 376, page 359; bibcode: 2001A&A...376..359H\nBZERO   =                   0. / Offset data range to that of unsigned short\nBSCALE  =                   1. / Default scaling factor\nPROGRAM = 'Siril 1.4.4'        / Software that created this HDU\nDATE    = '2026-11-05T18:14:15' / UTC date that FITS file was created\nDATE-OBS= '2026-11-05T21:00:00' / YYYY-MM-DDThh:mm:ss observation start, UT\nEXPTIME =                  30. / [s]  Exposure time duration\nINSTRUME= 'Synthetic camera'   / Instrument name\nGAIN    =                  100 / Sensor gain\nBAYERPAT= 'RGGB    '           / Bayer color pattern\nSTACKCNT=                    3 / Stack frames\nLIVETIME=                  90. / [s] Exposure time after deadtime correction\nOBJECT  = 'M42     '           / Name of the object of interest\nEND",
+     "software": "siril v1.4.4",
+     "dateTime": "2026:11:05 21:00:00",
+     "iccBytes": 9552,
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      270,
+      273,
+      274,
+      277,
+      278,
+      279,
+      284,
+      305,
+      306,
+      339,
+      34675
+     ],
+     "storedSamplesSha256": "CAAD469A3427E88AF2AD6922997051FC8ABD6790C96362D24D49D4083650A6DC"
+    }
+   ],
+   "expect": {
+    "writer": "Siril 1.4.4"
+   }
+  },
+  "siril_m42_rgb32_astro.tif": {
+   "fileSha256": "57120A1763F4A19AFBFEB0E89B57241354BC1E6097ED60F7D28B510930CF70D2",
+   "bytes": 472046,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 240,
+     "height": 160,
+     "samplesPerPixel": 3,
+     "bitsPerSample": 32,
+     "sampleFormat": 3,
+     "photometric": 2,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "description": "SIMPLE  =                    T / file does conform to FITS standard\nBITPIX  =                  -32 / number of bits per data pixel\nNAXIS   =                    3 / number of data axes\nNAXIS1  =                  240 / length of data axis 1\nNAXIS2  =                  160 / length of data axis 2\nNAXIS3  =                    3 / length of data axis 3\nEXTEND  =                    T / FITS dataset may contain extensions\nCOMMENT   FITS (Flexible Image Transport System) format is defined in 'Astronomy\nCOMMENT   and Astrophysics', volume 376, page 359; bibcode: 2001A&A...376..359H\nBZERO   =                   0. / Offset data range to that of unsigned short\nBSCALE  =                   1. / Default scaling factor\nPROGRAM = 'Siril 1.4.4'        / Software that created this HDU\nDATE    = '2026-11-05T18:14:15' / UTC date that FITS file was created\nDATE-OBS= '2026-11-05T21:00:00' / YYYY-MM-DDThh:mm:ss observation start, UT\nEXPTIME =                  30. / [s]  Exposure time duration\nINSTRUME= 'Synthetic camera'   / Instrument name\nGAIN    =                  100 / Sensor gain\nBAYERPAT= 'RGGB    '           / Bayer color pattern\nSTACKCNT=                    3 / Stack frames\nLIVETIME=                  90. / [s] Exposure time after deadtime correction\nOBJECT  = 'M42     '           / Name of the object of interest\nEND",
+     "software": "siril v1.4.4",
+     "dateTime": "2026:11:05 21:00:00",
+     "iccBytes": 9552,
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      270,
+      273,
+      274,
+      277,
+      278,
+      279,
+      284,
+      305,
+      306,
+      339,
+      34675
+     ],
+     "storedSamplesSha256": "879095230A99C846C06A2C8395DCB00A53B6ABF4C68EFBE7848E2195AF774A6A"
+    }
+   ],
+   "expect": {
+    "writer": "Siril 1.4.4"
+   }
+  },
+  "siril_m42_rgb8.tif": {
+   "fileSha256": "08FAEB2F18910D4ECC9EAAEBDA16B0FA56AA16F227EA73E16EB03F0D3359F3C9",
+   "bytes": 125022,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 240,
+     "height": 160,
+     "samplesPerPixel": 3,
+     "bitsPerSample": 8,
+     "sampleFormat": 1,
+     "photometric": 2,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "software": "siril v1.4.4",
+     "dateTime": "2026:11:05 21:00:00",
+     "iccBytes": 9552,
+     "tagCodes": [
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      274,
+      277,
+      278,
+      279,
+      284,
+      305,
+      306,
+      339,
+      34675
+     ],
+     "storedSamplesSha256": "5BB129E39D94B1B657564CF3BCCAD8744F5C7080EAC20A559A7E4F512C9548CC"
+    }
+   ],
+   "expect": {
+    "writer": "Siril 1.4.4"
+   }
+  },
+  "thumbnail_in_ifd0.tif": {
+   "fileSha256": "7F01F2E72E9762D4614F8ADE929143B6032C261D6DEDAD4B4545919BFE71618E",
+   "bytes": 116240,
+   "bigEndian": false,
+   "pages": [
+    {
+     "width": 16,
+     "height": 12,
+     "samplesPerPixel": 3,
+     "bitsPerSample": 8,
+     "sampleFormat": 1,
+     "photometric": 2,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 1,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "software": "tifffile.py",
+     "tagCodes": [
+      254,
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      277,
+      278,
+      279,
+      282,
+      283,
+      284,
+      296,
+      305
+     ],
+     "storedSamplesSha256": "E1CEF8AF9087B73741636572A10B6F0086FD44F1BD98EC03475A40A8CDFB1996"
+    },
+    {
+     "width": 160,
+     "height": 120,
+     "samplesPerPixel": 3,
+     "bitsPerSample": 16,
+     "sampleFormat": 1,
+     "photometric": 2,
+     "compression": 1,
+     "planar": false,
+     "subfileType": 0,
+     "extraSamples": [],
+     "orientation": 1,
+     "subIfds": 0,
+     "software": "tifffile.py",
+     "tagCodes": [
+      254,
+      256,
+      257,
+      258,
+      259,
+      262,
+      273,
+      277,
+      278,
+      279,
+      282,
+      283,
+      284,
+      296,
+      305
+     ],
+     "storedSamplesSha256": "94EBA04F552C26AA277898E4462DCBB61350D797C4AF138584FD3861D7EE4830"
+    }
+   ],
+   "expect": {
+    "primary": 1
+   }
+  }
+ }
+}

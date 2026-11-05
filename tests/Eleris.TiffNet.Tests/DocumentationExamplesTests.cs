@@ -25,6 +25,7 @@ public class DocumentationExamplesTests
 
         Assert.Contains("The file is damaged: The image declares more pixels than the file holds.", text, StringComparison.Ordinal);
         Assert.Contains("The file is too large for this device (MaxPixelBytes).", text, StringComparison.Ordinal);
+        Assert.Contains("Pixels: 256 MB, threads: 2", Capture(ReliabilityExamples.UntrustedFiles), StringComparison.Ordinal);
     }
 
     private static string Capture(Action action)

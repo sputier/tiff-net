@@ -331,7 +331,7 @@ Same table as FitsNet:
 | Situation | Exception |
 | --- | --- |
 | Data that is not valid TIFF: bad structure, truncated or damaged data, a limit of `TiffReadOptions` exceeded | `TiffException` (with `Limit` set when a limit was exceeded) |
-| A valid TIFF feature the library does not handle (palette, CMYK, old-style JPEG…) | `NotSupportedException` |
+| A valid TIFF feature the library does not handle (CMYK, old-style JPEG, CCITT compression…) | `NotSupportedException` |
 | A wrong argument (region outside the image, wrong array length, missing colour model) | `ArgumentException`, `ArgumentOutOfRangeException` |
 | A call that does not fit the state (reading `float` raw from a `UInt16` image) | `InvalidOperationException` |
 | The caller's file or stream fails | its own exception (`IOException`…), never relabelled |

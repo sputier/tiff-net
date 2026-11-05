@@ -74,8 +74,9 @@ Legend: **R** read, **W** write, — not supported (`NotSupportedException` with
 | 3 | 24 | — | `NotSupportedException` |
 | 5, 6 (complex) | any | — | `NotSupportedException` |
 
-`MinIsWhite` grey images (8 bits and more) are read with their values inverted (`max − value` for integers, `−value` for
-floating point), so that they behave like `MinIsBlack`; `TiffStorage` keeps what the file said.
+`MinIsWhite` grey images, at every depth, are read with their values inverted (`max − value` for integers, where `max` is
+`2^bits − 1` of the stored depth, so 1 − value for a bilevel mask; `−value` for floating point), so that they behave like
+`MinIsBlack`; `TiffStorage` keeps what the file said.
 
 ## Colour
 
