@@ -17,6 +17,44 @@ public class DomainFixturesTests
         });
     }
 
+    [Fact]
+    public void The_orientation_expectations_follow_TIFF_6()
+    {
+        // An oracle independent of the Python generator: the stored image is 2 rows of 3 samples, 1 to 6; TIFF 6.0 says where its
+        // row 0 and column 0 are on the visual image, and the delivered image is the visual one, top-down, left to right.
+        ushort[,] stored = { { 1, 2, 3 }, { 4, 5, 6 } };
+        Func<int, int, ushort>[] views =
+        [
+            (r, c) => stored[r, c],             // 1: top, left
+            (r, c) => stored[r, 2 - c],         // 2: top, right
+            (r, c) => stored[1 - r, 2 - c],     // 3: bottom, right
+            (r, c) => stored[1 - r, c],         // 4: bottom, left
+            (r, c) => stored[c, r],             // 5: left, top (transposed)
+            (r, c) => stored[1 - c, r],         // 6: right, top (90 degrees clockwise)
+            (r, c) => stored[1 - c, 2 - r],     // 7: right, bottom
+            (r, c) => stored[c, 2 - r],         // 8: left, bottom (90 degrees counterclockwise)
+        ];
+
+        for (int value = 1; value <= 8; value++)
+        {
+            (int rows, int columns) = value <= 4 ? (2, 3) : (3, 2);
+            var delivered = new ushort[rows * columns];
+            for (int r = 0; r < rows; r++)
+            {
+                for (int c = 0; c < columns; c++)
+                {
+                    delivered[r * columns + c] = views[value - 1](r, c);
+                }
+            }
+
+            var expect = DomainFixtures.Expect($"orientation_{value}.tif")!.Value;
+            string hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                System.Runtime.InteropServices.MemoryMarshal.AsBytes(delivered.AsSpan())));
+            Assert.Equal(hash, expect.GetProperty("delivered").GetString());
+            Assert.Equal([rows, columns], expect.GetProperty("deliveredShape").EnumerateArray().Select(e => e.GetInt32()));
+        }
+    }
+
     [Theory]
     [InlineData("siril_m42_grey16_astro.tif", 1, 16)]
     [InlineData("siril_m42_grey16_deflate.tif", 1, 16)]
@@ -49,6 +87,9 @@ public class DomainFixturesTests
             Assert.Equal(value, DomainFixtures.Page(name).GetProperty("orientation").GetInt32());
             Assert.Matches("^[0-9A-F]{64}$", DomainFixtures.Expect(name)!.Value.GetProperty("delivered").GetString());
         }
+
+        // Low depths: MinIsWhite is inverted at every depth, a bilevel mask included.
+        Assert.NotNull(DomainFixtures.Expect("miniswhite_1bit.tif"));
 
         // Grey with three samples stays grey; the kinds of extra channel are both there.
         Assert.Equal("grey", DomainFixtures.Expect("grey_3_samples.tif")!.Value.GetProperty("colorModel").GetString());

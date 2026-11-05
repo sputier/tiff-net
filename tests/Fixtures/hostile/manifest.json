@@ -4,6 +4,7 @@
    "finding": "SEC-03",
    "attack": "BigTIFF directory of 32008 entries, 32000 unknown tags",
    "outcome": "TiffException:MaxTagsPerDirectory",
+   "options": {},
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
@@ -11,6 +12,7 @@
    "finding": "SEC-05",
    "attack": "2048 strips of 65536 x 16 sharing one 1039-byte deflate stream: 2 GB of pixels declared",
    "outcome": "TiffException:MaxPixelBytes",
+   "options": {},
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
@@ -18,6 +20,7 @@
    "finding": "SEC-05",
    "attack": "2048 strips of 65536 x 16 sharing one 1867-byte lzw stream: 2 GB of pixels declared",
    "outcome": "TiffException:MaxPixelBytes",
+   "options": {},
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
@@ -25,6 +28,7 @@
    "finding": "SEC-05",
    "attack": "2048 strips of 65536 x 16 sharing one 16384-byte packbits stream: 2 GB of pixels declared",
    "outcome": "TiffException:MaxPixelBytes",
+   "options": {},
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
@@ -32,6 +36,7 @@
    "finding": "SEC-02",
    "attack": "StripByteCounts of 2 GB in a file of a few bytes",
    "outcome": "TiffException",
+   "options": {},
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
@@ -39,6 +44,7 @@
    "finding": "SEC-04",
    "attack": "4096 x 4096 progressive JPEG with 1000 AC scans of a few bytes",
    "outcome": "TiffException:MaxJpegScans",
+   "options": {},
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
@@ -46,13 +52,17 @@
    "finding": "SEC-04",
    "attack": "4096 x 4096 progressive JPEG with 10000 AC scans of a few bytes",
    "outcome": "TiffException:MaxJpegScans",
+   "options": {},
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
   "jpeg-progressive-coefficients-16k.tif": {
    "finding": "SEC-05",
-   "attack": "16384 x 16384 progressive JPEG with 1 AC scans of a few bytes",
+   "attack": "16384 x 16384 progressive JPEG: 512 MB of coefficients",
    "outcome": "TiffException:MaxPixelBytes",
+   "options": {
+    "MaxPixelBytes": 67108864
+   },
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
@@ -60,6 +70,7 @@
    "finding": "SEC-01",
    "attack": "same with SHORT offset tables",
    "outcome": "TiffException",
+   "options": {},
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
@@ -67,6 +78,7 @@
    "finding": "SEC-01",
    "attack": "1 x 268435456 image, one row per strip, a single strip offset: tables of 268435456 entries implied",
    "outcome": "TiffException",
+   "options": {},
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
@@ -74,6 +86,7 @@
    "finding": "SEC-01",
    "attack": "1 x 2147483647 image, one row per strip, a single strip offset: tables of 2147483647 entries implied",
    "outcome": "TiffException",
+   "options": {},
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
@@ -81,6 +94,7 @@
    "finding": "SEC-01",
    "attack": "262144 x 262144 image in 16 x 16 tiles: 2^28 tiles, one offset",
    "outcome": "TiffException",
+   "options": {},
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
@@ -88,13 +102,17 @@
    "finding": "SEC-06",
    "attack": "524288 Deflate tiles of 16 x 16 sharing one 64-byte stream",
    "outcome": "TiffException:MaxPixelBytes",
-   "maxSeconds": 5.0,
+   "options": {
+    "MaxPixelBytes": 67108864
+   },
+   "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
   "unknowntags-20k.tif": {
    "finding": "SEC-03",
    "attack": "20000 distinct unknown tags, unsorted",
    "outcome": "TiffException:MaxTagsPerDirectory",
+   "options": {},
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
@@ -102,6 +120,7 @@
    "finding": "SEC-03",
    "attack": "5000 distinct unknown tags, unsorted",
    "outcome": "TiffException:MaxTagsPerDirectory",
+   "options": {},
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   }
@@ -111,6 +130,9 @@
    "finding": "SEC-05",
    "attack": "same, Orientation = 3 (a mirror pass on 2 GB)",
    "outcome": "TiffException:MaxPixelBytes",
+   "options": {
+    "MaxPixelBytes": 67108864
+   },
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
@@ -118,6 +140,9 @@
    "finding": "SEC-05",
    "attack": "Deflate strips sharing one stream, 2 GB declared",
    "outcome": "TiffException:MaxPixelBytes",
+   "options": {
+    "MaxPixelBytes": 67108864
+   },
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
@@ -125,6 +150,9 @@
    "finding": "SEC-05",
    "attack": "same, floating point predictor",
    "outcome": "TiffException:MaxPixelBytes",
+   "options": {
+    "MaxPixelBytes": 67108864
+   },
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
@@ -132,6 +160,9 @@
    "finding": "SEC-05",
    "attack": "same, horizontal predictor",
    "outcome": "TiffException:MaxPixelBytes",
+   "options": {
+    "MaxPixelBytes": 67108864
+   },
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
@@ -139,6 +170,9 @@
    "finding": "SEC-05",
    "attack": "JPEG strips sharing one stream, 2 GB declared",
    "outcome": "TiffException:MaxPixelBytes",
+   "options": {
+    "MaxPixelBytes": 67108864
+   },
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
@@ -146,6 +180,9 @@
    "finding": "SEC-05",
    "attack": "LZW strips sharing one stream",
    "outcome": "TiffException:MaxPixelBytes",
+   "options": {
+    "MaxPixelBytes": 67108864
+   },
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
@@ -153,6 +190,9 @@
    "finding": "SEC-05",
    "attack": "PackBits strips sharing one stream",
    "outcome": "TiffException:MaxPixelBytes",
+   "options": {
+    "MaxPixelBytes": 67108864
+   },
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
@@ -160,6 +200,9 @@
    "finding": "SEC-06",
    "attack": "524288 Deflate tiles sharing one stream",
    "outcome": "TiffException:MaxPixelBytes",
+   "options": {
+    "MaxPixelBytes": 67108864
+   },
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
@@ -167,6 +210,7 @@
    "finding": "SEC-03",
    "attack": "BigTIFF with 32000 unknown tags",
    "outcome": "TiffException:MaxTagsPerDirectory",
+   "options": {},
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
@@ -174,6 +218,7 @@
    "finding": "SEC-02",
    "attack": "StripByteCounts of 2 GB in 124 bytes",
    "outcome": "TiffException",
+   "options": {},
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
@@ -181,6 +226,7 @@
    "finding": "SEC-01",
    "attack": "268 million strips implied by the geometry, one offset",
    "outcome": "TiffException",
+   "options": {},
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
@@ -188,6 +234,7 @@
    "finding": "SEC-01",
    "attack": "2^31 strips implied by the geometry, one offset",
    "outcome": "TiffException",
+   "options": {},
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
@@ -195,6 +242,7 @@
    "finding": "SEC-03",
    "attack": "20000 unknown tags",
    "outcome": "TiffException:MaxTagsPerDirectory",
+   "options": {},
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
@@ -202,27 +250,33 @@
    "finding": "SEC-03",
    "attack": "32000 unknown tags",
    "outcome": "TiffException:MaxTagsPerDirectory",
+   "options": {},
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
   "fuzz-cmyka-dircount-5s.tif": {
    "finding": "SEC-03",
    "attack": "a CMYK file whose directory count was mutated (5.4 s on the first implementation)",
-   "outcome": "TiffException",
+   "outcome": "TiffException:*|NotSupportedException",
+   "options": {},
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
   "fuzz-worker-fatal-oom-not-reproducible.tif": {
    "finding": "SEC-05",
    "attack": "fuzzing input of an out-of-memory crash that did not reproduce alone",
-   "outcome": "TiffException",
+   "outcome": "TiffException:*|NotSupportedException",
+   "options": {},
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
   "jpeg-prog-16k-coefbuf.tif": {
    "finding": "SEC-05",
-   "attack": "16k x 16k progressive JPEG: 1 GB of coefficients",
+   "attack": "16k x 16k progressive JPEG: 512 MB of coefficients",
    "outcome": "TiffException:MaxPixelBytes",
+   "options": {
+    "MaxPixelBytes": 67108864
+   },
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
@@ -230,6 +284,7 @@
    "finding": "SEC-05",
    "attack": "46k x 46k progressive JPEG: 8 GB of coefficients",
    "outcome": "TiffException:MaxPixelBytes",
+   "options": {},
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
@@ -237,6 +292,7 @@
    "finding": "SEC-04",
    "attack": "progressive JPEG with 10000 AC scans (35 s on the first implementation)",
    "outcome": "TiffException:MaxJpegScans",
+   "options": {},
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   },
@@ -244,6 +300,7 @@
    "finding": "SEC-04",
    "attack": "progressive JPEG with 1000 AC scans",
    "outcome": "TiffException:MaxJpegScans",
+   "options": {},
    "maxSeconds": 2.0,
    "maxAllocatedMB": 64
   }

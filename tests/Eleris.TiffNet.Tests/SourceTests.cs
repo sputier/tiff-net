@@ -115,6 +115,43 @@ public sealed class SourceTests : IDisposable
     }
 
     [Fact]
+    public void A_limit_above_what_an_array_holds_is_reduced_to_it()
+    {
+        var unlimited = TiffReadOptions.Default with { MaxInputBytes = long.MaxValue };
+
+        var ex = Assert.Throws<TiffException>(() => TiffSource.FromStream(new LengthOnlyStream(3L << 30), unlimited));
+
+        Assert.Equal("MaxInputBytes", ex.Limit);
+        Assert.Contains(Array.MaxLength.ToString(System.Globalization.CultureInfo.InvariantCulture), ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_name_given_by_the_caller_is_reduced_to_a_file_name()
+    {
+        using var source = TiffSource.FromStream(new MemoryStream(Data), TiffReadOptions.Default, _path);
+
+        Assert.Equal(Path.GetFileName(_path), source.Name);
+    }
+
+    [Fact]
+    public void An_open_file_can_be_moved_aside_and_deleted()
+    {
+        // What a save to the path of an open file needs: on Windows, a file open without FileShare.Delete can be neither
+        // renamed nor deleted. (Replacing it in one move is refused by Windows whatever the sharing; the save moves it aside.)
+        using var source = TiffSource.Open(_path);
+        string aside = _path + ".old";
+
+        File.Move(_path, aside);
+        File.WriteAllBytes(_path, [1, 2, 3]);
+        File.Delete(aside);
+
+        Assert.Equal(3, new FileInfo(_path).Length);
+        var buffer = new byte[10];
+        source.ReadExactly(0, buffer);   // the open source still reads the old content
+        Assert.Equal(Data[..10], buffer);
+    }
+
+    [Fact]
     public void A_stream_that_fails_rethrows_its_own_exception()
     {
         var failing = new FailingStream(new InvalidOperationException("The network is down."));
@@ -138,6 +175,17 @@ public sealed class SourceTests : IDisposable
         source.ReadExactly(2_500_000, buffer);
 
         Assert.Equal(Data.AsSpan(2_500_000, 100).ToArray(), buffer);
+    }
+
+    [Fact]
+    public async Task An_asynchronous_read_is_cancelled_even_if_the_stream_ignores_the_token()
+    {
+        using var later = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+        var endless = new EndlessStream();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            TiffSource.FromStreamAsync(endless, TiffReadOptions.Default, cancellationToken: later.Token));
+        Assert.True(endless.Given < Array.MaxLength, "the endless stream was read to the limit");
     }
 
     [Fact]
@@ -171,6 +219,21 @@ public sealed class SourceTests : IDisposable
         public override void Flush() { }
         public override int Read(byte[] buffer, int offset, int count) => inner.Read(buffer, offset, Math.Min(count, 70_000));
         public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    /// <summary>A seekable stream that announces a length and gives nothing.</summary>
+    private sealed class LengthOnlyStream(long length) : Stream
+    {
+        public override bool CanRead => true;
+        public override bool CanSeek => true;
+        public override bool CanWrite => false;
+        public override long Length => length;
+        public override long Position { get; set; }
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => 0;
+        public override long Seek(long offset, SeekOrigin origin) => Position = offset;
         public override void SetLength(long value) => throw new NotSupportedException();
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }

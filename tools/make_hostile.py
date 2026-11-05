@@ -77,10 +77,17 @@ def grey(width, height, *, bits=8, compression=1, rows=None, offsets=(8,), count
     return entries + list(extra)
 
 
+# Reading options of a case, when the defaults would let a valid but large file through: 64 MB of pixels, as a phone would set.
+SMALL_DEVICE = {"MaxPixelBytes": 64 << 20}
+
+
 def write(name: str, data: bytes, finding: str, attack: str, outcome: str = "TiffException", seconds: float = 2.0,
-          megabytes: int = 64) -> None:
+          megabytes: int = 64, options: dict | None = None) -> None:
+    """Outcome: "TiffException" (damaged: no limit), "TiffException:Limit" (that limit), "TiffException:*" (any limit),
+    "NotSupportedException", or alternatives separated by "|"."""
     (OUT / name).write_bytes(data)
-    cases[name] = {"finding": finding, "attack": attack, "outcome": outcome, "maxSeconds": seconds, "maxAllocatedMB": megabytes}
+    cases[name] = {"finding": finding, "attack": attack, "outcome": outcome, "options": options or {},
+                   "maxSeconds": seconds, "maxAllocatedMB": megabytes}
 
 
 # ---- Cases --------------------------------------------------------------------------------------------------------------------
@@ -156,9 +163,9 @@ def many_tiles() -> None:
     for tag, typ, count, value in entries:
         data += struct.pack("<HHI", tag, typ, count) + value.ljust(4, b"\x00")
     data += bytes(4)
-    # A valid file decoded at the limits: bounded by MaxPixelBytes (128 MB of pixels here) and by the work per byte of file.
+    # A valid file of 128 MB of pixels: refused by a device that allows 64 MB, before 524288 tiles are decoded.
     write("tiles-512k-shared-stream.tif", bytes(data), "SEC-06", "524288 Deflate tiles of 16 x 16 sharing one 64-byte stream",
-          outcome="TiffException:MaxPixelBytes", seconds=5.0, megabytes=64)
+          outcome="TiffException:MaxPixelBytes", options=SMALL_DEVICE)
 
 
 def decompression_bombs() -> None:
@@ -173,9 +180,10 @@ def decompression_bombs() -> None:
     strips = 2048
     for name, (code, stream) in payloads.items():
         entries = grey(width, rows * strips, compression=code, rows=rows, offsets=[8] * strips, counts=[len(stream)] * strips)
+        # 65536 x 32768 bytes = 2^31, just beyond the default MaxPixelBytes (2 147 483 591): the default limit is tested here.
         write(f"bomb-{name}-2G.tif", build(entries, payload=stream), "SEC-05",
               f"{strips} strips of {width} x {rows} sharing one {len(stream)}-byte {name} stream: 2 GB of pixels declared",
-              outcome="TiffException:MaxPixelBytes", seconds=2.0, megabytes=64)
+              outcome="TiffException:MaxPixelBytes")
 
 
 def packbits_zeros(length: int) -> bytes:
@@ -237,36 +245,42 @@ def progressive_jpeg() -> None:
                                                  (16384, 16384, 1, "jpeg-progressive-coefficients-16k.tif", "SEC-05")]:
         stream = jpeg(width, height, scans)
         entries = grey(width, height, compression=7, rows=height, counts=(len(stream),))
-        outcome = "TiffException:MaxJpegScans" if finding == "SEC-04" else "TiffException:MaxPixelBytes"
-        write(name, build(entries, payload=stream), finding,
-              f"{width} x {height} progressive JPEG with {scans} AC scans of a few bytes", outcome=outcome)
+        if finding == "SEC-04":
+            write(name, build(entries, payload=stream), finding, f"{width} x {height} progressive JPEG with {scans} AC scans of a few bytes",
+                  outcome="TiffException:MaxJpegScans")
+        else:
+            # 256 MB of pixels and 512 MB of coefficients: within the defaults, beyond a device that allows 64 MB.
+            write(name, build(entries, payload=stream), finding, f"{width} x {height} progressive JPEG: 512 MB of coefficients",
+                  outcome="TiffException:MaxPixelBytes", options=SMALL_DEVICE)
 
 
-# The files of the review (tests/Fixtures/hostile/review), measured on the first implementation; kept as they are.
+# The files of the review (tests/Fixtures/hostile/review), measured on the first implementation; kept as they are. The fourth
+# value says whether a small device's options apply: the bombs of the review declare 2 147 024 896 bytes, just below the default
+# MaxPixelBytes, so they are refused only with a lower limit.
 REVIEW_CASES = {
-    "bomb-deflate-2G.tif": ("SEC-05", "Deflate strips sharing one stream, 2 GB declared", "TiffException:MaxPixelBytes"),
-    "bomb-deflate-2G-botright.tif": ("SEC-05", "same, Orientation = 3 (a mirror pass on 2 GB)", "TiffException:MaxPixelBytes"),
-    "bomb-deflate-fp3-2G.tif": ("SEC-05", "same, floating point predictor", "TiffException:MaxPixelBytes"),
-    "bomb-deflate-pred2-2G.tif": ("SEC-05", "same, horizontal predictor", "TiffException:MaxPixelBytes"),
-    "bomb-jpeg-2G.tif": ("SEC-05", "JPEG strips sharing one stream, 2 GB declared", "TiffException:MaxPixelBytes"),
-    "bomb-lzw-2G.tif": ("SEC-05", "LZW strips sharing one stream", "TiffException:MaxPixelBytes"),
-    "bomb-packbits-2G.tif": ("SEC-05", "PackBits strips sharing one stream", "TiffException:MaxPixelBytes"),
-    "dos-512k-tiles.tif": ("SEC-06", "524288 Deflate tiles sharing one stream", "TiffException:MaxPixelBytes"),
-    "dos-bigtiff-unknowntags-32k.tif": ("SEC-03", "BigTIFF with 32000 unknown tags", "TiffException:MaxTagsPerDirectory"),
-    "dos-bytecount-2G-deflate.tif": ("SEC-02", "StripByteCounts of 2 GB in 124 bytes", "TiffException"),
-    "dos-nstrips-268M.tif": ("SEC-01", "268 million strips implied by the geometry, one offset", "TiffException"),
-    "dos-nstrips-2G.tif": ("SEC-01", "2^31 strips implied by the geometry, one offset", "TiffException"),
-    "dos-unknowntags-20k.tif": ("SEC-03", "20000 unknown tags", "TiffException:MaxTagsPerDirectory"),
-    "dos-unknowntags-32k.tif": ("SEC-03", "32000 unknown tags", "TiffException:MaxTagsPerDirectory"),
+    "bomb-deflate-2G.tif": ("SEC-05", "Deflate strips sharing one stream, 2 GB declared", "TiffException:MaxPixelBytes", True),
+    "bomb-deflate-2G-botright.tif": ("SEC-05", "same, Orientation = 3 (a mirror pass on 2 GB)", "TiffException:MaxPixelBytes", True),
+    "bomb-deflate-fp3-2G.tif": ("SEC-05", "same, floating point predictor", "TiffException:MaxPixelBytes", True),
+    "bomb-deflate-pred2-2G.tif": ("SEC-05", "same, horizontal predictor", "TiffException:MaxPixelBytes", True),
+    "bomb-jpeg-2G.tif": ("SEC-05", "JPEG strips sharing one stream, 2 GB declared", "TiffException:MaxPixelBytes", True),
+    "bomb-lzw-2G.tif": ("SEC-05", "LZW strips sharing one stream", "TiffException:MaxPixelBytes", True),
+    "bomb-packbits-2G.tif": ("SEC-05", "PackBits strips sharing one stream", "TiffException:MaxPixelBytes", True),
+    "dos-512k-tiles.tif": ("SEC-06", "524288 Deflate tiles sharing one stream", "TiffException:MaxPixelBytes", True),
+    "dos-bigtiff-unknowntags-32k.tif": ("SEC-03", "BigTIFF with 32000 unknown tags", "TiffException:MaxTagsPerDirectory", False),
+    "dos-bytecount-2G-deflate.tif": ("SEC-02", "StripByteCounts of 2 GB in 124 bytes", "TiffException", False),
+    "dos-nstrips-268M.tif": ("SEC-01", "268 million strips implied by the geometry, one offset", "TiffException", False),
+    "dos-nstrips-2G.tif": ("SEC-01", "2^31 strips implied by the geometry, one offset", "TiffException", False),
+    "dos-unknowntags-20k.tif": ("SEC-03", "20000 unknown tags", "TiffException:MaxTagsPerDirectory", False),
+    "dos-unknowntags-32k.tif": ("SEC-03", "32000 unknown tags", "TiffException:MaxTagsPerDirectory", False),
     "fuzz-cmyka-dircount-5s.tif": ("SEC-03", "a CMYK file whose directory count was mutated (5.4 s on the first implementation)",
-                                   "TiffException"),
+                                   "TiffException:*|NotSupportedException", False),
     "fuzz-worker-fatal-oom-not-reproducible.tif": ("SEC-05", "fuzzing input of an out-of-memory crash that did not reproduce alone",
-                                                   "TiffException"),
-    "jpeg-prog-16k-coefbuf.tif": ("SEC-05", "16k x 16k progressive JPEG: 1 GB of coefficients", "TiffException:MaxPixelBytes"),
-    "jpeg-prog-46k-coefbuf.tif": ("SEC-05", "46k x 46k progressive JPEG: 8 GB of coefficients", "TiffException:MaxPixelBytes"),
+                                                   "TiffException:*|NotSupportedException", False),
+    "jpeg-prog-16k-coefbuf.tif": ("SEC-05", "16k x 16k progressive JPEG: 512 MB of coefficients", "TiffException:MaxPixelBytes", True),
+    "jpeg-prog-46k-coefbuf.tif": ("SEC-05", "46k x 46k progressive JPEG: 8 GB of coefficients", "TiffException:MaxPixelBytes", False),
     "jpeg-prog-4k-10000scans.tif": ("SEC-04", "progressive JPEG with 10000 AC scans (35 s on the first implementation)",
-                                    "TiffException:MaxJpegScans"),
-    "jpeg-prog-4k-1000scans.tif": ("SEC-04", "progressive JPEG with 1000 AC scans", "TiffException:MaxJpegScans"),
+                                    "TiffException:MaxJpegScans", False),
+    "jpeg-prog-4k-1000scans.tif": ("SEC-04", "progressive JPEG with 1000 AC scans", "TiffException:MaxJpegScans", False),
 }
 
 
@@ -279,8 +293,9 @@ def main() -> int:
     manifest_path = FOLDER / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.exists() else {}
     manifest["crafted"] = dict(sorted(cases.items()))
-    manifest["review"] = {name: {"finding": finding, "attack": attack, "outcome": outcome, "maxSeconds": 2.0, "maxAllocatedMB": 64}
-                          for name, (finding, attack, outcome) in sorted(REVIEW_CASES.items())}
+    manifest["review"] = {name: {"finding": finding, "attack": attack, "outcome": outcome,
+                                 "options": SMALL_DEVICE if small else {}, "maxSeconds": 2.0, "maxAllocatedMB": 64}
+                          for name, (finding, attack, outcome, small) in sorted(REVIEW_CASES.items())}
     manifest_path.write_text(json.dumps(manifest, indent=1) + "\n", encoding="utf-8", newline="\n")
     total = sum((OUT / n).stat().st_size for n in cases)
     print(f"{len(cases)} files, {total // 1024} KB in {OUT.relative_to(ROOT)}")
