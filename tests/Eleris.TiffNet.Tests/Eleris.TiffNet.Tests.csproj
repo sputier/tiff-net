@@ -21,4 +21,8 @@
     <ProjectReference Include="..\..\docs\examples\Eleris.TiffNet.Examples\Eleris.TiffNet.Examples.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\Fixtures\interop\manifest.json" Link="Fixtures\interop\manifest.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
