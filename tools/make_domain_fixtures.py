@@ -10,6 +10,8 @@ it (geometry, sample type, photometric interpretation, extra channels, metadata,
 reader of this library must deliver when they differ from the stored ones (orientation applied, palette expanded, MinIsWhite
 inverted).
 
+--manifest-only rebuilds the manifest from the files as they are (keeping the expectations of the previous manifest).
+
 Siril files are made only when siril-cli is found (default path of the Windows installer, or --siril); the other files are
 always made. Run it again only to add cases: regenerated files differ in their dates, and the diff must be reviewed.
 """
@@ -223,6 +225,13 @@ def describe(path: Path) -> dict:
                 if info["planar"] and data.ndim == 3:
                     data = np.moveaxis(data, 0, -1)
                 info["storedSamplesSha256"] = samples_sha(data)
+                # What this library delivers when it differs from what is stored: palettes expanded to RGB 16-bit, MinIsWhite
+                # inverted (max of the stored depth minus the value).
+                if info["photometric"] == 3:
+                    colormap = page.colormap.astype(np.uint16)
+                    info["deliveredSamplesSha256"] = samples_sha(np.moveaxis(colormap[:, data], 0, -1))
+                elif info["photometric"] == 0 and data.dtype.kind in "ui":
+                    info["deliveredSamplesSha256"] = samples_sha((2 ** info["bitsPerSample"] - 1 - data.astype(np.int64)).astype(data.dtype))
             except Exception as e:   # tifffile cannot decode it (for example JPEG without imagecodecs support)
                 info["storedSamplesSha256"] = None
                 info["tifffileError"] = type(e).__name__
@@ -236,7 +245,8 @@ def main() -> int:
     if "--siril" in sys.argv:
         siril = Path(sys.argv[sys.argv.index("--siril") + 1])
     OUT.mkdir(parents=True, exist_ok=True)
-    structure_cases(); channel_cases(); depth_cases(); orientation_cases(); metadata_cases(); pillow_cases(); siril_cases(siril)
+    if "--manifest-only" not in sys.argv:
+        structure_cases(); channel_cases(); depth_cases(); orientation_cases(); metadata_cases(); pillow_cases(); siril_cases(siril)
 
     manifest_path = OUT / "manifest.json"
     previous = json.loads(manifest_path.read_text(encoding="utf-8"))["files"] if manifest_path.exists() else {}
