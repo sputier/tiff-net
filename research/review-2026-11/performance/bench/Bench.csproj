@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The repo sources (LibTiff + facade) are compiled INTO this assembly, read-only, by link, with the same defines as
+    src/Eleris.TiffNet: nothing is written in the repo (bin/obj stay here) and the internal LibTiff types (ZStream, Tiff, codecs)
+    are reachable for the micro benchmarks.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net10.0;net8.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <NoWarn>$(NoWarn);CS1591;CS8981;CS0618;CA1416;NU1603;NU1608</NoWarn>
+    <DefineConstants>$(DefineConstants);THREAD_SAFE_LIBTIFF;FIX_JPEG_IS_OJPEG</DefineConstants>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <TieredPGO>true</TieredPGO>
+    <RootNamespace>Bench</RootNamespace>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Repo>C:\data\DEV\git\tiff-net</Repo>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="$(Repo)\LibTiff\**\*.cs" Exclude="$(Repo)\LibTiff\obj\**;$(Repo)\LibTiff\bin\**;$(Repo)\LibTiff\Properties\**"
+             Link="LibTiff\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="$(Repo)\src\Eleris.TiffNet\**\*.cs" Exclude="$(Repo)\src\Eleris.TiffNet\obj\**;$(Repo)\src\Eleris.TiffNet\bin\**"
+             Link="Facade\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
+    <PackageReference Include="Magick.NET-Q16-HDRI-AnyCPU" Version="14.8.2" />
+  </ItemGroup>
+
+</Project>

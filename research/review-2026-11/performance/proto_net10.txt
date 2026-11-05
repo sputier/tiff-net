@@ -1,0 +1,27 @@
+case                                                          median ms   min ms     MB/s  alloc MB  gen2  extra
+proto read u16_24_zip_p2.tif threads=1            178,0    176,9      270      48,2     0  identical to TiffImage.Read
+proto read u16_24_zip_p2.tif threads=8             34,3     34,1     1399      48,3     0  identical to TiffImage.Read
+proto read u16_24_zip.tif threads=1               170,0    168,0      282      48,2     0  identical to TiffImage.Read
+proto read u16_24_zip.tif threads=8                32,9     32,2     1460      48,2     0  identical to TiffImage.Read
+proto read u16_24_lzw.tif threads=1               140,4    139,7      342      48,2     0  identical to TiffImage.Read
+proto read u16_24_lzw.tif threads=8                31,8     30,6     1512      48,2     0  identical to TiffImage.Read
+proto read u16_24_lzw_p2.tif threads=1            148,8    147,6      323      48,2     0  identical to TiffImage.Read
+proto read u16_24_lzw_p2.tif threads=8             29,6     27,3     1621      48,2     0  identical to TiffImage.Read
+proto read u16_24_none.tif threads=1                8,9      8,8     5390      48,2     0  identical to TiffImage.Read
+proto read u16_24_none.tif threads=8                9,3      9,1     5169      48,2     0  identical to TiffImage.Read
+proto read u16_61_zip_p2.tif threads=1            480,0    469,1      255     122,7     0  identical to TiffImage.Read
+proto read u16_61_zip_p2.tif threads=8             92,0     90,0     1330     122,7     0  identical to TiffImage.Read
+proto read f32rgb_24_zip_p3.tif threads=1         849,2    832,1      339     288,5     0  identical to TiffImage.Read
+proto read f32rgb_24_zip_p3.tif threads=8         176,6    158,0     1631     288,5     0  identical to TiffImage.Read
+proto read f32rgb_24_lzw_p3.tif threads=1        1033,3    998,9      279     288,2     0  identical to TiffImage.Read
+proto read f32rgb_24_lzw_p3.tif threads=8         340,8    314,9      845     288,2     0  identical to TiffImage.Read
+proto read f32rgb_24_none.tif threads=1            87,2     81,4     3302     288,2     0  identical to TiffImage.Read
+proto read f32rgb_24_none.tif threads=8            79,6     79,5     3619     288,2     0  identical to TiffImage.Read
+proto write u16_24 deflate Optimal+pred threads=1     1696,5   1402,4       28       1,1     0  out 27,9 MB
+proto write u16_24 deflate Optimal+pred threads=8      335,3    298,4      143       1,1     0  out 27,9 MB
+proto write u16_24 deflate Fastest+pred threads=1      535,7    508,4       90       1,1     0  out 40,3 MB
+proto write u16_24 deflate Fastest+pred threads=8      111,0    106,8      432       1,1     0  out 40,3 MB
+proto write f32rgb_24 deflate Optimal+pred threads=1     4244,7   4176,7       68     283,8     0  out 195,6 MB
+proto write f32rgb_24 deflate Optimal+pred threads=8      806,3    803,3      357     284,0     0  out 195,6 MB
+proto write f32rgb_24 deflate Fastest+pred threads=1     1721,9   1719,1      167     283,8     0  out 213,7 MB
+proto write f32rgb_24 deflate Fastest+pred threads=8      369,7    366,5      779     283,9     0  out 213,7 MB

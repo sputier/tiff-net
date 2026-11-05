@@ -1,0 +1,24 @@
+tifffile 2026.7.14 imagecodecs 2026.6.26 numpy 2.5.1 cores 8
+tifffile write u16_24 none workers=1                     113.6 ms      423 MB/s out 48.0 MB
+tifffile write u16_24 lzw+pred workers=1                 759.1 ms       63 MB/s out 33.5 MB
+tifffile write u16_24 lzw+pred workers=all               250.1 ms      192 MB/s out 33.5 MB
+tifffile write u16_24 deflate6+pred workers=1           1395.1 ms       34 MB/s out 28.6 MB
+tifffile write u16_24 deflate6+pred workers=all          498.4 ms       96 MB/s out 28.6 MB
+tifffile write u16_24 deflate6 workers=1                1222.1 ms       39 MB/s out 29.4 MB
+tifffile write u16_24 deflate6 workers=all               434.2 ms      111 MB/s out 29.4 MB
+tifffile write u16_24 packbits workers=1                 158.1 ms      304 MB/s out 48.4 MB
+tifffile write u16_24 packbits workers=all                91.7 ms      524 MB/s out 48.4 MB
+tifffile write f32rgb_24 none workers=1                  504.5 ms      571 MB/s out 288.0 MB
+tifffile write f32rgb_24 lzw+pred workers=1             5425.7 ms       53 MB/s out 239.7 MB
+tifffile write f32rgb_24 lzw+pred workers=all           1900.7 ms      152 MB/s out 239.7 MB
+tifffile write f32rgb_24 deflate6+pred workers=1        6382.1 ms       45 MB/s out 187.8 MB
+tifffile write f32rgb_24 deflate6+pred workers=all      1604.6 ms      179 MB/s out 187.8 MB
+tifffile write f32rgb_24 deflate6 workers=1             6611.5 ms       44 MB/s out 239.8 MB
+tifffile write f32rgb_24 deflate6 workers=all           1262.2 ms      228 MB/s out 239.8 MB
+tifffile write f32rgb_24 packbits workers=1              650.1 ms      443 MB/s out 290.3 MB
+tifffile write f32rgb_24 packbits workers=all            296.5 ms      971 MB/s out 290.3 MB
+imagecodecs.zlib_encode u16 level=1                     1458.3 ms       33 MB/s ratio 0.623
+imagecodecs.zlib_decode u16 level=1                      415.9 ms      115 MB/s 
+imagecodecs.zlib_encode u16 level=6                     5784.6 ms        8 MB/s ratio 0.607
+imagecodecs.zlib_decode u16 level=6                      393.7 ms      122 MB/s 
+imagecodecs.deflate_decode (libdeflate) u16              193.4 ms      248 MB/s 

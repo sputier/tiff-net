@@ -1,0 +1,13 @@
+readwrite u16_24_none.tif Lzw: 1270 ms, pixels 48 MB, peak WS 137 MB (start 25 MB), peak private 118 MB, total allocated 146 MB, gen0/1/2 8/2/1, heap now 103 MB, fragmented 0 MB
+patched read f32rgb_61_zip_p3.tif : 1656 ms, pixels 734 MB, peak WS 767 MB (start 25 MB), peak private 756 MB, total allocated 736 MB, gen0/1/2 1/1/1, heap now 736 MB, fragmented 1 MB
+patched readwrite f32rgb_61_none.tif Deflate: 13524 ms, pixels 734 MB, peak WS 1641 MB (start 25 MB), peak private 1773 MB, total allocated 2386 MB, gen0/1/2 64/3/2, heap now 998 MB, fragmented 0 MB
+# baseline (repo sources), fresh process each:
+read f32rgb_61_none.tif : 1070 ms, pixels 734 MB, peak WS 766 MB, total allocated 735 MB
+read f32rgb_61_zip_p3.tif : 5878 ms, pixels 734 MB, peak WS 1508 MB, total allocated 1677 MB, gen2 1
+read u16_24_none_onestrip.tif : peak WS 127 MB, total allocated 97 MB (pixels 48 MB)
+read u16_24_none_be.tif : peak WS 125 MB, total allocated 97 MB (pixels 48 MB)
+read f32rgb_24_planar_none.tif : peak WS 320 MB, allocated 289 MB
+read u16_24_zip_p2.tif : peak WS 87 MB, allocated 108 MB
+readwrite f32rgb_61_none.tif Deflate: 36670 ms, peak WS 1736 MB, total allocated 3062 MB
+readwrite f32rgb_61_none.tif None: 2037 ms, peak WS 767 MB, total allocated 736 MB
+readwrite u16_24_none.tif Lzw: 1270 ms, peak WS 137 MB, total allocated 146 MB

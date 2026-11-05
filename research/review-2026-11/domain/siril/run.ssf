@@ -1,0 +1,11 @@
+requires 1.2.0
+load m42
+savetif m42_16
+savetif m42_16_astro -astro
+savetif m42_16_deflate -astro -deflate
+savetif32 m42_32 -astro
+savetif8 m42_8
+debayer
+savetif m42_rgb16 -astro
+savetif32 m42_rgb32 -astro
+savetif8 m42_rgb8

@@ -1,0 +1,61 @@
+B1 read u16_24_lzw.tif                               215,6    202,5      223      48,6     1  file 34,2 MB
+P1 read u16_24_lzw.tif                               225,1    215,2      213      48,6     1  file 34,2 MB
+B2 read u16_24_lzw.tif                               232,1    206,8      207      48,6     1  file 34,2 MB
+P2 read u16_24_lzw.tif                               220,5    206,3      218      48,6     1  file 34,2 MB
+B1 read u16_24_lzw_p2.tif                            266,1    250,4      180      96,7     1  file 33,5 MB
+P1 read u16_24_lzw_p2.tif                            217,7    212,2      221      48,6     1  file 33,5 MB
+B2 read u16_24_lzw_p2.tif                            258,1    256,8      186      96,7     1  file 33,5 MB
+P2 read u16_24_lzw_p2.tif                            214,5    211,0      224      48,6     1  file 33,5 MB
+B1 read u16_24_zip_p2.tif                            325,0    310,9      148     107,5     1  file 28,6 MB
+P1 read u16_24_zip_p2.tif                            204,7    193,4      234      48,7     1  file 28,6 MB
+B2 read u16_24_zip_p2.tif                            326,3    320,5      147     107,5     1  file 28,6 MB
+P2 read u16_24_zip_p2.tif                            203,3    202,6      236      48,7     1  file 28,6 MB
+B1 read u16_24_zip.tif                               457,2    444,3      105      71,3     1  file 29,4 MB
+P1 read u16_24_zip.tif                               309,5    294,0      155      48,6     1  file 29,4 MB
+B2 read u16_24_zip.tif                               421,3    371,9      114      71,3     1  file 29,4 MB
+P2 read u16_24_zip.tif                               210,8    210,1      228      48,6     1  file 29,4 MB
+B1 read u16_24_none_be.tif                            55,8     54,3      860      96,5     3  file 48,0 MB
+P1 read u16_24_none_be.tif                            20,6     15,9     2325      48,5     1  file 48,0 MB
+B2 read u16_24_none_be.tif                            54,3     52,5      885      96,5     3  file 48,0 MB
+P2 read u16_24_none_be.tif                            20,1     15,0     2392      48,5     1  file 48,0 MB
+B1 read u16_24_zip_p2_be.tif                         360,7    350,2      133     107,5     1  file 28,7 MB
+P1 read u16_24_zip_p2_be.tif                         221,7    218,9      217      48,7     1  file 28,7 MB
+B2 read u16_24_zip_p2_be.tif                         344,6    336,4      139     107,5     1  file 28,7 MB
+P2 read u16_24_zip_p2_be.tif                         201,8    201,4      238      48,7     1  file 28,7 MB
+B1 read f32rgb_24_zip_p3.tif                        1643,9   1566,8      175     653,5     1  file 187,6 MB
+P1 read f32rgb_24_zip_p3.tif                         934,1    900,5      308     289,2     1  file 187,6 MB
+B2 read f32rgb_24_zip_p3.tif                        1605,5   1499,9      179     653,5     1  file 187,6 MB
+P2 read f32rgb_24_zip_p3.tif                         947,7    934,2      304     289,2     1  file 187,6 MB
+B1 read f32rgb_24_lzw_p3.tif                        2372,5   1878,7      121     576,9     1  file 239,5 MB
+P1 read f32rgb_24_lzw_p3.tif                        1557,3   1493,9      185     288,9     1  file 239,5 MB
+B2 read f32rgb_24_lzw_p3.tif                        1680,1   1677,7      171     576,9     1  file 239,5 MB
+P2 read f32rgb_24_lzw_p3.tif                        1456,4   1437,5      198     288,9     1  file 239,5 MB
+B1 read f32rgb_24_planar_zip_p3.tif                 2034,1   1910,7      142     699,1     1  file 201,1 MB
+P1 read f32rgb_24_planar_zip_p3.tif                 1360,6   1301,0      212     289,5     1  file 201,1 MB
+B2 read f32rgb_24_planar_zip_p3.tif                 2045,9   1978,4      141     699,1     1  file 201,1 MB
+P2 read f32rgb_24_planar_zip_p3.tif                 1196,7   1191,4      241     289,5     1  file 201,1 MB
+B1 read u16_61_zip_p2.tif                            706,2    691,4      173     272,9     1  file 72,6 MB
+P1 read u16_61_zip_p2.tif                            450,7    445,7      271     122,9     1  file 72,6 MB
+B2 read u16_61_zip_p2.tif                            697,7    684,2      175     272,9     1  file 72,6 MB
+P2 read u16_61_zip_p2.tif                            447,9    446,7      273     122,9     1  file 72,6 MB
+B1 write u16_24 Lzw (file)                           414,8    414,6      116      97,0     0  out 33,5 MB
+P1 write u16_24 Lzw (file)                           395,9    395,3      121       0,9     0  out 33,5 MB
+B2 write u16_24 Lzw (file)                           415,4    415,2      116      97,0     0  out 33,5 MB
+P2 write u16_24 Lzw (file)                           416,5    412,5      115       0,9     0  out 33,5 MB
+B1 write u16_24 Deflate (file)                      4137,7   3961,5       12     148,5     0  out 28,6 MB
+P1 write u16_24 Deflate (file)                       748,7    747,5       64      99,2     2  out 27,9 MB
+B2 write u16_24 Deflate (file)                      4408,8   4177,7       11     148,5     0  out 28,6 MB
+P2 write u16_24 Deflate (file)                       774,4    748,2       62      99,2     2  out 27,9 MB
+B1 write u16_24 PackBits (file)                       94,0     93,7      510       0,6     0  out 48,3 MB
+P1 write u16_24 PackBits (file)                       94,7     93,0      507       0,6     0  out 48,3 MB
+B2 write u16_24 PackBits (file)                       93,8     93,0      512       0,6     0  out 48,3 MB
+P2 write u16_24 PackBits (file)                       95,4     90,1      503       0,6     0  out 48,3 MB
+B1 write f32rgb_24 Lzw (file)                       2571,1   2554,0      112     577,0     0  out 239,7 MB
+P1 write f32rgb_24 Lzw (file)                       2358,3   2325,1      122       1,0     0  out 239,7 MB
+B2 write f32rgb_24 Lzw (file)                       2532,7   2490,6      114     577,0     0  out 239,7 MB
+P2 write f32rgb_24 Lzw (file)                       2922,0   2448,0       99       1,0     0  out 239,7 MB
+B1 write f32rgb_24 Deflate (file)                   7501,0   7459,3       38     935,3     0  out 186,8 MB
+P1 write f32rgb_24 Deflate (file)                   4691,4   4594,9       61     689,6     2  out 195,7 MB
+B2 write f32rgb_24 Deflate (file)                   7981,5   7792,2       36     935,3     1  out 186,8 MB
+P2 write f32rgb_24 Deflate (file)                   4973,0   4874,7       58     689,6     2  out 195,7 MB
+finished

@@ -1,0 +1,1622 @@
+// Validating benchmarks:
+//    * Assembly Bench, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null is located in temp. If you are running benchmarks from xUnit you need to disable shadow copy. It's not supported by design.
+
+// ***** BenchmarkRunner: Start   *****
+// ***** Found 24 benchmark(s) in total *****
+// ***** Building 1 exe(s) in Parallel: Start   *****
+Unable to find .sln or .csproj file. Will use current directory <scratchpad>\review-perf to search for project file. If you don't use .sln file on purpose it should not be a problem.
+// start dotnet  restore --nodeReuse:false /p:UseSharedCompilation=false /p:Deterministic=true /p:Optimize=true /p:ArtifactsPath="<scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1/" /p:OutDir="<scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\bin\Release\net10.0/" /p:OutputPath="<scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\bin\Release\net10.0/" /p:PublishDir="<scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\publish/" in <scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1
+// command took 1.08 sec and exited with 0
+// start dotnet  build -c Release --no-restore --nodeReuse:false /p:UseSharedCompilation=false /p:Deterministic=true /p:Optimize=true /p:ArtifactsPath="<scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1/" /p:OutDir="<scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\bin\Release\net10.0/" /p:OutputPath="<scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\bin\Release\net10.0/" /p:PublishDir="<scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\publish/" --output "<scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\bin\Release\net10.0/" in <scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1
+// command took 5.43 sec and exited with 0
+// ***** Done, took 00:00:06 (6.57 sec)   *****
+// Found 15 benchmarks:
+//   ThirdPartyReadBenchmarks.ImageSharp_Load: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=f32rgb_24_none.tif]
+//   ThirdPartyReadBenchmarks.MagickNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=f32rgb_24_none.tif]
+//   ThirdPartyReadBenchmarks.TiffNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=f32rgb_24_none.tif]
+//   ThirdPartyReadBenchmarks.ImageSharp_Load: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=f32rgb_24_zip_p3.tif]
+//   ThirdPartyReadBenchmarks.MagickNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=f32rgb_24_zip_p3.tif]
+//   ThirdPartyReadBenchmarks.TiffNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=f32rgb_24_zip_p3.tif]
+//   ThirdPartyReadBenchmarks.ImageSharp_Load: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=u16_24_lzw_p2.tif]
+//   ThirdPartyReadBenchmarks.MagickNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=u16_24_lzw_p2.tif]
+//   ThirdPartyReadBenchmarks.TiffNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=u16_24_lzw_p2.tif]
+//   ThirdPartyReadBenchmarks.ImageSharp_Load: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=u16_24_none.tif]
+//   ThirdPartyReadBenchmarks.MagickNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=u16_24_none.tif]
+//   ThirdPartyReadBenchmarks.TiffNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=u16_24_none.tif]
+//   ThirdPartyReadBenchmarks.ImageSharp_Load: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=u16_24_zip_p2.tif]
+//   ThirdPartyReadBenchmarks.MagickNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=u16_24_zip_p2.tif]
+//   ThirdPartyReadBenchmarks.TiffNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=u16_24_zip_p2.tif]
+
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Haute performance)
+// **************************
+// Benchmark: ThirdPartyReadBenchmarks.ImageSharp_Load: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=f32rgb_24_none.tif]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bench-big-1.dll --anonymousPipes 1040 1232 --benchmarkName "Bench.ThirdPartyReadBenchmarks.ImageSharp_Load(File_: \"f32rgb_24_none.tif\")" --job big --benchmarkId 0 in <scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2)
+
+WorkloadWarmup   1: 1 op, 265556300.00 ns, 265.5563 ms/op
+WorkloadWarmup   2: 1 op, 90475200.00 ns, 90.4752 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 89571600.00 ns, 89.5716 ms/op
+WorkloadActual   2: 1 op, 90324500.00 ns, 90.3245 ms/op
+WorkloadActual   3: 1 op, 94490700.00 ns, 94.4907 ms/op
+WorkloadActual   4: 1 op, 90434800.00 ns, 90.4348 ms/op
+WorkloadActual   5: 1 op, 90371500.00 ns, 90.3715 ms/op
+WorkloadActual   6: 1 op, 92262700.00 ns, 92.2627 ms/op
+WorkloadActual   7: 1 op, 91034900.00 ns, 91.0349 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 1 op, 89571600.00 ns, 89.5716 ms/op
+WorkloadResult   2: 1 op, 90324500.00 ns, 90.3245 ms/op
+WorkloadResult   3: 1 op, 94490700.00 ns, 94.4907 ms/op
+WorkloadResult   4: 1 op, 90434800.00 ns, 90.4348 ms/op
+WorkloadResult   5: 1 op, 90371500.00 ns, 90.3715 ms/op
+WorkloadResult   6: 1 op, 92262700.00 ns, 92.2627 ms/op
+WorkloadResult   7: 1 op, 91034900.00 ns, 91.0349 ms/op
+// GC:  0 0 0 93568 1
+// Threading:  0 0 1
+
+// AfterAll
+// Benchmark Process 47968 has exited with code 0.
+
+Mean = 91.213 ms, StdErr = 0.630 ms (0.69%), N = 7, StdDev = 1.667 ms
+Min = 89.572 ms, Q1 = 90.348 ms, Median = 90.435 ms, Q3 = 91.649 ms, Max = 94.491 ms
+IQR = 1.301 ms, LowerFence = 88.397 ms, UpperFence = 93.600 ms
+ConfidenceInterval = [87.458 ms; 94.968 ms] (CI 99.9%), Margin = 3.755 ms (4.12% of Mean)
+Skewness = 0.93, Kurtosis = 2.32, MValue = 2
+
+// ** Remained 23 (95,8 %) benchmark(s) to run. Estimated finish 2026-11-05 17:43 (0h 0m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Haute performance)
+// **************************
+// Benchmark: ThirdPartyReadBenchmarks.MagickNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=f32rgb_24_none.tif]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bench-big-1.dll --anonymousPipes 1040 1232 --benchmarkName "Bench.ThirdPartyReadBenchmarks.MagickNet_Read(File_: \"f32rgb_24_none.tif\")" --job big --benchmarkId 1 in <scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2)
+
+WorkloadWarmup   1: 1 op, 847408100.00 ns, 847.4081 ms/op
+WorkloadWarmup   2: 1 op, 800946700.00 ns, 800.9467 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 800586200.00 ns, 800.5862 ms/op
+WorkloadActual   2: 1 op, 807536100.00 ns, 807.5361 ms/op
+WorkloadActual   3: 1 op, 804443400.00 ns, 804.4434 ms/op
+WorkloadActual   4: 1 op, 805623800.00 ns, 805.6238 ms/op
+WorkloadActual   5: 1 op, 809524800.00 ns, 809.5248 ms/op
+WorkloadActual   6: 1 op, 807843000.00 ns, 807.8430 ms/op
+WorkloadActual   7: 1 op, 804669100.00 ns, 804.6691 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 1 op, 800586200.00 ns, 800.5862 ms/op
+WorkloadResult   2: 1 op, 807536100.00 ns, 807.5361 ms/op
+WorkloadResult   3: 1 op, 804443400.00 ns, 804.4434 ms/op
+WorkloadResult   4: 1 op, 805623800.00 ns, 805.6238 ms/op
+WorkloadResult   5: 1 op, 809524800.00 ns, 809.5248 ms/op
+WorkloadResult   6: 1 op, 807843000.00 ns, 807.8430 ms/op
+WorkloadResult   7: 1 op, 804669100.00 ns, 804.6691 ms/op
+// GC:  0 0 0 3976 1
+// Threading:  0 0 1
+
+// AfterAll
+// Benchmark Process 38440 has exited with code 0.
+
+Mean = 805.747 ms, StdErr = 1.106 ms (0.14%), N = 7, StdDev = 2.926 ms
+Min = 800.586 ms, Q1 = 804.556 ms, Median = 805.624 ms, Q3 = 807.690 ms, Max = 809.525 ms
+IQR = 3.133 ms, LowerFence = 799.856 ms, UpperFence = 812.389 ms
+ConfidenceInterval = [799.156 ms; 812.337 ms] (CI 99.9%), Margin = 6.590 ms (0.82% of Mean)
+Skewness = -0.41, Kurtosis = 1.84, MValue = 2
+
+// ** Remained 22 (91,7 %) benchmark(s) to run. Estimated finish 2026-11-05 17:44 (0h 1m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Haute performance)
+// **************************
+// Benchmark: ThirdPartyReadBenchmarks.TiffNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=f32rgb_24_none.tif]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bench-big-1.dll --anonymousPipes 1312 1300 --benchmarkName "Bench.ThirdPartyReadBenchmarks.TiffNet_Read(File_: \"f32rgb_24_none.tif\")" --job big --benchmarkId 2 in <scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2)
+
+WorkloadWarmup   1: 1 op, 109994000.00 ns, 109.9940 ms/op
+WorkloadWarmup   2: 1 op, 63816500.00 ns, 63.8165 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 63109500.00 ns, 63.1095 ms/op
+WorkloadActual   2: 1 op, 63119100.00 ns, 63.1191 ms/op
+WorkloadActual   3: 1 op, 78339100.00 ns, 78.3391 ms/op
+WorkloadActual   4: 1 op, 66232800.00 ns, 66.2328 ms/op
+WorkloadActual   5: 1 op, 64598800.00 ns, 64.5988 ms/op
+WorkloadActual   6: 1 op, 64290700.00 ns, 64.2907 ms/op
+WorkloadActual   7: 1 op, 62931800.00 ns, 62.9318 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 1 op, 63109500.00 ns, 63.1095 ms/op
+WorkloadResult   2: 1 op, 63119100.00 ns, 63.1191 ms/op
+WorkloadResult   3: 1 op, 78339100.00 ns, 78.3391 ms/op
+WorkloadResult   4: 1 op, 66232800.00 ns, 66.2328 ms/op
+WorkloadResult   5: 1 op, 64598800.00 ns, 64.5988 ms/op
+WorkloadResult   6: 1 op, 64290700.00 ns, 64.2907 ms/op
+WorkloadResult   7: 1 op, 62931800.00 ns, 62.9318 ms/op
+// GC:  1 1 1 288557928 1
+// Threading:  0 0 1
+
+// AfterAll
+// Benchmark Process 2436 has exited with code 0.
+
+Mean = 66.089 ms, StdErr = 2.089 ms (3.16%), N = 7, StdDev = 5.526 ms
+Min = 62.932 ms, Q1 = 63.114 ms, Median = 64.291 ms, Q3 = 65.416 ms, Max = 78.339 ms
+IQR = 2.301 ms, LowerFence = 59.662 ms, UpperFence = 68.868 ms
+ConfidenceInterval = [53.644 ms; 78.534 ms] (CI 99.9%), Margin = 12.445 ms (18.83% of Mean)
+Skewness = 1.48, Kurtosis = 3.49, MValue = 2
+
+// ** Remained 21 (87,5 %) benchmark(s) to run. Estimated finish 2026-11-05 17:44 (0h 1m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Haute performance)
+// **************************
+// Benchmark: ThirdPartyReadBenchmarks.ImageSharp_Load: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=f32rgb_24_zip_p3.tif]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bench-big-1.dll --anonymousPipes 1356 1360 --benchmarkName "Bench.ThirdPartyReadBenchmarks.ImageSharp_Load(File_: \"f32rgb_24_zip_p3.tif\")" --job big --benchmarkId 3 in <scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2)
+
+
+System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation.
+ ---> System.NotSupportedException: TIFF images with FloatingPoint horizontal predictor are not supported.
+   at SixLabors.ImageSharp.Formats.Tiff.TiffThrowHelper.ThrowNotSupported(String message)
+   at SixLabors.ImageSharp.Formats.Tiff.TiffDecoderOptionsParser.VerifyAndParse(TiffDecoderCore options, ExifProfile exifProfile, TiffFrameMetadata frameMetadata)
+   at SixLabors.ImageSharp.Formats.Tiff.TiffDecoderCore.DecodeFrame[TPixel](ExifProfile tags, CancellationToken cancellationToken)
+   at SixLabors.ImageSharp.Formats.Tiff.TiffDecoderCore.Decode[TPixel](BufferedReadStream stream, CancellationToken cancellationToken)
+   at SixLabors.ImageSharp.Formats.ImageDecoderCore.Decode[TPixel](Configuration configuration, Stream stream, CancellationToken cancellationToken)
+   at SixLabors.ImageSharp.Formats.Tiff.TiffDecoder.Decode[TPixel](DecoderOptions options, Stream stream, CancellationToken cancellationToken)
+   at SixLabors.ImageSharp.Formats.ImageDecoder.<>c__DisplayClass0_0`1.<Decode>b__0(Stream s)
+   at SixLabors.ImageSharp.Formats.ImageDecoder.<WithSeekableStream>g__PerformActionAndResetPosition|11_0[T](Stream s, Int64 position, <>c__DisplayClass11_0`1&)
+   at SixLabors.ImageSharp.Formats.ImageDecoder.WithSeekableStream[T](DecoderOptions options, Stream stream, Func`2 action)
+   at SixLabors.ImageSharp.Formats.ImageDecoder.Decode[TPixel](DecoderOptions options, Stream stream)
+   at SixLabors.ImageSharp.Image.Decode[TPixel](DecoderOptions options, Stream stream)
+   at SixLabors.ImageSharp.Image.<>c__DisplayClass84_0`1.<Load>b__0(Stream s)
+   at SixLabors.ImageSharp.Image.WithSeekableStream[T](DecoderOptions options, Stream stream, Func`2 action)
+   at SixLabors.ImageSharp.Image.Load[TPixel](DecoderOptions options, Stream stream)
+   at SixLabors.ImageSharp.Image.Load[TPixel](DecoderOptions options, String path)
+   at SixLabors.ImageSharp.Image.Load[TPixel](String path)
+   at Bench.ThirdPartyReadBenchmarks.ImageSharp_Load() in <scratchpad>\review-perf\bench\ThirdParty.cs:line 22
+   at BenchmarkDotNet.Autogenerated.Runnable_3.WorkloadActionUnroll(Int64 invokeCount) in <scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\Bench-big-1.notcs:line 798
+   at BenchmarkDotNet.Engines.Engine.Measure(Action`1 action, Int64 invokeCount)
+   at BenchmarkDotNet.Engines.Engine.RunIteration(IterationData data)
+   at BenchmarkDotNet.Engines.Engine.Run()
+   at BenchmarkDotNet.Autogenerated.Runnable_3.Run(IHost host, String benchmarkName) in <scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\Bench-big-1.notcs:line 703
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+   --- End of inner exception stack trace ---
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+   at System.Reflection.RuntimeMethodInfo.Invoke(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+   at System.Reflection.MethodBase.Invoke(Object obj, Object[] parameters)
+   at BenchmarkDotNet.Autogenerated.UniqueProgramName.AfterAssemblyLoadingAttached(String[] args) in <scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\Bench-big-1.notcs:line 57
+// AfterAll
+No Workload Results were obtained from the run.
+// Benchmark Process 9812 has exited with code -1.
+
+// ** Remained 20 (83,3 %) benchmark(s) to run. Estimated finish 2026-11-05 17:43 (0h 0m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Haute performance)
+// **************************
+// Benchmark: ThirdPartyReadBenchmarks.MagickNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=f32rgb_24_zip_p3.tif]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bench-big-1.dll --anonymousPipes 1316 1368 --benchmarkName "Bench.ThirdPartyReadBenchmarks.MagickNet_Read(File_: \"f32rgb_24_zip_p3.tif\")" --job big --benchmarkId 4 in <scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2)
+
+WorkloadWarmup   1: 1 op, 1738321100.00 ns, 1.7383 s/op
+WorkloadWarmup   2: 1 op, 1711949600.00 ns, 1.7119 s/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 1709669600.00 ns, 1.7097 s/op
+WorkloadActual   2: 1 op, 1711135600.00 ns, 1.7111 s/op
+WorkloadActual   3: 1 op, 1715098500.00 ns, 1.7151 s/op
+WorkloadActual   4: 1 op, 1708697600.00 ns, 1.7087 s/op
+WorkloadActual   5: 1 op, 1719623700.00 ns, 1.7196 s/op
+WorkloadActual   6: 1 op, 1717013100.00 ns, 1.7170 s/op
+WorkloadActual   7: 1 op, 1795419200.00 ns, 1.7954 s/op
+
+// AfterActualRun
+WorkloadResult   1: 1 op, 1709669600.00 ns, 1.7097 s/op
+WorkloadResult   2: 1 op, 1711135600.00 ns, 1.7111 s/op
+WorkloadResult   3: 1 op, 1715098500.00 ns, 1.7151 s/op
+WorkloadResult   4: 1 op, 1708697600.00 ns, 1.7087 s/op
+WorkloadResult   5: 1 op, 1719623700.00 ns, 1.7196 s/op
+WorkloadResult   6: 1 op, 1717013100.00 ns, 1.7170 s/op
+WorkloadResult   7: 1 op, 1795419200.00 ns, 1.7954 s/op
+// GC:  0 0 0 3984 1
+// Threading:  0 0 1
+
+// AfterAll
+// Benchmark Process 33000 has exited with code 0.
+
+Mean = 1.725 s, StdErr = 0.012 s (0.68%), N = 7, StdDev = 0.031 s
+Min = 1.709 s, Q1 = 1.710 s, Median = 1.715 s, Q3 = 1.718 s, Max = 1.795 s
+IQR = 0.008 s, LowerFence = 1.699 s, UpperFence = 1.730 s
+ConfidenceInterval = [1.655 s; 1.796 s] (CI 99.9%), Margin = 0.070 s (4.07% of Mean)
+Skewness = 1.56, Kurtosis = 3.68, MValue = 2
+
+// ** Remained 19 (79,2 %) benchmark(s) to run. Estimated finish 2026-11-05 17:45 (0h 1m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Haute performance)
+// **************************
+// Benchmark: ThirdPartyReadBenchmarks.TiffNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=f32rgb_24_zip_p3.tif]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bench-big-1.dll --anonymousPipes 1312 1396 --benchmarkName "Bench.ThirdPartyReadBenchmarks.TiffNet_Read(File_: \"f32rgb_24_zip_p3.tif\")" --job big --benchmarkId 5 in <scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2)
+
+WorkloadWarmup   1: 1 op, 1766125700.00 ns, 1.7661 s/op
+WorkloadWarmup   2: 1 op, 1898366900.00 ns, 1.8984 s/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 2059938000.00 ns, 2.0599 s/op
+WorkloadActual   2: 1 op, 1685441200.00 ns, 1.6854 s/op
+WorkloadActual   3: 1 op, 1471664200.00 ns, 1.4717 s/op
+WorkloadActual   4: 1 op, 1403238000.00 ns, 1.4032 s/op
+WorkloadActual   5: 1 op, 1344439300.00 ns, 1.3444 s/op
+WorkloadActual   6: 1 op, 1340812100.00 ns, 1.3408 s/op
+WorkloadActual   7: 1 op, 1352090000.00 ns, 1.3521 s/op
+
+// AfterActualRun
+WorkloadResult   1: 1 op, 2059938000.00 ns, 2.0599 s/op
+WorkloadResult   2: 1 op, 1685441200.00 ns, 1.6854 s/op
+WorkloadResult   3: 1 op, 1471664200.00 ns, 1.4717 s/op
+WorkloadResult   4: 1 op, 1403238000.00 ns, 1.4032 s/op
+WorkloadResult   5: 1 op, 1344439300.00 ns, 1.3444 s/op
+WorkloadResult   6: 1 op, 1340812100.00 ns, 1.3408 s/op
+WorkloadResult   7: 1 op, 1352090000.00 ns, 1.3521 s/op
+// GC:  58 9 1 653500304 1
+// Threading:  0 0 1
+
+// AfterAll
+// Benchmark Process 33012 has exited with code 0.
+
+Mean = 1.523 s, StdErr = 0.101 s (6.61%), N = 7, StdDev = 0.266 s
+Min = 1.341 s, Q1 = 1.348 s, Median = 1.403 s, Q3 = 1.579 s, Max = 2.060 s
+IQR = 0.230 s, LowerFence = 1.003 s, UpperFence = 1.924 s
+ConfidenceInterval = [0.922 s; 2.123 s] (CI 99.9%), Margin = 0.600 s (39.41% of Mean)
+Skewness = 1.07, Kurtosis = 2.47, MValue = 2.4
+
+// ** Remained 18 (75,0 %) benchmark(s) to run. Estimated finish 2026-11-05 17:45 (0h 2m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Haute performance)
+// **************************
+// Benchmark: ThirdPartyReadBenchmarks.ImageSharp_Load: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=u16_24_lzw_p2.tif]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bench-big-1.dll --anonymousPipes 1316 1368 --benchmarkName "Bench.ThirdPartyReadBenchmarks.ImageSharp_Load(File_: \"u16_24_lzw_p2.tif\")" --job big --benchmarkId 6 in <scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2)
+
+WorkloadWarmup   1: 1 op, 542987100.00 ns, 542.9871 ms/op
+WorkloadWarmup   2: 1 op, 361628200.00 ns, 361.6282 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 357464200.00 ns, 357.4642 ms/op
+WorkloadActual   2: 1 op, 359717400.00 ns, 359.7174 ms/op
+WorkloadActual   3: 1 op, 361534800.00 ns, 361.5348 ms/op
+WorkloadActual   4: 1 op, 361124600.00 ns, 361.1246 ms/op
+WorkloadActual   5: 1 op, 359063900.00 ns, 359.0639 ms/op
+WorkloadActual   6: 1 op, 356110500.00 ns, 356.1105 ms/op
+WorkloadActual   7: 1 op, 355997600.00 ns, 355.9976 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 1 op, 357464200.00 ns, 357.4642 ms/op
+WorkloadResult   2: 1 op, 359717400.00 ns, 359.7174 ms/op
+WorkloadResult   3: 1 op, 361534800.00 ns, 361.5348 ms/op
+WorkloadResult   4: 1 op, 361124600.00 ns, 361.1246 ms/op
+WorkloadResult   5: 1 op, 359063900.00 ns, 359.0639 ms/op
+WorkloadResult   6: 1 op, 356110500.00 ns, 356.1105 ms/op
+WorkloadResult   7: 1 op, 355997600.00 ns, 355.9976 ms/op
+// GC:  122 41 0 769314336 1
+// Threading:  0 0 1
+
+// AfterAll
+// Benchmark Process 40856 has exited with code 0.
+
+Mean = 358.716 ms, StdErr = 0.854 ms (0.24%), N = 7, StdDev = 2.259 ms
+Min = 355.998 ms, Q1 = 356.787 ms, Median = 359.064 ms, Q3 = 360.421 ms, Max = 361.535 ms
+IQR = 3.634 ms, LowerFence = 351.337 ms, UpperFence = 365.871 ms
+ConfidenceInterval = [353.629 ms; 363.804 ms] (CI 99.9%), Margin = 5.088 ms (1.42% of Mean)
+Skewness = -0.03, Kurtosis = 1.1, MValue = 2
+
+// ** Remained 17 (70,8 %) benchmark(s) to run. Estimated finish 2026-11-05 17:45 (0h 1m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Haute performance)
+// **************************
+// Benchmark: ThirdPartyReadBenchmarks.MagickNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=u16_24_lzw_p2.tif]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bench-big-1.dll --anonymousPipes 1020 604 --benchmarkName "Bench.ThirdPartyReadBenchmarks.MagickNet_Read(File_: \"u16_24_lzw_p2.tif\")" --job big --benchmarkId 7 in <scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2)
+
+WorkloadWarmup   1: 1 op, 194262600.00 ns, 194.2626 ms/op
+WorkloadWarmup   2: 1 op, 165888900.00 ns, 165.8889 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 161652100.00 ns, 161.6521 ms/op
+WorkloadActual   2: 1 op, 161890300.00 ns, 161.8903 ms/op
+WorkloadActual   3: 1 op, 161945400.00 ns, 161.9454 ms/op
+WorkloadActual   4: 1 op, 161075100.00 ns, 161.0751 ms/op
+WorkloadActual   5: 1 op, 161583700.00 ns, 161.5837 ms/op
+WorkloadActual   6: 1 op, 163921300.00 ns, 163.9213 ms/op
+WorkloadActual   7: 1 op, 161875500.00 ns, 161.8755 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 1 op, 161652100.00 ns, 161.6521 ms/op
+WorkloadResult   2: 1 op, 161890300.00 ns, 161.8903 ms/op
+WorkloadResult   3: 1 op, 161945400.00 ns, 161.9454 ms/op
+WorkloadResult   4: 1 op, 161075100.00 ns, 161.0751 ms/op
+WorkloadResult   5: 1 op, 161583700.00 ns, 161.5837 ms/op
+WorkloadResult   6: 1 op, 163921300.00 ns, 163.9213 ms/op
+WorkloadResult   7: 1 op, 161875500.00 ns, 161.8755 ms/op
+// GC:  0 0 0 3976 1
+// Threading:  0 0 1
+
+// AfterAll
+// Benchmark Process 55464 has exited with code 0.
+
+Mean = 161.992 ms, StdErr = 0.341 ms (0.21%), N = 7, StdDev = 0.901 ms
+Min = 161.075 ms, Q1 = 161.618 ms, Median = 161.875 ms, Q3 = 161.918 ms, Max = 163.921 ms
+IQR = 0.300 ms, LowerFence = 161.168 ms, UpperFence = 162.368 ms
+ConfidenceInterval = [159.963 ms; 164.021 ms] (CI 99.9%), Margin = 2.029 ms (1.25% of Mean)
+Skewness = 1.23, Kurtosis = 3.17, MValue = 2
+
+// ** Remained 16 (66,7 %) benchmark(s) to run. Estimated finish 2026-11-05 17:45 (0h 1m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Haute performance)
+// **************************
+// Benchmark: ThirdPartyReadBenchmarks.TiffNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=u16_24_lzw_p2.tif]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bench-big-1.dll --anonymousPipes 1216 1312 --benchmarkName "Bench.ThirdPartyReadBenchmarks.TiffNet_Read(File_: \"u16_24_lzw_p2.tif\")" --job big --benchmarkId 8 in <scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2)
+
+WorkloadWarmup   1: 1 op, 297466200.00 ns, 297.4662 ms/op
+WorkloadWarmup   2: 1 op, 251463600.00 ns, 251.4636 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 231942900.00 ns, 231.9429 ms/op
+WorkloadActual   2: 1 op, 234316000.00 ns, 234.3160 ms/op
+WorkloadActual   3: 1 op, 229547000.00 ns, 229.5470 ms/op
+WorkloadActual   4: 1 op, 233442200.00 ns, 233.4422 ms/op
+WorkloadActual   5: 1 op, 229910400.00 ns, 229.9104 ms/op
+WorkloadActual   6: 1 op, 228941700.00 ns, 228.9417 ms/op
+WorkloadActual   7: 1 op, 230471600.00 ns, 230.4716 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 1 op, 231942900.00 ns, 231.9429 ms/op
+WorkloadResult   2: 1 op, 234316000.00 ns, 234.3160 ms/op
+WorkloadResult   3: 1 op, 229547000.00 ns, 229.5470 ms/op
+WorkloadResult   4: 1 op, 233442200.00 ns, 233.4422 ms/op
+WorkloadResult   5: 1 op, 229910400.00 ns, 229.9104 ms/op
+WorkloadResult   6: 1 op, 228941700.00 ns, 228.9417 ms/op
+WorkloadResult   7: 1 op, 230471600.00 ns, 230.4716 ms/op
+// GC:  8 1 1 96708792 1
+// Threading:  0 0 1
+
+// AfterAll
+// Benchmark Process 45628 has exited with code 0.
+
+Mean = 231.225 ms, StdErr = 0.776 ms (0.34%), N = 7, StdDev = 2.054 ms
+Min = 228.942 ms, Q1 = 229.729 ms, Median = 230.472 ms, Q3 = 232.693 ms, Max = 234.316 ms
+IQR = 2.964 ms, LowerFence = 225.283 ms, UpperFence = 237.138 ms
+ConfidenceInterval = [226.599 ms; 235.850 ms] (CI 99.9%), Margin = 4.626 ms (2.00% of Mean)
+Skewness = 0.35, Kurtosis = 1.24, MValue = 2
+
+// ** Remained 15 (62,5 %) benchmark(s) to run. Estimated finish 2026-11-05 17:45 (0h 1m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Haute performance)
+// **************************
+// Benchmark: ThirdPartyReadBenchmarks.ImageSharp_Load: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=u16_24_none.tif]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bench-big-1.dll --anonymousPipes 1228 1232 --benchmarkName "Bench.ThirdPartyReadBenchmarks.ImageSharp_Load(File_: \"u16_24_none.tif\")" --job big --benchmarkId 9 in <scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2)
+
+WorkloadWarmup   1: 1 op, 73607500.00 ns, 73.6075 ms/op
+WorkloadWarmup   2: 1 op, 13270400.00 ns, 13.2704 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 13082200.00 ns, 13.0822 ms/op
+WorkloadActual   2: 1 op, 13271400.00 ns, 13.2714 ms/op
+WorkloadActual   3: 1 op, 13143400.00 ns, 13.1434 ms/op
+WorkloadActual   4: 1 op, 13252300.00 ns, 13.2523 ms/op
+WorkloadActual   5: 1 op, 13321500.00 ns, 13.3215 ms/op
+WorkloadActual   6: 1 op, 13303900.00 ns, 13.3039 ms/op
+WorkloadActual   7: 1 op, 13302200.00 ns, 13.3022 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 1 op, 13082200.00 ns, 13.0822 ms/op
+WorkloadResult   2: 1 op, 13271400.00 ns, 13.2714 ms/op
+WorkloadResult   3: 1 op, 13143400.00 ns, 13.1434 ms/op
+WorkloadResult   4: 1 op, 13252300.00 ns, 13.2523 ms/op
+WorkloadResult   5: 1 op, 13321500.00 ns, 13.3215 ms/op
+WorkloadResult   6: 1 op, 13303900.00 ns, 13.3039 ms/op
+WorkloadResult   7: 1 op, 13302200.00 ns, 13.3022 ms/op
+// GC:  0 0 0 27480 1
+// Threading:  0 0 1
+
+// AfterAll
+// Benchmark Process 22928 has exited with code 0.
+
+Mean = 13.240 ms, StdErr = 0.034 ms (0.26%), N = 7, StdDev = 0.091 ms
+Min = 13.082 ms, Q1 = 13.198 ms, Median = 13.271 ms, Q3 = 13.303 ms, Max = 13.322 ms
+IQR = 0.105 ms, LowerFence = 13.040 ms, UpperFence = 13.461 ms
+ConfidenceInterval = [13.034 ms; 13.445 ms] (CI 99.9%), Margin = 0.206 ms (1.55% of Mean)
+Skewness = -0.69, Kurtosis = 1.6, MValue = 2
+
+// ** Remained 14 (58,3 %) benchmark(s) to run. Estimated finish 2026-11-05 17:45 (0h 1m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Haute performance)
+// **************************
+// Benchmark: ThirdPartyReadBenchmarks.MagickNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=u16_24_none.tif]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bench-big-1.dll --anonymousPipes 1228 1232 --benchmarkName "Bench.ThirdPartyReadBenchmarks.MagickNet_Read(File_: \"u16_24_none.tif\")" --job big --benchmarkId 10 in <scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2)
+
+WorkloadWarmup   1: 1 op, 80963600.00 ns, 80.9636 ms/op
+WorkloadWarmup   2: 1 op, 56513100.00 ns, 56.5131 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 56788700.00 ns, 56.7887 ms/op
+WorkloadActual   2: 1 op, 57521700.00 ns, 57.5217 ms/op
+WorkloadActual   3: 1 op, 57954700.00 ns, 57.9547 ms/op
+WorkloadActual   4: 1 op, 57798600.00 ns, 57.7986 ms/op
+WorkloadActual   5: 1 op, 58441100.00 ns, 58.4411 ms/op
+WorkloadActual   6: 1 op, 58446300.00 ns, 58.4463 ms/op
+WorkloadActual   7: 1 op, 59858000.00 ns, 59.8580 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 1 op, 56788700.00 ns, 56.7887 ms/op
+WorkloadResult   2: 1 op, 57521700.00 ns, 57.5217 ms/op
+WorkloadResult   3: 1 op, 57954700.00 ns, 57.9547 ms/op
+WorkloadResult   4: 1 op, 57798600.00 ns, 57.7986 ms/op
+WorkloadResult   5: 1 op, 58441100.00 ns, 58.4411 ms/op
+WorkloadResult   6: 1 op, 58446300.00 ns, 58.4463 ms/op
+WorkloadResult   7: 1 op, 59858000.00 ns, 59.8580 ms/op
+// GC:  0 0 0 3976 1
+// Threading:  0 0 1
+
+// AfterAll
+// Benchmark Process 52308 has exited with code 0.
+
+Mean = 58.116 ms, StdErr = 0.362 ms (0.62%), N = 7, StdDev = 0.957 ms
+Min = 56.789 ms, Q1 = 57.660 ms, Median = 57.955 ms, Q3 = 58.444 ms, Max = 59.858 ms
+IQR = 0.784 ms, LowerFence = 56.485 ms, UpperFence = 59.619 ms
+ConfidenceInterval = [55.961 ms; 60.270 ms] (CI 99.9%), Margin = 2.155 ms (3.71% of Mean)
+Skewness = 0.45, Kurtosis = 2.13, MValue = 2
+
+// ** Remained 13 (54,2 %) benchmark(s) to run. Estimated finish 2026-11-05 17:44 (0h 1m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Haute performance)
+// **************************
+// Benchmark: ThirdPartyReadBenchmarks.TiffNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=u16_24_none.tif]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bench-big-1.dll --anonymousPipes 1312 988 --benchmarkName "Bench.ThirdPartyReadBenchmarks.TiffNet_Read(File_: \"u16_24_none.tif\")" --job big --benchmarkId 11 in <scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2)
+
+WorkloadWarmup   1: 1 op, 35518000.00 ns, 35.5180 ms/op
+WorkloadWarmup   2: 1 op, 13130000.00 ns, 13.1300 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 12688700.00 ns, 12.6887 ms/op
+WorkloadActual   2: 1 op, 12696700.00 ns, 12.6967 ms/op
+WorkloadActual   3: 1 op, 12634000.00 ns, 12.6340 ms/op
+WorkloadActual   4: 1 op, 12580000.00 ns, 12.5800 ms/op
+WorkloadActual   5: 1 op, 12676500.00 ns, 12.6765 ms/op
+WorkloadActual   6: 1 op, 12496000.00 ns, 12.4960 ms/op
+WorkloadActual   7: 1 op, 12584700.00 ns, 12.5847 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 1 op, 12688700.00 ns, 12.6887 ms/op
+WorkloadResult   2: 1 op, 12696700.00 ns, 12.6967 ms/op
+WorkloadResult   3: 1 op, 12634000.00 ns, 12.6340 ms/op
+WorkloadResult   4: 1 op, 12580000.00 ns, 12.5800 ms/op
+WorkloadResult   5: 1 op, 12676500.00 ns, 12.6765 ms/op
+WorkloadResult   6: 1 op, 12496000.00 ns, 12.4960 ms/op
+WorkloadResult   7: 1 op, 12584700.00 ns, 12.5847 ms/op
+// GC:  1 1 1 48469856 1
+// Threading:  0 0 1
+
+// AfterAll
+// Benchmark Process 30176 has exited with code 0.
+
+Mean = 12.622 ms, StdErr = 0.028 ms (0.22%), N = 7, StdDev = 0.073 ms
+Min = 12.496 ms, Q1 = 12.582 ms, Median = 12.634 ms, Q3 = 12.683 ms, Max = 12.697 ms
+IQR = 0.100 ms, LowerFence = 12.432 ms, UpperFence = 12.833 ms
+ConfidenceInterval = [12.457 ms; 12.787 ms] (CI 99.9%), Margin = 0.165 ms (1.31% of Mean)
+Skewness = -0.47, Kurtosis = 1.58, MValue = 2
+
+// ** Remained 12 (50,0 %) benchmark(s) to run. Estimated finish 2026-11-05 17:44 (0h 0m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Haute performance)
+// **************************
+// Benchmark: ThirdPartyReadBenchmarks.ImageSharp_Load: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=u16_24_zip_p2.tif]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bench-big-1.dll --anonymousPipes 1368 1288 --benchmarkName "Bench.ThirdPartyReadBenchmarks.ImageSharp_Load(File_: \"u16_24_zip_p2.tif\")" --job big --benchmarkId 12 in <scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2)
+
+WorkloadWarmup   1: 1 op, 313544300.00 ns, 313.5443 ms/op
+WorkloadWarmup   2: 1 op, 253429500.00 ns, 253.4295 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 249872600.00 ns, 249.8726 ms/op
+WorkloadActual   2: 1 op, 218731100.00 ns, 218.7311 ms/op
+WorkloadActual   3: 1 op, 185281800.00 ns, 185.2818 ms/op
+WorkloadActual   4: 1 op, 186443900.00 ns, 186.4439 ms/op
+WorkloadActual   5: 1 op, 186381600.00 ns, 186.3816 ms/op
+WorkloadActual   6: 1 op, 185505000.00 ns, 185.5050 ms/op
+WorkloadActual   7: 1 op, 187341500.00 ns, 187.3415 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 1 op, 249872600.00 ns, 249.8726 ms/op
+WorkloadResult   2: 1 op, 218731100.00 ns, 218.7311 ms/op
+WorkloadResult   3: 1 op, 185281800.00 ns, 185.2818 ms/op
+WorkloadResult   4: 1 op, 186443900.00 ns, 186.4439 ms/op
+WorkloadResult   5: 1 op, 186381600.00 ns, 186.3816 ms/op
+WorkloadResult   6: 1 op, 185505000.00 ns, 185.5050 ms/op
+WorkloadResult   7: 1 op, 187341500.00 ns, 187.3415 ms/op
+// GC:  0 0 0 97384 1
+// Threading:  0 0 1
+
+// AfterAll
+// Benchmark Process 29488 has exited with code 0.
+
+Mean = 199.937 ms, StdErr = 9.505 ms (4.75%), N = 7, StdDev = 25.147 ms
+Min = 185.282 ms, Q1 = 185.943 ms, Median = 186.444 ms, Q3 = 203.036 ms, Max = 249.873 ms
+IQR = 17.093 ms, LowerFence = 160.304 ms, UpperFence = 228.676 ms
+ConfidenceInterval = [143.300 ms; 256.574 ms] (CI 99.9%), Margin = 56.637 ms (28.33% of Mean)
+Skewness = 1.06, Kurtosis = 2.33, MValue = 2.4
+
+// ** Remained 11 (45,8 %) benchmark(s) to run. Estimated finish 2026-11-05 17:44 (0h 0m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Haute performance)
+// **************************
+// Benchmark: ThirdPartyReadBenchmarks.MagickNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=u16_24_zip_p2.tif]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bench-big-1.dll --anonymousPipes 1432 1012 --benchmarkName "Bench.ThirdPartyReadBenchmarks.MagickNet_Read(File_: \"u16_24_zip_p2.tif\")" --job big --benchmarkId 13 in <scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2)
+
+WorkloadWarmup   1: 1 op, 263484200.00 ns, 263.4842 ms/op
+WorkloadWarmup   2: 1 op, 238149500.00 ns, 238.1495 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 236255000.00 ns, 236.2550 ms/op
+WorkloadActual   2: 1 op, 238743300.00 ns, 238.7433 ms/op
+WorkloadActual   3: 1 op, 239924500.00 ns, 239.9245 ms/op
+WorkloadActual   4: 1 op, 239031500.00 ns, 239.0315 ms/op
+WorkloadActual   5: 1 op, 235851000.00 ns, 235.8510 ms/op
+WorkloadActual   6: 1 op, 238582700.00 ns, 238.5827 ms/op
+WorkloadActual   7: 1 op, 240407800.00 ns, 240.4078 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 1 op, 236255000.00 ns, 236.2550 ms/op
+WorkloadResult   2: 1 op, 238743300.00 ns, 238.7433 ms/op
+WorkloadResult   3: 1 op, 239924500.00 ns, 239.9245 ms/op
+WorkloadResult   4: 1 op, 239031500.00 ns, 239.0315 ms/op
+WorkloadResult   5: 1 op, 235851000.00 ns, 235.8510 ms/op
+WorkloadResult   6: 1 op, 238582700.00 ns, 238.5827 ms/op
+WorkloadResult   7: 1 op, 240407800.00 ns, 240.4078 ms/op
+// GC:  0 0 0 3976 1
+// Threading:  0 0 1
+
+// AfterAll
+// Benchmark Process 39148 has exited with code 0.
+
+Mean = 238.399 ms, StdErr = 0.655 ms (0.27%), N = 7, StdDev = 1.732 ms
+Min = 235.851 ms, Q1 = 237.419 ms, Median = 238.743 ms, Q3 = 239.478 ms, Max = 240.408 ms
+IQR = 2.059 ms, LowerFence = 234.330 ms, UpperFence = 242.567 ms
+ConfidenceInterval = [234.498 ms; 242.301 ms] (CI 99.9%), Margin = 3.901 ms (1.64% of Mean)
+Skewness = -0.4, Kurtosis = 1.35, MValue = 2
+
+// ** Remained 10 (41,7 %) benchmark(s) to run. Estimated finish 2026-11-05 17:44 (0h 0m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Haute performance)
+// **************************
+// Benchmark: ThirdPartyReadBenchmarks.TiffNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=u16_24_zip_p2.tif]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bench-big-1.dll --anonymousPipes 988 1288 --benchmarkName "Bench.ThirdPartyReadBenchmarks.TiffNet_Read(File_: \"u16_24_zip_p2.tif\")" --job big --benchmarkId 14 in <scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2)
+
+WorkloadWarmup   1: 1 op, 423537800.00 ns, 423.5378 ms/op
+WorkloadWarmup   2: 1 op, 307805600.00 ns, 307.8056 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 292379200.00 ns, 292.3792 ms/op
+WorkloadActual   2: 1 op, 293712300.00 ns, 293.7123 ms/op
+WorkloadActual   3: 1 op, 293482800.00 ns, 293.4828 ms/op
+WorkloadActual   4: 1 op, 294205200.00 ns, 294.2052 ms/op
+WorkloadActual   5: 1 op, 292798000.00 ns, 292.7980 ms/op
+WorkloadActual   6: 1 op, 292623100.00 ns, 292.6231 ms/op
+WorkloadActual   7: 1 op, 287454100.00 ns, 287.4541 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 1 op, 292379200.00 ns, 292.3792 ms/op
+WorkloadResult   2: 1 op, 293712300.00 ns, 293.7123 ms/op
+WorkloadResult   3: 1 op, 293482800.00 ns, 293.4828 ms/op
+WorkloadResult   4: 1 op, 294205200.00 ns, 294.2052 ms/op
+WorkloadResult   5: 1 op, 292798000.00 ns, 292.7980 ms/op
+WorkloadResult   6: 1 op, 292623100.00 ns, 292.6231 ms/op
+WorkloadResult   7: 1 op, 287454100.00 ns, 287.4541 ms/op
+// GC:  10 2 1 107537936 1
+// Threading:  0 0 1
+
+// AfterAll
+// Benchmark Process 37168 has exited with code 0.
+
+Mean = 292.379 ms, StdErr = 0.857 ms (0.29%), N = 7, StdDev = 2.266 ms
+Min = 287.454 ms, Q1 = 292.501 ms, Median = 292.798 ms, Q3 = 293.598 ms, Max = 294.205 ms
+IQR = 1.096 ms, LowerFence = 290.857 ms, UpperFence = 295.242 ms
+ConfidenceInterval = [287.275 ms; 297.484 ms] (CI 99.9%), Margin = 5.105 ms (1.75% of Mean)
+Skewness = -1.34, Kurtosis = 3.27, MValue = 2
+
+// ** Remained 9 (37,5 %) benchmark(s) to run. Estimated finish 2026-11-05 17:44 (0h 0m from now) **
+Successfully reverted power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Haute performance)
+// ***** BenchmarkRunner: Finish  *****
+
+// * Export *
+  BenchmarkDotNet.Artifacts\results\Bench.ThirdPartyReadBenchmarks-report.csv
+  BenchmarkDotNet.Artifacts\results\Bench.ThirdPartyReadBenchmarks-report-github.md
+  BenchmarkDotNet.Artifacts\results\Bench.ThirdPartyReadBenchmarks-report.html
+
+// * Detailed results *
+ThirdPartyReadBenchmarks.ImageSharp_Load: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=f32rgb_24_none.tif]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 91.213 ms, StdErr = 0.630 ms (0.69%), N = 7, StdDev = 1.667 ms
+Min = 89.572 ms, Q1 = 90.348 ms, Median = 90.435 ms, Q3 = 91.649 ms, Max = 94.491 ms
+IQR = 1.301 ms, LowerFence = 88.397 ms, UpperFence = 93.600 ms
+ConfidenceInterval = [87.458 ms; 94.968 ms] (CI 99.9%), Margin = 3.755 ms (4.12% of Mean)
+Skewness = 0.93, Kurtosis = 2.32, MValue = 2
+-------------------- Histogram --------------------
+[89.159 ms ; 91.447 ms) | @@@@@
+[91.447 ms ; 94.520 ms) | @@
+---------------------------------------------------
+
+ThirdPartyReadBenchmarks.MagickNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=f32rgb_24_none.tif]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 805.747 ms, StdErr = 1.106 ms (0.14%), N = 7, StdDev = 2.926 ms
+Min = 800.586 ms, Q1 = 804.556 ms, Median = 805.624 ms, Q3 = 807.690 ms, Max = 809.525 ms
+IQR = 3.133 ms, LowerFence = 799.856 ms, UpperFence = 812.389 ms
+ConfidenceInterval = [799.156 ms; 812.337 ms] (CI 99.9%), Margin = 6.590 ms (0.82% of Mean)
+Skewness = -0.41, Kurtosis = 1.84, MValue = 2
+-------------------- Histogram --------------------
+[798.578 ms ; 811.533 ms) | @@@@@@@
+---------------------------------------------------
+
+ThirdPartyReadBenchmarks.TiffNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=f32rgb_24_none.tif]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 66.089 ms, StdErr = 2.089 ms (3.16%), N = 7, StdDev = 5.526 ms
+Min = 62.932 ms, Q1 = 63.114 ms, Median = 64.291 ms, Q3 = 65.416 ms, Max = 78.339 ms
+IQR = 2.301 ms, LowerFence = 59.662 ms, UpperFence = 68.868 ms
+ConfidenceInterval = [53.644 ms; 78.534 ms] (CI 99.9%), Margin = 12.445 ms (18.83% of Mean)
+Skewness = 1.48, Kurtosis = 3.49, MValue = 2
+-------------------- Histogram --------------------
+[60.791 ms ; 68.374 ms) | @@@@@@
+[68.374 ms ; 74.548 ms) | 
+[74.548 ms ; 82.130 ms) | @
+---------------------------------------------------
+
+ThirdPartyReadBenchmarks.ImageSharp_Load: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=f32rgb_24_zip_p3.tif]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+There are not any results runs
+
+ThirdPartyReadBenchmarks.MagickNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=f32rgb_24_zip_p3.tif]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 1.725 s, StdErr = 0.012 s (0.68%), N = 7, StdDev = 0.031 s
+Min = 1.709 s, Q1 = 1.710 s, Median = 1.715 s, Q3 = 1.718 s, Max = 1.795 s
+IQR = 0.008 s, LowerFence = 1.699 s, UpperFence = 1.730 s
+ConfidenceInterval = [1.655 s; 1.796 s] (CI 99.9%), Margin = 0.070 s (4.07% of Mean)
+Skewness = 1.56, Kurtosis = 3.68, MValue = 2
+-------------------- Histogram --------------------
+[1.693 s ; 1.736 s) | @@@@@@
+[1.736 s ; 1.774 s) | 
+[1.774 s ; 1.817 s) | @
+---------------------------------------------------
+
+ThirdPartyReadBenchmarks.TiffNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=f32rgb_24_zip_p3.tif]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 1.523 s, StdErr = 0.101 s (6.61%), N = 7, StdDev = 0.266 s
+Min = 1.341 s, Q1 = 1.348 s, Median = 1.403 s, Q3 = 1.579 s, Max = 2.060 s
+IQR = 0.230 s, LowerFence = 1.003 s, UpperFence = 1.924 s
+ConfidenceInterval = [0.922 s; 2.123 s] (CI 99.9%), Margin = 0.600 s (39.41% of Mean)
+Skewness = 1.07, Kurtosis = 2.47, MValue = 2.4
+-------------------- Histogram --------------------
+[1.330 s ; 1.696 s) | @@@@@@
+[1.696 s ; 1.877 s) | 
+[1.877 s ; 2.243 s) | @
+---------------------------------------------------
+
+ThirdPartyReadBenchmarks.ImageSharp_Load: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=u16_24_lzw_p2.tif]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 358.716 ms, StdErr = 0.854 ms (0.24%), N = 7, StdDev = 2.259 ms
+Min = 355.998 ms, Q1 = 356.787 ms, Median = 359.064 ms, Q3 = 360.421 ms, Max = 361.535 ms
+IQR = 3.634 ms, LowerFence = 351.337 ms, UpperFence = 365.871 ms
+ConfidenceInterval = [353.629 ms; 363.804 ms] (CI 99.9%), Margin = 5.088 ms (1.42% of Mean)
+Skewness = -0.03, Kurtosis = 1.1, MValue = 2
+-------------------- Histogram --------------------
+[354.448 ms ; 363.085 ms) | @@@@@@@
+---------------------------------------------------
+
+ThirdPartyReadBenchmarks.MagickNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=u16_24_lzw_p2.tif]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 161.992 ms, StdErr = 0.341 ms (0.21%), N = 7, StdDev = 0.901 ms
+Min = 161.075 ms, Q1 = 161.618 ms, Median = 161.875 ms, Q3 = 161.918 ms, Max = 163.921 ms
+IQR = 0.300 ms, LowerFence = 161.168 ms, UpperFence = 162.368 ms
+ConfidenceInterval = [159.963 ms; 164.021 ms] (CI 99.9%), Margin = 2.029 ms (1.25% of Mean)
+Skewness = 1.23, Kurtosis = 3.17, MValue = 2
+-------------------- Histogram --------------------
+[160.457 ms ; 164.540 ms) | @@@@@@@
+---------------------------------------------------
+
+ThirdPartyReadBenchmarks.TiffNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=u16_24_lzw_p2.tif]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 231.225 ms, StdErr = 0.776 ms (0.34%), N = 7, StdDev = 2.054 ms
+Min = 228.942 ms, Q1 = 229.729 ms, Median = 230.472 ms, Q3 = 232.693 ms, Max = 234.316 ms
+IQR = 2.964 ms, LowerFence = 225.283 ms, UpperFence = 237.138 ms
+ConfidenceInterval = [226.599 ms; 235.850 ms] (CI 99.9%), Margin = 4.626 ms (2.00% of Mean)
+Skewness = 0.35, Kurtosis = 1.24, MValue = 2
+-------------------- Histogram --------------------
+[227.532 ms ; 235.725 ms) | @@@@@@@
+---------------------------------------------------
+
+ThirdPartyReadBenchmarks.ImageSharp_Load: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=u16_24_none.tif]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 13.240 ms, StdErr = 0.034 ms (0.26%), N = 7, StdDev = 0.091 ms
+Min = 13.082 ms, Q1 = 13.198 ms, Median = 13.271 ms, Q3 = 13.303 ms, Max = 13.322 ms
+IQR = 0.105 ms, LowerFence = 13.040 ms, UpperFence = 13.461 ms
+ConfidenceInterval = [13.034 ms; 13.445 ms] (CI 99.9%), Margin = 0.206 ms (1.55% of Mean)
+Skewness = -0.69, Kurtosis = 1.6, MValue = 2
+-------------------- Histogram --------------------
+[13.020 ms ; 13.384 ms) | @@@@@@@
+---------------------------------------------------
+
+ThirdPartyReadBenchmarks.MagickNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=u16_24_none.tif]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 58.116 ms, StdErr = 0.362 ms (0.62%), N = 7, StdDev = 0.957 ms
+Min = 56.789 ms, Q1 = 57.660 ms, Median = 57.955 ms, Q3 = 58.444 ms, Max = 59.858 ms
+IQR = 0.784 ms, LowerFence = 56.485 ms, UpperFence = 59.619 ms
+ConfidenceInterval = [55.961 ms; 60.270 ms] (CI 99.9%), Margin = 2.155 ms (3.71% of Mean)
+Skewness = 0.45, Kurtosis = 2.13, MValue = 2
+-------------------- Histogram --------------------
+[56.132 ms ; 57.328 ms) | @
+[57.328 ms ; 58.640 ms) | @@@@@
+[58.640 ms ; 60.514 ms) | @
+---------------------------------------------------
+
+ThirdPartyReadBenchmarks.TiffNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=u16_24_none.tif]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 12.622 ms, StdErr = 0.028 ms (0.22%), N = 7, StdDev = 0.073 ms
+Min = 12.496 ms, Q1 = 12.582 ms, Median = 12.634 ms, Q3 = 12.683 ms, Max = 12.697 ms
+IQR = 0.100 ms, LowerFence = 12.432 ms, UpperFence = 12.833 ms
+ConfidenceInterval = [12.457 ms; 12.787 ms] (CI 99.9%), Margin = 0.165 ms (1.31% of Mean)
+Skewness = -0.47, Kurtosis = 1.58, MValue = 2
+-------------------- Histogram --------------------
+[12.446 ms ; 12.747 ms) | @@@@@@@
+---------------------------------------------------
+
+ThirdPartyReadBenchmarks.ImageSharp_Load: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=u16_24_zip_p2.tif]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 199.937 ms, StdErr = 9.505 ms (4.75%), N = 7, StdDev = 25.147 ms
+Min = 185.282 ms, Q1 = 185.943 ms, Median = 186.444 ms, Q3 = 203.036 ms, Max = 249.873 ms
+IQR = 17.093 ms, LowerFence = 160.304 ms, UpperFence = 228.676 ms
+ConfidenceInterval = [143.300 ms; 256.574 ms] (CI 99.9%), Margin = 56.637 ms (28.33% of Mean)
+Skewness = 1.06, Kurtosis = 2.33, MValue = 2.4
+-------------------- Histogram --------------------
+[184.752 ms ; 219.260 ms) | @@@@@@
+[219.260 ms ; 232.619 ms) | 
+[232.619 ms ; 267.127 ms) | @
+---------------------------------------------------
+
+ThirdPartyReadBenchmarks.MagickNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=u16_24_zip_p2.tif]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 238.399 ms, StdErr = 0.655 ms (0.27%), N = 7, StdDev = 1.732 ms
+Min = 235.851 ms, Q1 = 237.419 ms, Median = 238.743 ms, Q3 = 239.478 ms, Max = 240.408 ms
+IQR = 2.059 ms, LowerFence = 234.330 ms, UpperFence = 242.567 ms
+ConfidenceInterval = [234.498 ms; 242.301 ms] (CI 99.9%), Margin = 3.901 ms (1.64% of Mean)
+Skewness = -0.4, Kurtosis = 1.35, MValue = 2
+-------------------- Histogram --------------------
+[234.662 ms ; 241.596 ms) | @@@@@@@
+---------------------------------------------------
+
+ThirdPartyReadBenchmarks.TiffNet_Read: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=u16_24_zip_p2.tif]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 292.379 ms, StdErr = 0.857 ms (0.29%), N = 7, StdDev = 2.266 ms
+Min = 287.454 ms, Q1 = 292.501 ms, Median = 292.798 ms, Q3 = 293.598 ms, Max = 294.205 ms
+IQR = 1.096 ms, LowerFence = 290.857 ms, UpperFence = 295.242 ms
+ConfidenceInterval = [287.275 ms; 297.484 ms] (CI 99.9%), Margin = 5.105 ms (1.75% of Mean)
+Skewness = -1.34, Kurtosis = 3.27, MValue = 2
+-------------------- Histogram --------------------
+[285.899 ms ; 295.760 ms) | @@@@@@@
+---------------------------------------------------
+
+// * Summary *
+
+BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.9711/25H2/2025Update/HudsonValley2)
+Intel Core Ultra 7 258V 2.20GHz, 1 CPU, 8 logical and 8 physical cores
+.NET SDK 10.0.401
+  [Host] : .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+  big    : .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+
+Job=big  InvocationCount=1  IterationCount=7  
+LaunchCount=1  RunStrategy=Monitoring  UnrollFactor=1  
+WarmupCount=2  
+
+| Method          | File_                | Mean        | Error      | StdDev     | Median      | Min         | Gen0        | Gen1       | Gen2      | Allocated    |
+|---------------- |--------------------- |------------:|-----------:|-----------:|------------:|------------:|------------:|-----------:|----------:|-------------:|
+| ImageSharp_Load | f32rgb_24_none.tif   |    91.21 ms |   3.755 ms |   1.667 ms |    90.43 ms |    89.57 ms |           - |          - |         - |     91.38 KB |
+| MagickNet_Read  | f32rgb_24_none.tif   |   805.75 ms |   6.590 ms |   2.926 ms |   805.62 ms |   800.59 ms |           - |          - |         - |      3.88 KB |
+| TiffNet_Read    | f32rgb_24_none.tif   |    66.09 ms |  12.445 ms |   5.526 ms |    64.29 ms |    62.93 ms |   1000.0000 |  1000.0000 | 1000.0000 | 281794.85 KB |
+| ImageSharp_Load | f32rgb_24_zip_p3.tif |          NA |         NA |         NA |          NA |          NA |          NA |         NA |        NA |           NA |
+| MagickNet_Read  | f32rgb_24_zip_p3.tif | 1,725.24 ms |  70.279 ms |  31.204 ms | 1,715.10 ms | 1,708.70 ms |           - |          - |         - |      3.89 KB |
+| TiffNet_Read    | f32rgb_24_zip_p3.tif | 1,522.52 ms | 600.090 ms | 266.443 ms | 1,403.24 ms | 1,340.81 ms |  58000.0000 |  9000.0000 | 1000.0000 | 638183.89 KB |
+| ImageSharp_Load | u16_24_lzw_p2.tif    |   358.72 ms |   5.088 ms |   2.259 ms |   359.06 ms |   356.00 ms | 122000.0000 | 41000.0000 |         - | 751283.53 KB |
+| MagickNet_Read  | u16_24_lzw_p2.tif    |   161.99 ms |   2.029 ms |   0.901 ms |   161.88 ms |   161.08 ms |           - |          - |         - |      3.88 KB |
+| TiffNet_Read    | u16_24_lzw_p2.tif    |   231.22 ms |   4.626 ms |   2.054 ms |   230.47 ms |   228.94 ms |   8000.0000 |  1000.0000 | 1000.0000 |  94442.18 KB |
+| ImageSharp_Load | u16_24_none.tif      |    13.24 ms |   0.206 ms |   0.091 ms |    13.27 ms |    13.08 ms |           - |          - |         - |     26.84 KB |
+| MagickNet_Read  | u16_24_none.tif      |    58.12 ms |   2.155 ms |   0.957 ms |    57.95 ms |    56.79 ms |           - |          - |         - |      3.88 KB |
+| TiffNet_Read    | u16_24_none.tif      |    12.62 ms |   0.165 ms |   0.073 ms |    12.63 ms |    12.50 ms |   1000.0000 |  1000.0000 | 1000.0000 |  47333.84 KB |
+| ImageSharp_Load | u16_24_zip_p2.tif    |   199.94 ms |  56.637 ms |  25.147 ms |   186.44 ms |   185.28 ms |           - |          - |         - |      95.1 KB |
+| MagickNet_Read  | u16_24_zip_p2.tif    |   238.40 ms |   3.901 ms |   1.732 ms |   238.74 ms |   235.85 ms |           - |          - |         - |      3.88 KB |
+| TiffNet_Read    | u16_24_zip_p2.tif    |   292.38 ms |   5.105 ms |   2.266 ms |   292.80 ms |   287.45 ms |  10000.0000 |  2000.0000 | 1000.0000 | 105017.52 KB |
+
+Benchmarks with issues:
+  ThirdPartyReadBenchmarks.ImageSharp_Load: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [File_=f32rgb_24_zip_p3.tif]
+
+// * Warnings *
+Environment
+  Summary -> Detected error exit code from one of the benchmarks. It might be caused by following antivirus software:
+        - Windows Defender (windowsdefender://)
+Use InProcessEmitToolchain or InProcessNoEmitToolchain to avoid new process creation.
+
+MinIterationTime
+  ThirdPartyReadBenchmarks.ImageSharp_Load: big -> The minimum observed iteration time is 89.572ms which is very small. It's recommended to increase it to at least 100ms using more operations.
+  ThirdPartyReadBenchmarks.TiffNet_Read: big    -> The minimum observed iteration time is 62.932ms which is very small. It's recommended to increase it to at least 100ms using more operations.
+  ThirdPartyReadBenchmarks.ImageSharp_Load: big -> The minimum observed iteration time is 13.082ms which is very small. It's recommended to increase it to at least 100ms using more operations.
+  ThirdPartyReadBenchmarks.MagickNet_Read: big  -> The minimum observed iteration time is 56.789ms which is very small. It's recommended to increase it to at least 100ms using more operations.
+  ThirdPartyReadBenchmarks.TiffNet_Read: big    -> The minimum observed iteration time is 12.496ms which is very small. It's recommended to increase it to at least 100ms using more operations.
+
+// * Hints *
+Outliers
+  ThirdPartyReadBenchmarks.ImageSharp_Load: big -> 1 outlier  was  detected (94.49 ms)
+  ThirdPartyReadBenchmarks.TiffNet_Read: big    -> 1 outlier  was  detected (78.34 ms)
+  ThirdPartyReadBenchmarks.MagickNet_Read: big  -> 1 outlier  was  detected (1.80 s)
+  ThirdPartyReadBenchmarks.TiffNet_Read: big    -> 1 outlier  was  detected (2.06 s)
+  ThirdPartyReadBenchmarks.MagickNet_Read: big  -> 2 outliers were detected (161.08 ms, 163.92 ms)
+  ThirdPartyReadBenchmarks.MagickNet_Read: big  -> 1 outlier  was  detected (59.86 ms)
+  ThirdPartyReadBenchmarks.ImageSharp_Load: big -> 1 outlier  was  detected (249.87 ms)
+  ThirdPartyReadBenchmarks.TiffNet_Read: big    -> 1 outlier  was  detected (287.45 ms)
+
+// * Legends *
+  File_     : Value of the 'File_' parameter
+  Mean      : Arithmetic mean of all measurements
+  Error     : Half of 99.9% confidence interval
+  StdDev    : Standard deviation of all measurements
+  Median    : Value separating the higher half of all measurements (50th percentile)
+  Min       : Minimum
+  Gen0      : GC Generation 0 collects per 1000 operations
+  Gen1      : GC Generation 1 collects per 1000 operations
+  Gen2      : GC Generation 2 collects per 1000 operations
+  Allocated : Allocated memory per single operation (managed only, inclusive, 1KB = 1024B)
+  1 ms      : 1 Millisecond (0.001 sec)
+
+// * Diagnostic Output - MemoryDiagnoser *
+
+
+// ***** BenchmarkRunner: End *****
+Run time: 00:01:03 (63.5 sec), executed benchmarks: 15
+
+// Found 9 benchmarks:
+//   ThirdPartyWriteBenchmarks.ImageSharp_Save_u16: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [Compression=deflate]
+//   ThirdPartyWriteBenchmarks.MagickNet_Write_u16: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [Compression=deflate]
+//   ThirdPartyWriteBenchmarks.TiffNet_Save_u16: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [Compression=deflate]
+//   ThirdPartyWriteBenchmarks.ImageSharp_Save_u16: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [Compression=lzw]
+//   ThirdPartyWriteBenchmarks.MagickNet_Write_u16: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [Compression=lzw]
+//   ThirdPartyWriteBenchmarks.TiffNet_Save_u16: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [Compression=lzw]
+//   ThirdPartyWriteBenchmarks.ImageSharp_Save_u16: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [Compression=none]
+//   ThirdPartyWriteBenchmarks.MagickNet_Write_u16: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [Compression=none]
+//   ThirdPartyWriteBenchmarks.TiffNet_Save_u16: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [Compression=none]
+
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Haute performance)
+// **************************
+// Benchmark: ThirdPartyWriteBenchmarks.ImageSharp_Save_u16: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [Compression=deflate]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bench-big-1.dll --anonymousPipes 1204 1288 --benchmarkName "Bench.ThirdPartyWriteBenchmarks.ImageSharp_Save_u16(Compression: \"deflate\")" --job big --benchmarkId 15 in <scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2)
+
+WorkloadWarmup   1: 1 op, 1485880100.00 ns, 1.4859 s/op
+WorkloadWarmup   2: 1 op, 1294160900.00 ns, 1.2942 s/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 1271731200.00 ns, 1.2717 s/op
+WorkloadActual   2: 1 op, 1262060900.00 ns, 1.2621 s/op
+WorkloadActual   3: 1 op, 1233017600.00 ns, 1.2330 s/op
+WorkloadActual   4: 1 op, 1236579300.00 ns, 1.2366 s/op
+WorkloadActual   5: 1 op, 1236107000.00 ns, 1.2361 s/op
+WorkloadActual   6: 1 op, 1242337500.00 ns, 1.2423 s/op
+WorkloadActual   7: 1 op, 1219943200.00 ns, 1.2199 s/op
+
+// AfterActualRun
+WorkloadResult   1: 1 op, 1271731200.00 ns, 1.2717 s/op
+WorkloadResult   2: 1 op, 1262060900.00 ns, 1.2621 s/op
+WorkloadResult   3: 1 op, 1233017600.00 ns, 1.2330 s/op
+WorkloadResult   4: 1 op, 1236579300.00 ns, 1.2366 s/op
+WorkloadResult   5: 1 op, 1236107000.00 ns, 1.2361 s/op
+WorkloadResult   6: 1 op, 1242337500.00 ns, 1.2423 s/op
+WorkloadResult   7: 1 op, 1219943200.00 ns, 1.2199 s/op
+// GC:  3 0 0 21755256 1
+// Threading:  0 0 1
+
+// AfterAll
+// Benchmark Process 22624 has exited with code 0.
+
+Mean = 1.243 s, StdErr = 0.007 s (0.54%), N = 7, StdDev = 0.018 s
+Min = 1.220 s, Q1 = 1.235 s, Median = 1.237 s, Q3 = 1.252 s, Max = 1.272 s
+IQR = 0.018 s, LowerFence = 1.208 s, UpperFence = 1.279 s
+ConfidenceInterval = [1.203 s; 1.283 s] (CI 99.9%), Margin = 0.040 s (3.23% of Mean)
+Skewness = 0.41, Kurtosis = 1.56, MValue = 2
+
+// ** Remained 8 (33,3 %) benchmark(s) to run. Estimated finish 2026-11-05 17:44 (0h 0m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Haute performance)
+// **************************
+// Benchmark: ThirdPartyWriteBenchmarks.MagickNet_Write_u16: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [Compression=deflate]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bench-big-1.dll --anonymousPipes 1556 1236 --benchmarkName "Bench.ThirdPartyWriteBenchmarks.MagickNet_Write_u16(Compression: \"deflate\")" --job big --benchmarkId 16 in <scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2)
+
+WorkloadWarmup   1: 1 op, 3359143400.00 ns, 3.3591 s/op
+WorkloadWarmup   2: 1 op, 3325172300.00 ns, 3.3252 s/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 3323712400.00 ns, 3.3237 s/op
+WorkloadActual   2: 1 op, 3331809600.00 ns, 3.3318 s/op
+WorkloadActual   3: 1 op, 3315698900.00 ns, 3.3157 s/op
+WorkloadActual   4: 1 op, 3322970600.00 ns, 3.3230 s/op
+WorkloadActual   5: 1 op, 3371112600.00 ns, 3.3711 s/op
+WorkloadActual   6: 1 op, 3387964900.00 ns, 3.3880 s/op
+WorkloadActual   7: 1 op, 3410376400.00 ns, 3.4104 s/op
+
+// AfterActualRun
+WorkloadResult   1: 1 op, 3323712400.00 ns, 3.3237 s/op
+WorkloadResult   2: 1 op, 3331809600.00 ns, 3.3318 s/op
+WorkloadResult   3: 1 op, 3315698900.00 ns, 3.3157 s/op
+WorkloadResult   4: 1 op, 3322970600.00 ns, 3.3230 s/op
+WorkloadResult   5: 1 op, 3371112600.00 ns, 3.3711 s/op
+WorkloadResult   6: 1 op, 3387964900.00 ns, 3.3880 s/op
+WorkloadResult   7: 1 op, 3410376400.00 ns, 3.4104 s/op
+// GC:  0 0 0 14560 1
+// Threading:  0 0 1
+
+// AfterAll
+// Benchmark Process 37676 has exited with code 0.
+
+Mean = 3.352 s, StdErr = 0.014 s (0.42%), N = 7, StdDev = 0.037 s
+Min = 3.316 s, Q1 = 3.323 s, Median = 3.332 s, Q3 = 3.380 s, Max = 3.410 s
+IQR = 0.056 s, LowerFence = 3.239 s, UpperFence = 3.464 s
+ConfidenceInterval = [3.268 s; 3.436 s] (CI 99.9%), Margin = 0.084 s (2.52% of Mean)
+Skewness = 0.41, Kurtosis = 1.21, MValue = 2
+
+// ** Remained 7 (29,2 %) benchmark(s) to run. Estimated finish 2026-11-05 17:45 (0h 0m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Haute performance)
+// **************************
+// Benchmark: ThirdPartyWriteBenchmarks.TiffNet_Save_u16: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [Compression=deflate]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bench-big-1.dll --anonymousPipes 1204 1352 --benchmarkName "Bench.ThirdPartyWriteBenchmarks.TiffNet_Save_u16(Compression: \"deflate\")" --job big --benchmarkId 17 in <scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2)
+
+WorkloadWarmup   1: 1 op, 3701977500.00 ns, 3.7020 s/op
+WorkloadWarmup   2: 1 op, 3625743500.00 ns, 3.6257 s/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 3708340900.00 ns, 3.7083 s/op
+WorkloadActual   2: 1 op, 3758061200.00 ns, 3.7581 s/op
+WorkloadActual   3: 1 op, 3558621400.00 ns, 3.5586 s/op
+WorkloadActual   4: 1 op, 3598840500.00 ns, 3.5988 s/op
+WorkloadActual   5: 1 op, 3727547900.00 ns, 3.7275 s/op
+WorkloadActual   6: 1 op, 3569360200.00 ns, 3.5694 s/op
+WorkloadActual   7: 1 op, 3600279000.00 ns, 3.6003 s/op
+
+// AfterActualRun
+WorkloadResult   1: 1 op, 3708340900.00 ns, 3.7083 s/op
+WorkloadResult   2: 1 op, 3758061200.00 ns, 3.7581 s/op
+WorkloadResult   3: 1 op, 3558621400.00 ns, 3.5586 s/op
+WorkloadResult   4: 1 op, 3598840500.00 ns, 3.5988 s/op
+WorkloadResult   5: 1 op, 3727547900.00 ns, 3.7275 s/op
+WorkloadResult   6: 1 op, 3569360200.00 ns, 3.5694 s/op
+WorkloadResult   7: 1 op, 3600279000.00 ns, 3.6003 s/op
+// GC:  15 7 0 148481192 1
+// Threading:  0 0 1
+
+// AfterAll
+// Benchmark Process 38220 has exited with code 0.
+
+Mean = 3.646 s, StdErr = 0.031 s (0.86%), N = 7, StdDev = 0.083 s
+Min = 3.559 s, Q1 = 3.584 s, Median = 3.600 s, Q3 = 3.718 s, Max = 3.758 s
+IQR = 0.134 s, LowerFence = 3.383 s, UpperFence = 3.919 s
+ConfidenceInterval = [3.460 s; 3.832 s] (CI 99.9%), Margin = 0.186 s (5.10% of Mean)
+Skewness = 0.23, Kurtosis = 0.98, MValue = 2
+
+// ** Remained 6 (25,0 %) benchmark(s) to run. Estimated finish 2026-11-05 17:46 (0h 0m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Haute performance)
+// **************************
+// Benchmark: ThirdPartyWriteBenchmarks.ImageSharp_Save_u16: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [Compression=lzw]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bench-big-1.dll --anonymousPipes 892 1544 --benchmarkName "Bench.ThirdPartyWriteBenchmarks.ImageSharp_Save_u16(Compression: \"lzw\")" --job big --benchmarkId 18 in <scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2)
+
+WorkloadWarmup   1: 1 op, 847459700.00 ns, 847.4597 ms/op
+WorkloadWarmup   2: 1 op, 836251500.00 ns, 836.2515 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 825094500.00 ns, 825.0945 ms/op
+WorkloadActual   2: 1 op, 850339800.00 ns, 850.3398 ms/op
+WorkloadActual   3: 1 op, 822329100.00 ns, 822.3291 ms/op
+WorkloadActual   4: 1 op, 822134900.00 ns, 822.1349 ms/op
+WorkloadActual   5: 1 op, 823750100.00 ns, 823.7501 ms/op
+WorkloadActual   6: 1 op, 821373100.00 ns, 821.3731 ms/op
+WorkloadActual   7: 1 op, 822792500.00 ns, 822.7925 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 1 op, 825094500.00 ns, 825.0945 ms/op
+WorkloadResult   2: 1 op, 850339800.00 ns, 850.3398 ms/op
+WorkloadResult   3: 1 op, 822329100.00 ns, 822.3291 ms/op
+WorkloadResult   4: 1 op, 822134900.00 ns, 822.1349 ms/op
+WorkloadResult   5: 1 op, 823750100.00 ns, 823.7501 ms/op
+WorkloadResult   6: 1 op, 821373100.00 ns, 821.3731 ms/op
+WorkloadResult   7: 1 op, 822792500.00 ns, 822.7925 ms/op
+// GC:  0 0 0 651200 1
+// Threading:  0 0 1
+
+// AfterAll
+// Benchmark Process 27544 has exited with code 0.
+
+Mean = 826.831 ms, StdErr = 3.945 ms (0.48%), N = 7, StdDev = 10.437 ms
+Min = 821.373 ms, Q1 = 822.232 ms, Median = 822.793 ms, Q3 = 824.422 ms, Max = 850.340 ms
+IQR = 2.190 ms, LowerFence = 818.947 ms, UpperFence = 827.708 ms
+ConfidenceInterval = [803.324 ms; 850.337 ms] (CI 99.9%), Margin = 23.506 ms (2.84% of Mean)
+Skewness = 1.58, Kurtosis = 3.7, MValue = 2
+
+// ** Remained 5 (20,8 %) benchmark(s) to run. Estimated finish 2026-11-05 17:46 (0h 0m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Haute performance)
+// **************************
+// Benchmark: ThirdPartyWriteBenchmarks.MagickNet_Write_u16: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [Compression=lzw]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bench-big-1.dll --anonymousPipes 1560 1564 --benchmarkName "Bench.ThirdPartyWriteBenchmarks.MagickNet_Write_u16(Compression: \"lzw\")" --job big --benchmarkId 19 in <scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2)
+
+WorkloadWarmup   1: 1 op, 408328000.00 ns, 408.3280 ms/op
+WorkloadWarmup   2: 1 op, 402877500.00 ns, 402.8775 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 407963000.00 ns, 407.9630 ms/op
+WorkloadActual   2: 1 op, 405418500.00 ns, 405.4185 ms/op
+WorkloadActual   3: 1 op, 405601300.00 ns, 405.6013 ms/op
+WorkloadActual   4: 1 op, 409695900.00 ns, 409.6959 ms/op
+WorkloadActual   5: 1 op, 408269600.00 ns, 408.2696 ms/op
+WorkloadActual   6: 1 op, 409022200.00 ns, 409.0222 ms/op
+WorkloadActual   7: 1 op, 406459900.00 ns, 406.4599 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 1 op, 407963000.00 ns, 407.9630 ms/op
+WorkloadResult   2: 1 op, 405418500.00 ns, 405.4185 ms/op
+WorkloadResult   3: 1 op, 405601300.00 ns, 405.6013 ms/op
+WorkloadResult   4: 1 op, 409695900.00 ns, 409.6959 ms/op
+WorkloadResult   5: 1 op, 408269600.00 ns, 408.2696 ms/op
+WorkloadResult   6: 1 op, 409022200.00 ns, 409.0222 ms/op
+WorkloadResult   7: 1 op, 406459900.00 ns, 406.4599 ms/op
+// GC:  0 0 0 14560 1
+// Threading:  0 0 1
+
+// AfterAll
+// Benchmark Process 39448 has exited with code 0.
+
+Mean = 407.490 ms, StdErr = 0.636 ms (0.16%), N = 7, StdDev = 1.681 ms
+Min = 405.418 ms, Q1 = 406.031 ms, Median = 407.963 ms, Q3 = 408.646 ms, Max = 409.696 ms
+IQR = 2.615 ms, LowerFence = 402.108 ms, UpperFence = 412.569 ms
+ConfidenceInterval = [403.703 ms; 411.277 ms] (CI 99.9%), Margin = 3.787 ms (0.93% of Mean)
+Skewness = -0.05, Kurtosis = 1.11, MValue = 2
+
+// ** Remained 4 (16,7 %) benchmark(s) to run. Estimated finish 2026-11-05 17:46 (0h 0m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Haute performance)
+// **************************
+// Benchmark: ThirdPartyWriteBenchmarks.TiffNet_Save_u16: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [Compression=lzw]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bench-big-1.dll --anonymousPipes 1560 1420 --benchmarkName "Bench.ThirdPartyWriteBenchmarks.TiffNet_Save_u16(Compression: \"lzw\")" --job big --benchmarkId 20 in <scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2)
+
+WorkloadWarmup   1: 1 op, 483723600.00 ns, 483.7236 ms/op
+WorkloadWarmup   2: 1 op, 417246000.00 ns, 417.2460 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 414353100.00 ns, 414.3531 ms/op
+WorkloadActual   2: 1 op, 415250200.00 ns, 415.2502 ms/op
+WorkloadActual   3: 1 op, 409150300.00 ns, 409.1503 ms/op
+WorkloadActual   4: 1 op, 407072800.00 ns, 407.0728 ms/op
+WorkloadActual   5: 1 op, 408832200.00 ns, 408.8322 ms/op
+WorkloadActual   6: 1 op, 407409800.00 ns, 407.4098 ms/op
+WorkloadActual   7: 1 op, 404897900.00 ns, 404.8979 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 1 op, 414353100.00 ns, 414.3531 ms/op
+WorkloadResult   2: 1 op, 415250200.00 ns, 415.2502 ms/op
+WorkloadResult   3: 1 op, 409150300.00 ns, 409.1503 ms/op
+WorkloadResult   4: 1 op, 407072800.00 ns, 407.0728 ms/op
+WorkloadResult   5: 1 op, 408832200.00 ns, 408.8322 ms/op
+WorkloadResult   6: 1 op, 407409800.00 ns, 407.4098 ms/op
+WorkloadResult   7: 1 op, 404897900.00 ns, 404.8979 ms/op
+// GC:  7 0 0 97017448 1
+// Threading:  0 0 1
+
+// AfterAll
+// Benchmark Process 27524 has exited with code 0.
+
+Mean = 409.567 ms, StdErr = 1.452 ms (0.35%), N = 7, StdDev = 3.843 ms
+Min = 404.898 ms, Q1 = 407.241 ms, Median = 408.832 ms, Q3 = 411.752 ms, Max = 415.250 ms
+IQR = 4.510 ms, LowerFence = 400.476 ms, UpperFence = 418.517 ms
+ConfidenceInterval = [400.912 ms; 418.221 ms] (CI 99.9%), Margin = 8.654 ms (2.11% of Mean)
+Skewness = 0.42, Kurtosis = 1.38, MValue = 2
+
+// ** Remained 3 (12,5 %) benchmark(s) to run. Estimated finish 2026-11-05 17:46 (0h 0m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Haute performance)
+// **************************
+// Benchmark: ThirdPartyWriteBenchmarks.ImageSharp_Save_u16: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [Compression=none]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bench-big-1.dll --anonymousPipes 1664 1624 --benchmarkName "Bench.ThirdPartyWriteBenchmarks.ImageSharp_Save_u16(Compression: \"none\")" --job big --benchmarkId 21 in <scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2)
+
+WorkloadWarmup   1: 1 op, 44543400.00 ns, 44.5434 ms/op
+WorkloadWarmup   2: 1 op, 34398200.00 ns, 34.3982 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 38243400.00 ns, 38.2434 ms/op
+WorkloadActual   2: 1 op, 33564200.00 ns, 33.5642 ms/op
+WorkloadActual   3: 1 op, 32428500.00 ns, 32.4285 ms/op
+WorkloadActual   4: 1 op, 33413000.00 ns, 33.4130 ms/op
+WorkloadActual   5: 1 op, 31926400.00 ns, 31.9264 ms/op
+WorkloadActual   6: 1 op, 31866700.00 ns, 31.8667 ms/op
+WorkloadActual   7: 1 op, 37710900.00 ns, 37.7109 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 1 op, 38243400.00 ns, 38.2434 ms/op
+WorkloadResult   2: 1 op, 33564200.00 ns, 33.5642 ms/op
+WorkloadResult   3: 1 op, 32428500.00 ns, 32.4285 ms/op
+WorkloadResult   4: 1 op, 33413000.00 ns, 33.4130 ms/op
+WorkloadResult   5: 1 op, 31926400.00 ns, 31.9264 ms/op
+WorkloadResult   6: 1 op, 31866700.00 ns, 31.8667 ms/op
+WorkloadResult   7: 1 op, 37710900.00 ns, 37.7109 ms/op
+// GC:  0 0 0 651832 1
+// Threading:  0 0 1
+
+// AfterAll
+// Benchmark Process 27836 has exited with code 0.
+
+Mean = 34.165 ms, StdErr = 1.017 ms (2.98%), N = 7, StdDev = 2.691 ms
+Min = 31.867 ms, Q1 = 32.177 ms, Median = 33.413 ms, Q3 = 35.638 ms, Max = 38.243 ms
+IQR = 3.460 ms, LowerFence = 26.987 ms, UpperFence = 40.828 ms
+ConfidenceInterval = [28.104 ms; 40.225 ms] (CI 99.9%), Margin = 6.060 ms (17.74% of Mean)
+Skewness = 0.61, Kurtosis = 1.36, MValue = 2.8
+
+// ** Remained 2 (8,3 %) benchmark(s) to run. Estimated finish 2026-11-05 17:45 (0h 0m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Haute performance)
+// **************************
+// Benchmark: ThirdPartyWriteBenchmarks.MagickNet_Write_u16: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [Compression=none]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bench-big-1.dll --anonymousPipes 1432 1540 --benchmarkName "Bench.ThirdPartyWriteBenchmarks.MagickNet_Write_u16(Compression: \"none\")" --job big --benchmarkId 22 in <scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2)
+
+WorkloadWarmup   1: 1 op, 68663400.00 ns, 68.6634 ms/op
+WorkloadWarmup   2: 1 op, 66473200.00 ns, 66.4732 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 66389900.00 ns, 66.3899 ms/op
+WorkloadActual   2: 1 op, 65429200.00 ns, 65.4292 ms/op
+WorkloadActual   3: 1 op, 67309700.00 ns, 67.3097 ms/op
+WorkloadActual   4: 1 op, 69465800.00 ns, 69.4658 ms/op
+WorkloadActual   5: 1 op, 67829600.00 ns, 67.8296 ms/op
+WorkloadActual   6: 1 op, 66618200.00 ns, 66.6182 ms/op
+WorkloadActual   7: 1 op, 65756600.00 ns, 65.7566 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 1 op, 66389900.00 ns, 66.3899 ms/op
+WorkloadResult   2: 1 op, 65429200.00 ns, 65.4292 ms/op
+WorkloadResult   3: 1 op, 67309700.00 ns, 67.3097 ms/op
+WorkloadResult   4: 1 op, 69465800.00 ns, 69.4658 ms/op
+WorkloadResult   5: 1 op, 67829600.00 ns, 67.8296 ms/op
+WorkloadResult   6: 1 op, 66618200.00 ns, 66.6182 ms/op
+WorkloadResult   7: 1 op, 65756600.00 ns, 65.7566 ms/op
+// GC:  0 0 0 14360 1
+// Threading:  0 0 1
+
+// AfterAll
+// Benchmark Process 42840 has exited with code 0.
+
+Mean = 66.971 ms, StdErr = 0.521 ms (0.78%), N = 7, StdDev = 1.378 ms
+Min = 65.429 ms, Q1 = 66.073 ms, Median = 66.618 ms, Q3 = 67.570 ms, Max = 69.466 ms
+IQR = 1.496 ms, LowerFence = 63.829 ms, UpperFence = 69.814 ms
+ConfidenceInterval = [63.868 ms; 70.074 ms] (CI 99.9%), Margin = 3.103 ms (4.63% of Mean)
+Skewness = 0.57, Kurtosis = 1.87, MValue = 2
+
+// ** Remained 1 (4,2 %) benchmark(s) to run. Estimated finish 2026-11-05 17:45 (0h 0m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Haute performance)
+// **************************
+// Benchmark: ThirdPartyWriteBenchmarks.TiffNet_Save_u16: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [Compression=none]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bench-big-1.dll --anonymousPipes 1672 1600 --benchmarkName "Bench.ThirdPartyWriteBenchmarks.TiffNet_Save_u16(Compression: \"none\")" --job big --benchmarkId 23 in <scratchpad>\review-perf\bench\bin\Release\net10.0\Bench-big-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2)
+
+WorkloadWarmup   1: 1 op, 74245800.00 ns, 74.2458 ms/op
+WorkloadWarmup   2: 1 op, 20044600.00 ns, 20.0446 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 18762200.00 ns, 18.7622 ms/op
+WorkloadActual   2: 1 op, 19292700.00 ns, 19.2927 ms/op
+WorkloadActual   3: 1 op, 19156300.00 ns, 19.1563 ms/op
+WorkloadActual   4: 1 op, 18870800.00 ns, 18.8708 ms/op
+WorkloadActual   5: 1 op, 18973000.00 ns, 18.9730 ms/op
+WorkloadActual   6: 1 op, 21430800.00 ns, 21.4308 ms/op
+WorkloadActual   7: 1 op, 19059700.00 ns, 19.0597 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 1 op, 18762200.00 ns, 18.7622 ms/op
+WorkloadResult   2: 1 op, 19292700.00 ns, 19.2927 ms/op
+WorkloadResult   3: 1 op, 19156300.00 ns, 19.1563 ms/op
+WorkloadResult   4: 1 op, 18870800.00 ns, 18.8708 ms/op
+WorkloadResult   5: 1 op, 18973000.00 ns, 18.9730 ms/op
+WorkloadResult   6: 1 op, 21430800.00 ns, 21.4308 ms/op
+WorkloadResult   7: 1 op, 19059700.00 ns, 19.0597 ms/op
+// GC:  0 0 0 590168 1
+// Threading:  0 0 1
+
+// AfterAll
+// Benchmark Process 39224 has exited with code 0.
+
+Mean = 19.364 ms, StdErr = 0.351 ms (1.81%), N = 7, StdDev = 0.928 ms
+Min = 18.762 ms, Q1 = 18.922 ms, Median = 19.060 ms, Q3 = 19.224 ms, Max = 21.431 ms
+IQR = 0.303 ms, LowerFence = 18.468 ms, UpperFence = 19.678 ms
+ConfidenceInterval = [17.273 ms; 21.454 ms] (CI 99.9%), Margin = 2.091 ms (10.80% of Mean)
+Skewness = 1.5, Kurtosis = 3.56, MValue = 2
+
+// ** Remained 0 (0,0 %) benchmark(s) to run. Estimated finish 2026-11-05 17:45 (0h 0m from now) **
+Successfully reverted power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: Haute performance)
+// ***** BenchmarkRunner: Finish  *****
+
+// * Export *
+  BenchmarkDotNet.Artifacts\results\Bench.ThirdPartyWriteBenchmarks-report.csv
+  BenchmarkDotNet.Artifacts\results\Bench.ThirdPartyWriteBenchmarks-report-github.md
+  BenchmarkDotNet.Artifacts\results\Bench.ThirdPartyWriteBenchmarks-report.html
+
+// * Detailed results *
+ThirdPartyWriteBenchmarks.ImageSharp_Save_u16: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [Compression=deflate]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 1.243 s, StdErr = 0.007 s (0.54%), N = 7, StdDev = 0.018 s
+Min = 1.220 s, Q1 = 1.235 s, Median = 1.237 s, Q3 = 1.252 s, Max = 1.272 s
+IQR = 0.018 s, LowerFence = 1.208 s, UpperFence = 1.279 s
+ConfidenceInterval = [1.203 s; 1.283 s] (CI 99.9%), Margin = 0.040 s (3.23% of Mean)
+Skewness = 0.41, Kurtosis = 1.56, MValue = 2
+-------------------- Histogram --------------------
+[1.219 s ; 1.280 s) | @@@@@@@
+---------------------------------------------------
+
+ThirdPartyWriteBenchmarks.MagickNet_Write_u16: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [Compression=deflate]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 3.352 s, StdErr = 0.014 s (0.42%), N = 7, StdDev = 0.037 s
+Min = 3.316 s, Q1 = 3.323 s, Median = 3.332 s, Q3 = 3.380 s, Max = 3.410 s
+IQR = 0.056 s, LowerFence = 3.239 s, UpperFence = 3.464 s
+ConfidenceInterval = [3.268 s; 3.436 s] (CI 99.9%), Margin = 0.084 s (2.52% of Mean)
+Skewness = 0.41, Kurtosis = 1.21, MValue = 2
+-------------------- Histogram --------------------
+[3.290 s ; 3.425 s) | @@@@@@@
+---------------------------------------------------
+
+ThirdPartyWriteBenchmarks.TiffNet_Save_u16: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [Compression=deflate]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 3.646 s, StdErr = 0.031 s (0.86%), N = 7, StdDev = 0.083 s
+Min = 3.559 s, Q1 = 3.584 s, Median = 3.600 s, Q3 = 3.718 s, Max = 3.758 s
+IQR = 0.134 s, LowerFence = 3.383 s, UpperFence = 3.919 s
+ConfidenceInterval = [3.460 s; 3.832 s] (CI 99.9%), Margin = 0.186 s (5.10% of Mean)
+Skewness = 0.23, Kurtosis = 0.98, MValue = 2
+-------------------- Histogram --------------------
+[3.523 s ; 3.636 s) | @@@@
+[3.636 s ; 3.790 s) | @@@
+---------------------------------------------------
+
+ThirdPartyWriteBenchmarks.ImageSharp_Save_u16: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [Compression=lzw]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 826.831 ms, StdErr = 3.945 ms (0.48%), N = 7, StdDev = 10.437 ms
+Min = 821.373 ms, Q1 = 822.232 ms, Median = 822.793 ms, Q3 = 824.422 ms, Max = 850.340 ms
+IQR = 2.190 ms, LowerFence = 818.947 ms, UpperFence = 827.708 ms
+ConfidenceInterval = [803.324 ms; 850.337 ms] (CI 99.9%), Margin = 23.506 ms (2.84% of Mean)
+Skewness = 1.58, Kurtosis = 3.7, MValue = 2
+-------------------- Histogram --------------------
+[814.212 ms ; 831.466 ms) | @@@@@@
+[831.466 ms ; 857.501 ms) | @
+---------------------------------------------------
+
+ThirdPartyWriteBenchmarks.MagickNet_Write_u16: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [Compression=lzw]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 407.490 ms, StdErr = 0.636 ms (0.16%), N = 7, StdDev = 1.681 ms
+Min = 405.418 ms, Q1 = 406.031 ms, Median = 407.963 ms, Q3 = 408.646 ms, Max = 409.696 ms
+IQR = 2.615 ms, LowerFence = 402.108 ms, UpperFence = 412.569 ms
+ConfidenceInterval = [403.703 ms; 411.277 ms] (CI 99.9%), Margin = 3.787 ms (0.93% of Mean)
+Skewness = -0.05, Kurtosis = 1.11, MValue = 2
+-------------------- Histogram --------------------
+[404.265 ms ; 410.850 ms) | @@@@@@@
+---------------------------------------------------
+
+ThirdPartyWriteBenchmarks.TiffNet_Save_u16: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [Compression=lzw]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 409.567 ms, StdErr = 1.452 ms (0.35%), N = 7, StdDev = 3.843 ms
+Min = 404.898 ms, Q1 = 407.241 ms, Median = 408.832 ms, Q3 = 411.752 ms, Max = 415.250 ms
+IQR = 4.510 ms, LowerFence = 400.476 ms, UpperFence = 418.517 ms
+ConfidenceInterval = [400.912 ms; 418.221 ms] (CI 99.9%), Margin = 8.654 ms (2.11% of Mean)
+Skewness = 0.42, Kurtosis = 1.38, MValue = 2
+-------------------- Histogram --------------------
+[402.954 ms ; 417.887 ms) | @@@@@@@
+---------------------------------------------------
+
+ThirdPartyWriteBenchmarks.ImageSharp_Save_u16: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [Compression=none]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 34.165 ms, StdErr = 1.017 ms (2.98%), N = 7, StdDev = 2.691 ms
+Min = 31.867 ms, Q1 = 32.177 ms, Median = 33.413 ms, Q3 = 35.638 ms, Max = 38.243 ms
+IQR = 3.460 ms, LowerFence = 26.987 ms, UpperFence = 40.828 ms
+ConfidenceInterval = [28.104 ms; 40.225 ms] (CI 99.9%), Margin = 6.060 ms (17.74% of Mean)
+Skewness = 0.61, Kurtosis = 1.36, MValue = 2.8
+-------------------- Histogram --------------------
+[30.869 ms ; 34.562 ms) | @@@@@
+[34.562 ms ; 36.131 ms) | 
+[36.131 ms ; 40.090 ms) | @@
+---------------------------------------------------
+
+ThirdPartyWriteBenchmarks.MagickNet_Write_u16: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [Compression=none]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 66.971 ms, StdErr = 0.521 ms (0.78%), N = 7, StdDev = 1.378 ms
+Min = 65.429 ms, Q1 = 66.073 ms, Median = 66.618 ms, Q3 = 67.570 ms, Max = 69.466 ms
+IQR = 1.496 ms, LowerFence = 63.829 ms, UpperFence = 69.814 ms
+ConfidenceInterval = [63.868 ms; 70.074 ms] (CI 99.9%), Margin = 3.103 ms (4.63% of Mean)
+Skewness = 0.57, Kurtosis = 1.87, MValue = 2
+-------------------- Histogram --------------------
+[65.424 ms ; 67.702 ms) | @@@@@
+[67.702 ms ; 69.593 ms) | @@
+---------------------------------------------------
+
+ThirdPartyWriteBenchmarks.TiffNet_Save_u16: big(InvocationCount=1, IterationCount=7, LaunchCount=1, RunStrategy=Monitoring, UnrollFactor=1, WarmupCount=2) [Compression=none]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 19.364 ms, StdErr = 0.351 ms (1.81%), N = 7, StdDev = 0.928 ms
+Min = 18.762 ms, Q1 = 18.922 ms, Median = 19.060 ms, Q3 = 19.224 ms, Max = 21.431 ms
+IQR = 0.303 ms, LowerFence = 18.468 ms, UpperFence = 19.678 ms
+ConfidenceInterval = [17.273 ms; 21.454 ms] (CI 99.9%), Margin = 2.091 ms (10.80% of Mean)
+Skewness = 1.5, Kurtosis = 3.56, MValue = 2
+-------------------- Histogram --------------------
+[18.391 ms ; 19.664 ms) | @@@@@@
+[19.664 ms ; 20.794 ms) | 
+[20.794 ms ; 22.068 ms) | @
+---------------------------------------------------
+
+// * Summary *
+
+BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.9711/25H2/2025Update/HudsonValley2)
+Intel Core Ultra 7 258V 2.20GHz, 1 CPU, 8 logical and 8 physical cores
+.NET SDK 10.0.401
+  [Host] : .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+  big    : .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+
+Job=big  InvocationCount=1  IterationCount=7  
+LaunchCount=1  RunStrategy=Monitoring  UnrollFactor=1  
+WarmupCount=2  
+
+| Method              | Compression | Mean        | Error      | StdDev    | Median      | Min         | Gen0       | Gen1      | Allocated    |
+|-------------------- |------------ |------------:|-----------:|----------:|------------:|------------:|-----------:|----------:|-------------:|
+| ImageSharp_Save_u16 | deflate     | 1,243.11 ms |  40.175 ms | 17.838 ms | 1,236.58 ms | 1,219.94 ms |  3000.0000 |         - |  21245.37 KB |
+| MagickNet_Write_u16 | deflate     | 3,351.95 ms |  84.445 ms | 37.494 ms | 3,331.81 ms | 3,315.70 ms |          - |         - |     14.22 KB |
+| TiffNet_Save_u16    | deflate     | 3,645.86 ms | 185.989 ms | 82.580 ms | 3,600.28 ms | 3,558.62 ms | 15000.0000 | 7000.0000 | 145001.16 KB |
+| ImageSharp_Save_u16 | lzw         |   826.83 ms |  23.506 ms | 10.437 ms |   822.79 ms |   821.37 ms |          - |         - |    635.94 KB |
+| MagickNet_Write_u16 | lzw         |   407.49 ms |   3.787 ms |  1.681 ms |   407.96 ms |   405.42 ms |          - |         - |     14.22 KB |
+| TiffNet_Save_u16    | lzw         |   409.57 ms |   8.654 ms |  3.843 ms |   408.83 ms |   404.90 ms |  7000.0000 |         - |   94743.6 KB |
+| ImageSharp_Save_u16 | none        |    34.16 ms |   6.060 ms |  2.691 ms |    33.41 ms |    31.87 ms |          - |         - |    636.55 KB |
+| MagickNet_Write_u16 | none        |    66.97 ms |   3.103 ms |  1.378 ms |    66.62 ms |    65.43 ms |          - |         - |     14.02 KB |
+| TiffNet_Save_u16    | none        |    19.36 ms |   2.091 ms |  0.928 ms |    19.06 ms |    18.76 ms |          - |         - |    576.34 KB |
+
+// * Warnings *
+MinIterationTime
+  ThirdPartyWriteBenchmarks.ImageSharp_Save_u16: big -> The minimum observed iteration time is 31.867ms which is very small. It's recommended to increase it to at least 100ms using more operations.
+  ThirdPartyWriteBenchmarks.MagickNet_Write_u16: big -> The minimum observed iteration time is 65.429ms which is very small. It's recommended to increase it to at least 100ms using more operations.
+  ThirdPartyWriteBenchmarks.TiffNet_Save_u16: big    -> The minimum observed iteration time is 18.762ms which is very small. It's recommended to increase it to at least 100ms using more operations.
+
+// * Hints *
+Outliers
+  ThirdPartyWriteBenchmarks.ImageSharp_Save_u16: big -> 1 outlier  was  detected (850.34 ms)
+  ThirdPartyWriteBenchmarks.TiffNet_Save_u16: big    -> 1 outlier  was  detected (21.43 ms)
+
+// * Legends *
+  Compression : Value of the 'Compression' parameter
+  Mean        : Arithmetic mean of all measurements
+  Error       : Half of 99.9% confidence interval
+  StdDev      : Standard deviation of all measurements
+  Median      : Value separating the higher half of all measurements (50th percentile)
+  Min         : Minimum
+  Gen0        : GC Generation 0 collects per 1000 operations
+  Gen1        : GC Generation 1 collects per 1000 operations
+  Allocated   : Allocated memory per single operation (managed only, inclusive, 1KB = 1024B)
+  1 ms        : 1 Millisecond (0.001 sec)
+
+// * Diagnostic Output - MemoryDiagnoser *
+
+
+// ***** BenchmarkRunner: End *****
+Run time: 00:01:44 (104.21 sec), executed benchmarks: 9
+
+Global total time: 00:02:55 (175.09 sec), executed benchmarks: 24
+// * Artifacts cleanup *
+Artifacts cleanup is finished

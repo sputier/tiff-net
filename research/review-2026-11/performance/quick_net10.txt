@@ -1,0 +1,72 @@
+.NET 10.0.12, 8 cores, Server GC=False
+case                                          median ms   min ms     MB/s  alloc MB  gen2  extra
+read f32rgb_24_lzw_p3.tif                        1603,6   1542,5      180     576,9     2  file 239,5 MB
+  ref File.ReadAllBytes                            63,4     47,2     3780     239,5     2  
+read f32rgb_24_none.tif                            80,7     76,0     3568     288,6     2  file 288,0 MB
+  ref File.ReadAllBytes                            58,2     56,4     4946     288,0     2  
+read f32rgb_24_planar_none.tif                    192,7    191,6     1494     288,8     2  file 288,0 MB
+  ref File.ReadAllBytes                            66,1     64,8     4356     288,0     2  
+read f32rgb_24_planar_zip_p3.tif                 2694,1   2420,0      107     699,1     2  file 201,1 MB
+  ref File.ReadAllBytes                            61,7     60,8     3259     201,1     2  
+read f32rgb_24_tiled_zip_p3.tif                  2830,9   2556,3      102     683,8     2  file 196,8 MB
+  ref File.ReadAllBytes                            51,8     50,7     3796     196,8     2  
+read f32rgb_24_zip_p3.tif                        2017,3   1824,7      143     653,5     2  file 187,6 MB
+  ref File.ReadAllBytes                            64,2     58,4     2922     187,6     2  
+read f32rgb_24_zip.tif                           1880,8   1653,7      153     342,2     2  file 239,8 MB
+  ref File.ReadAllBytes                            66,0     63,9     3632     239,8     2  
+read u16_24_lzw_p2.tif                            307,4    297,4      156      96,7     2  file 33,5 MB
+  ref File.ReadAllBytes                            11,6     10,5     2879      33,5     2  
+read u16_24_lzw.tif                               251,2    192,3      191      48,6     2  file 34,2 MB
+  ref File.ReadAllBytes                             7,9      6,6     4354      34,2     2  
+read u16_24_none_be.tif                            45,6     36,3     1053      96,5     5  file 48,0 MB
+  ref File.ReadAllBytes                            12,2     10,1     3926      48,0     2  
+read u16_24_none_flip.tif                          20,7     13,5     2316      48,5     2  file 48,0 MB
+  ref File.ReadAllBytes                            14,5     10,1     3307      48,0     2  
+read u16_24_none_onestrip.tif                      25,9     17,0     1852      96,2     2  file 48,0 MB
+  ref File.ReadAllBytes                             9,5      9,4     5079      48,0     2  
+read u16_24_none.tif                               10,8     10,4     4454      48,5     2  file 48,0 MB
+  ref File.ReadAllBytes                             9,4      9,2     5083      48,0     2  
+read u16_24_packbits.tif                           13,7     13,5     3491      48,7     2  file 48,4 MB
+  ref File.ReadAllBytes                             9,5      9,3     5066      48,4     2  
+read u16_24_tiled_none.tif                         12,6     12,2     3817      48,5     2  file 50,3 MB
+  ref File.ReadAllBytes                            10,4     10,2     4863      50,3     2  
+read u16_24_tiled_zip_p2.tif                      301,6    294,5      159     121,6     2  file 29,1 MB
+  ref File.ReadAllBytes                             7,9      7,7     3695      29,1     2  
+read u16_24_zip_p2_be.tif                         310,7    306,0      155     107,5     2  file 28,7 MB
+  ref File.ReadAllBytes                             7,5      6,4     3851      28,7     2  
+read u16_24_zip_p2.tif                            299,2    297,0      160     107,5     2  file 28,6 MB
+  ref File.ReadAllBytes                             8,6      7,6     3320      28,6     2  
+read u16_24_zip.tif                               282,9    281,5      170      71,3     2  file 29,4 MB
+  ref File.ReadAllBytes                             7,3      7,3     4024      29,4     2  
+read u16_61_none.tif                               40,3     28,0     3036     122,8     2  file 122,3 MB
+  ref File.ReadAllBytes                            26,6     24,4     4606     122,3     2  
+read u16_61_zip_p2.tif                            765,1    755,5      160     272,9     2  file 72,6 MB
+  ref File.ReadAllBytes                            18,1     16,9     4019      72,6     2  
+write u16_24 None (file)                           22,2     21,7     2161       0,6     0  out 48,0 MB
+write u16_24 None (MemoryStream)                   11,2      7,0     4276      54,5     0  
+write u16_24 Lzw (file)                           509,3    499,1       94      97,0     0  out 33,5 MB
+write u16_24 Lzw (MemoryStream)                   509,8    505,0       94     151,0     0  
+write u16_24 Deflate (file)                      4395,8   4334,0       11     148,5     0  out 28,6 MB
+write u16_24 Deflate (MemoryStream)              5035,5   3680,0       10     202,4     0  
+write u16_24 PackBits (file)                      158,1    139,0      304       0,6     0  out 48,3 MB
+write u16_24 PackBits (MemoryStream)              149,4    142,6      321      54,5     0  
+  ref File.WriteAllBytes u16_24                    43,9     41,6     1093       0,0     0  
+  ref ZLibStream Fastest compress u16_24          417,0    415,0      115     174,4     0  ratio 0,837
+  ref ZLibStream Fastest decompress u16_24        161,6    158,7      297       0,0     0  
+  ref ZLibStream Optimal compress u16_24          864,4    859,6       56      96,1     0  ratio 0,603
+  ref ZLibStream Optimal decompress u16_24        221,3    211,5      217       0,0     0  
+write f32rgb_24 None (file)                       166,9    159,4     1726       0,6     0  out 288,0 MB
+write f32rgb_24 None (MemoryStream)               104,2     62,1     2764     324,5     1  
+write f32rgb_24 Lzw (file)                       3324,9   2778,7       87     577,0     0  out 239,7 MB
+write f32rgb_24 Lzw (MemoryStream)               2703,4   2421,8      107     901,0     3  
+write f32rgb_24 Deflate (file)                   8041,6   7909,9       36     935,3     2  out 186,8 MB
+write f32rgb_24 Deflate (MemoryStream)           8114,1   7783,7       35    1259,2     3  
+write f32rgb_24 PackBits (file)                  1338,4   1288,8      215       0,6     0  out 290,3 MB
+write f32rgb_24 PackBits (MemoryStream)           887,5    844,3      325     324,5     1  
+  ref File.WriteAllBytes f32rgb_24                358,9    356,3      803       0,0     0  
+  ref ZLibStream Fastest compress f32rgb_24      2777,7   2679,3      104    1377,9     2  ratio 1,056
+  ref ZLibStream Fastest decompress f32rgb_24      597,6    586,4      482       0,0     0  
+  ref ZLibStream Optimal compress f32rgb_24      7038,0   6625,5       41     775,8     2  ratio 0,830
+  ref ZLibStream Optimal decompress f32rgb_24      689,2    671,8      418       0,0     0  
+
+[exited with code 0]
