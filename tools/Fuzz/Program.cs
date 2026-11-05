@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Globalization;
 using Eleris.TiffNet.Fuzz;
 
@@ -6,70 +5,99 @@ using Eleris.TiffNet.Fuzz;
 //
 //   dotnet run -c Release --project tools/Fuzz -- run [--seconds 60] [--seed 1] [--mode mixed] [--target none] [--out fuzz-out] [corpus...]
 //   dotnet run -c Release --project tools/Fuzz -- reproduce --seed 1 --iteration 1234 [--mode mixed] [--out input.tif] [corpus...]
-//   dotnet run -c Release --project tools/Fuzz -- replay [--target none] file-or-folder...
+//   dotnet run -c Release --project tools/Fuzz -- replay [--target none] [--out fuzz-out] file-or-folder...
 //
 // The corpus defaults to the fixtures of the repository (tests/Fixtures: domain, hostile, and interop/generated when it is
-// generated). An input is a pure function of the campaign seed, the iteration and the corpus: "reproduce" writes it again.
-// Inputs that crash (an exception other than TiffException or NotSupportedException), take more than 2 s or allocate more than
-// 256 MB are saved under the output folder with a note giving their seed and iteration; an input that runs for 60 s stops the
-// process (exit code 3).
+// generated). An input is a pure function of the campaign seed, the iteration and the corpus, whose identifier is printed and
+// written in every note: "reproduce" writes the input again from the same corpus. Inputs that crash (an exception other than
+// TiffException or NotSupportedException), take more than 2 s or allocate more than 256 MB are saved under the output folder
+// with a note; the input being run is also written to current.txt before it runs, which survives a crash of the process itself.
+// An input running for 60 s stops the process (exit code 3). "run" and "replay" exit with 1 when an input misbehaved, so that
+// they can be used as gates.
 
-if (args.Length == 0)
+// Numbers in the output must not depend on the culture of the machine.
+CultureInfo.DefaultThreadCurrentCulture = CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
+try
 {
-    Console.WriteLine("Commands: run, reproduce, replay. See tools/Fuzz/Program.cs.");
+    return Run(args);
+}
+catch (Exception ex) when (ex is ArgumentException or FormatException or InvalidOperationException)
+{
+    Console.Error.WriteLine(ex.Message);
+    Console.Error.WriteLine("Usage: see tools/Fuzz/Program.cs.");
     return 2;
 }
 
-var options = Options.Parse(args.Skip(1));
-var target = Targets.All.TryGetValue(options.Get("target", "none"), out var t)
-    ? t
-    : throw new ArgumentException($"Unknown target; the targets are: {string.Join(", ", Targets.All.Keys)}.");
-var mode = Enum.Parse<MutationMode>(options.Get("mode", "mixed"), ignoreCase: true);
-int seed = int.Parse(options.Get("seed", "1"), CultureInfo.InvariantCulture);
-
-switch (args[0])
+static int Run(string[] args)
 {
-    case "run":
+    if (args.Length == 0)
     {
-        var corpus = Corpus.Load(options.Corpus);
-        string output = options.Get("out", "fuzz-out");
-        var duration = TimeSpan.FromSeconds(double.Parse(options.Get("seconds", "60"), CultureInfo.InvariantCulture));
-        var campaign = new Campaign(corpus, target, mode, seed, output);
-        long iterations = campaign.Run(duration);
-        Console.WriteLine($"{iterations} inputs from {corpus.Count} seeds (seed {seed}, {mode}, target {options.Get("target", "none")}):");
-        foreach (var (outcome, count) in campaign.Outcomes.OrderByDescending(o => o.Value))
+        throw new ArgumentException("A command is expected: run, reproduce or replay.");
+    }
+
+    var options = Options.Parse(args.Skip(1));
+    string targetName = options.Get("target", "none");
+    var target = Targets.All.TryGetValue(targetName, out var t)
+        ? t
+        : throw new ArgumentException($"Unknown target '{targetName}'; the targets are: {string.Join(", ", Targets.All.Keys)}.");
+    var mode = Enum.TryParse<MutationMode>(options.Get("mode", "mixed"), ignoreCase: true, out var m)
+        ? m
+        : throw new ArgumentException($"Unknown mode; the modes are: {string.Join(", ", Enum.GetNames<MutationMode>())}.");
+    int seed = int.Parse(options.Get("seed", "1"), CultureInfo.InvariantCulture);
+
+    switch (args[0])
+    {
+        case "run":
         {
-            Console.WriteLine($"  {count,10}  {outcome}");
+            var corpus = LoadCorpus(options);
+            var duration = TimeSpan.FromSeconds(double.Parse(options.Get("seconds", "60"), CultureInfo.InvariantCulture));
+            var campaign = new Campaign(corpus, target, mode, seed, options.Get("out", "fuzz-out"));
+            long iterations = campaign.Run(duration);
+            Console.WriteLine($"{iterations} inputs from corpus {corpus.Id} ({corpus.Count} files), seed {seed}, {mode}, target {targetName}:");
+            foreach (var (outcome, count) in campaign.Outcomes.OrderByDescending(o => o.Value))
+            {
+                Console.WriteLine($"  {count,10}  {outcome}");
+            }
+
+            return campaign.Failed ? 1 : 0;
         }
 
-        return campaign.Outcomes.Keys.Any(o => o.StartsWith("crash", StringComparison.Ordinal) || o is "slow" or "memory") ? 1 : 0;
-    }
-
-    case "reproduce":
-    {
-        var corpus = Corpus.Load(options.Corpus);
-        long iteration = long.Parse(options.Get("iteration", "0"), CultureInfo.InvariantCulture);
-        string output = options.Get("out", "input.tif");
-        File.WriteAllBytes(output, corpus.Input(seed, iteration, mode));
-        Console.WriteLine($"{output}: input {iteration} of seed {seed} ({mode}), from {corpus.Count} seeds.");
-        return 0;
-    }
-
-    case "replay":
-    {
-        var campaign = new Campaign(Corpus.Load([]), target, mode, seed, Path.GetTempPath());
-        foreach (string file in options.Positional.SelectMany(p => Directory.Exists(p) ? Directory.GetFiles(p, "*.tif") : [p]))
+        case "reproduce":
         {
-            var (outcome, elapsed, allocated) = campaign.Execute(File.ReadAllBytes(file));
-            Console.WriteLine($"{Path.GetFileName(file)}: {outcome}, {elapsed.TotalSeconds:F2} s, {allocated >> 20} MB");
+            var corpus = LoadCorpus(options);
+            long iteration = long.Parse(options.Get("iteration", "0"), CultureInfo.InvariantCulture);
+            string output = options.Get("out", "input.tif");
+            File.WriteAllBytes(output, corpus.Input(seed, iteration, mode));
+            Console.WriteLine($"{output}: input {iteration} of seed {seed} ({mode}), corpus {corpus.Id} ({corpus.Count} files).");
+            return 0;
         }
 
-        return 0;
-    }
+        case "replay":
+        {
+            string[] files = [.. options.Positional.SelectMany(p => Directory.Exists(p) ? Directory.GetFiles(p, "*.tif") : [p])];
+            if (files.Length == 0)
+            {
+                throw new ArgumentException("No file to replay.");
+            }
 
-    default:
-        Console.WriteLine($"Unknown command '{args[0]}'.");
-        return 2;
+            var campaign = new Campaign(new Corpus([]), target, mode, seed, options.Get("out", "fuzz-out"));
+            foreach (var (file, outcome, elapsed, allocated) in campaign.Replay(files))
+            {
+                Console.WriteLine($"{Path.GetFileName(file)}: {outcome}, {elapsed.TotalSeconds:F2} s, {allocated >> 20} MB");
+            }
+
+            return campaign.Failed ? 1 : 0;
+        }
+
+        default:
+            throw new ArgumentException($"Unknown command '{args[0]}'.");
+    }
+}
+
+static Corpus LoadCorpus(Options options)
+{
+    var corpus = Corpus.Load(options.Corpus);
+    return corpus.Count > 0 ? corpus : throw new ArgumentException($"No seed file (*.tif) in {string.Join(", ", options.Corpus)}.");
 }
 
 /// <summary>"--name value" options and positional arguments.</summary>
@@ -88,8 +116,13 @@ internal sealed class Options
         string[] args = [.. arguments];
         for (int i = 0; i < args.Length; i++)
         {
-            if (args[i].StartsWith("--", StringComparison.Ordinal) && i + 1 < args.Length)
+            if (args[i].StartsWith("--", StringComparison.Ordinal))
             {
+                if (i + 1 >= args.Length || args[i + 1].StartsWith("--", StringComparison.Ordinal))
+                {
+                    throw new ArgumentException($"{args[i]} needs a value.");
+                }
+
                 options._named[args[i][2..]] = args[++i];
             }
             else
@@ -103,13 +136,13 @@ internal sealed class Options
 
     public string Get(string name, string fallback) => _named.TryGetValue(name, out string? value) ? value : fallback;
 
-    private static IEnumerable<string> DefaultCorpus()
+    private static string[] DefaultCorpus()
     {
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
         {
-            string fixtures = Path.Combine(dir.FullName, "tests", "Fixtures");
             if (File.Exists(Path.Combine(dir.FullName, "Eleris.TiffNet.slnx")))
             {
+                string fixtures = Path.Combine(dir.FullName, "tests", "Fixtures");
                 return [Path.Combine(fixtures, "domain"), Path.Combine(fixtures, "hostile"), Path.Combine(fixtures, "interop", "generated")];
             }
         }

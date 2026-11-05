@@ -21,7 +21,7 @@ internal sealed class ResourceBudget
     public ResourceBudget(TiffReadOptions options, string sourceName, CancellationToken cancellation = default)
     {
         _options = options;
-        SourceName = sourceName;
+        SourceName = NameOf(sourceName);
         _cancellation = cancellation;
     }
 
@@ -35,12 +35,24 @@ internal sealed class ResourceBudget
     public void ReservePixels(long bytes, string what)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(bytes);
-        long total = Interlocked.Add(ref _pixelBytes, bytes);
-        if (total < 0 || total > _options.MaxPixelBytes)
+        // Compare and swap: a refused reservation never shows in the total, so it cannot make a concurrent one that fits fail.
+        long current = Interlocked.Read(ref _pixelBytes);
+        while (true)
         {
-            Interlocked.Add(ref _pixelBytes, -bytes);
-            throw Limit(nameof(TiffReadOptions.MaxPixelBytes),
-                $"{what} needs {Describe(bytes)}, beyond the {Describe(_options.MaxPixelBytes)} allowed by MaxPixelBytes.");
+            if (bytes > _options.MaxPixelBytes - current)
+            {
+                throw Limit(nameof(TiffReadOptions.MaxPixelBytes),
+                    $"{what} needs {Describe(bytes)}, beyond the {Describe(_options.MaxPixelBytes - current)} left of the "
+                    + $"{Describe(_options.MaxPixelBytes)} allowed by MaxPixelBytes.");
+            }
+
+            long seen = Interlocked.CompareExchange(ref _pixelBytes, current + bytes, current);
+            if (seen == current)
+            {
+                return;
+            }
+
+            current = seen;
         }
     }
 
@@ -95,12 +107,13 @@ internal sealed class ResourceBudget
 
     private TiffException Limit(string limit, string message) => new($"{SourceName}: {message}", limit);
 
-    // Messages are in English and must not depend on the culture of the machine ("1.5 GB", never "1,5 GB").
+    // Messages are in English and must not depend on the culture of the machine ("1.5 GB", never "1,5 GB"). The exact count
+    // follows a rounded size, so that two sizes that round alike (2 GB and the limit of 2 GB) can be told apart.
     private static string Describe(long bytes) => bytes switch
     {
-        >= 1L << 30 => string.Create(CultureInfo.InvariantCulture, $"{bytes / (double)(1L << 30):0.#} GB"),
-        >= 1L << 20 => string.Create(CultureInfo.InvariantCulture, $"{bytes / (double)(1L << 20):0.#} MB"),
-        >= 1L << 10 => string.Create(CultureInfo.InvariantCulture, $"{bytes / 1024.0:0.#} KB"),
+        >= 1L << 30 => string.Create(CultureInfo.InvariantCulture, $"{bytes / (double)(1L << 30):0.#} GB ({bytes} bytes)"),
+        >= 1L << 20 => string.Create(CultureInfo.InvariantCulture, $"{bytes / (double)(1L << 20):0.#} MB ({bytes} bytes)"),
+        >= 1L << 10 => string.Create(CultureInfo.InvariantCulture, $"{bytes / 1024.0:0.#} KB ({bytes} bytes)"),
         _ => string.Create(CultureInfo.InvariantCulture, $"{bytes} bytes"),
     };
 }
