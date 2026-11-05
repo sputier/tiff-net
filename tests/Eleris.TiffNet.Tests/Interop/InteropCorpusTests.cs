@@ -27,6 +27,19 @@ public class InteropCorpusTests
 
         Assert.Contains(files, f => !f.Supported);   // zstd and lzma: refused by design
         Assert.True(files.Count > 5000, $"only {files.Count} files");
+
+        // What tifffile cannot write by itself is encoded by the generator: predictor 2 on 64-bit integers, both byte orders.
+        Assert.Contains(files, f => f.SampleType == "int64" && f.Predictor && f.BigEndian && f.Planar);
+        Assert.Contains(files, f => f.SampleType == "uint64" && f.Predictor && !f.BigEndian && f.Compression == "lzw");
+
+        // Every kind of extra channel, which the readers must report.
+        foreach (var kind in new[] { InteropExtraKind.Unspecified, InteropExtraKind.AssociatedAlpha, InteropExtraKind.UnassociatedAlpha })
+        {
+            Assert.Contains(files, f => f.ExtraKind == kind && f.Channels == 2);
+            Assert.Contains(files, f => f.ExtraKind == kind && f.Channels == 4);
+        }
+
+        Assert.All(files, f => Assert.Equal(f.Channels is 2 or 4, f.ExtraKind != InteropExtraKind.None));
     }
 
     [Fact]
@@ -35,9 +48,11 @@ public class InteropCorpusTests
         var datasets = new Dictionary<string, string> { ["uint16-c3"] = new string('A', 64) };
 
         var file = InteropCorpus.Parse("uint16-c3-zlib-p1-t0-pl1-b1-be.tif", datasets, ["zlib"]);
+        var alpha = InteropCorpus.Parse("uint16-c3a-zlib-p0-t0-pl0-b0-le.tif", datasets, ["zlib"]);
 
-        Assert.Equal(new InteropFile("uint16-c3-zlib-p1-t0-pl1-b1-be.tif", "uint16", 3, "zlib", Predictor: true, Tiled: false,
-            Planar: true, BigTiff: true, BigEndian: true, Supported: true, new string('A', 64)), file);
+        Assert.Equal(new InteropFile("uint16-c3-zlib-p1-t0-pl1-b1-be.tif", "uint16", 3, InteropExtraKind.None, "zlib", Predictor: true,
+            Tiled: false, Planar: true, BigTiff: true, BigEndian: true, Supported: true, new string('A', 64)), file);
+        Assert.Equal(InteropExtraKind.AssociatedAlpha, alpha.ExtraKind);
         Assert.Throws<FormatException>(() => InteropCorpus.Parse("other.tif", datasets, ["zlib"]));
     }
 

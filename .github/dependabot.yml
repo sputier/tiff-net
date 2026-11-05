@@ -8,6 +8,11 @@ updates:
       test-tools:
         patterns: ["xunit*", "Microsoft.NET.Test.Sdk", "coverlet*", "BenchmarkDotNet*"]
 
+  - package-ecosystem: pip
+    directories: ["/docs", "/tools"]
+    schedule:
+      interval: weekly
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
