@@ -86,6 +86,20 @@ internal sealed class JpegFrame
 /// </remarks>
 internal sealed class JpegDecoder(ResourceBudget budget, int maxWidth = ushort.MaxValue, int maxHeight = ushort.MaxValue)
 {
+    /// <summary>A decoder that starts from tables read once (TIFF's JPEGTables), shared with the decoders of the other blocks.</summary>
+    /// <remarks>A table the stream redefines replaces the shared one in this decoder only: the shared tables are never changed.</remarks>
+    public JpegDecoder(JpegTables tables, ResourceBudget budget, int maxWidth, int maxHeight)
+        : this(budget, maxWidth, maxHeight)
+    {
+        Array.Copy(tables.Quantization, _quantization, 4);
+        Array.Copy(tables.Dc, _dc, 4);
+        Array.Copy(tables.Ac, _ac, 4);
+        _shared = [.. tables.Dc, .. tables.Ac];
+    }
+
+    /// <summary>The Huffman tables shared with other decoders (not to be redefined in place).</summary>
+    private readonly HuffmanTable?[] _shared = [];
+
     /// <summary>The natural (row by row) index of the k-th coefficient in zig-zag order, with 16 more entries that absorb a run
     /// past the end of a damaged block, as in libjpeg.</summary>
     private static ReadOnlySpan<byte> Natural =>
@@ -238,8 +252,17 @@ internal sealed class JpegDecoder(ResourceBudget budget, int maxWidth = ushort.M
                     budget.ThrowIfCancelled();
                     for (int bx = 0; bx < across; bx++)
                     {
-                        JpegIdct.Transform(coefficients.AsSpan((by * across + bx) * 64, 64), quantization,
-                            c.Plane.AsSpan(by * 8 * c.Stride + bx * 8), c.Stride);
+                        var block = coefficients.AsSpan((by * across + bx) * 64, 64);
+                        var output = c.Plane.AsSpan(by * 8 * c.Stride + bx * 8);
+                        if (block[1..].IndexOfAnyExcept((short)0) < 0)
+                        {
+                            // DC only (all the blocks of a stream that ends early, most of a smooth image): a fill.
+                            JpegIdct.TransformDcOnly(block[0] * quantization[0], output, c.Stride);
+                        }
+                        else
+                        {
+                            JpegIdct.Transform(block, quantization, output, c.Stride);
+                        }
                     }
                 }
             }
@@ -346,7 +369,12 @@ internal sealed class JpegDecoder(ResourceBudget budget, int maxWidth = ushort.M
 
             // Defined into the table of that slot (built when a scan uses it): redefinitions cost their bytes only.
             var tables = kind == 0 ? _dc : _ac;
-            (tables[id] ??= new HuffmanTable()).Define(counts, s.Slice(17, total), dc: kind == 0);
+            if (tables[id] is null || Array.IndexOf(_shared, tables[id]) >= 0)
+            {
+                tables[id] = new HuffmanTable();
+            }
+
+            tables[id]!.Define(counts, s.Slice(17, total), dc: kind == 0);
             s = s[(17 + total)..];
         }
     }
@@ -474,7 +502,7 @@ internal sealed class JpegDecoder(ResourceBudget budget, int maxWidth = ushort.M
                 PlaneRows = (int)(mcusDown * p.V * 8),
                 Stride = stride,
                 Coefficients = progressive ? new short[(int)(stride * mcusDown * p.V * 8)] : null,
-                KnownBits = progressive ? [.. Enumerable.Repeat(-1, 64)] : null,
+                KnownBits = progressive ? Unknown() : null,
             };
         }
 
@@ -520,7 +548,11 @@ internal sealed class JpegDecoder(ResourceBudget budget, int maxWidth = ushort.M
             (_ac[component.AcTable] ??= HuffmanTable.Standard(dc: false, luminance: component.AcTable == 0)).Build();
             component.Scanned = true;
             component.Prediction = 0;
-            component.Quantization ??= (ushort[])_quantization[component.QuantizationTable]!.Clone();
+            if (frame.Progressive)
+            {
+                // Latched at the first scan of the component: a progressive image is transformed after its last scan.
+                component.Quantization ??= (ushort[])_quantization[component.QuantizationTable]!.Clone();
+            }
             scan[i] = component;
         }
 
@@ -896,5 +928,46 @@ internal sealed class JpegDecoder(ResourceBudget budget, int maxWidth = ushort.M
         {
             coefficient += (short)(coefficient >= 0 ? plus : minus);
         }
+    }
+
+    /// <summary>The known bits of the 64 coefficients of a progressive component before its first scan: none.</summary>
+    private static int[] Unknown()
+    {
+        var known = new int[64];
+        Array.Fill(known, -1);
+        return known;
+    }
+
+    /// <summary>The tables of the decoder, to share with the decoders of other blocks (see <see cref="JpegTables"/>).</summary>
+    internal JpegTables Tables()
+    {
+        foreach (var table in _dc.Concat(_ac))
+        {
+            table?.Build();
+        }
+
+        return new JpegTables([.. _quantization], [.. _dc], [.. _ac]);
+    }
+}
+
+/// <summary>
+/// The tables of TIFF's JPEGTables, read and built once per read and shared by the decoders of its strips or tiles (which never
+/// change them): a JPEGTables tag costs its parsing once, not once per tile.
+/// </summary>
+internal sealed class JpegTables(ushort[]?[] quantization, HuffmanTable?[] dc, HuffmanTable?[] ac)
+{
+    public ushort[]?[] Quantization { get; } = quantization;
+
+    public HuffmanTable?[] Dc { get; } = dc;
+
+    public HuffmanTable?[] Ac { get; } = ac;
+
+    /// <summary>Reads an abbreviated table-specification stream.</summary>
+    /// <exception cref="InvalidDataException">The stream is damaged, or holds more than tables.</exception>
+    public static JpegTables Read(ReadOnlySpan<byte> stream, ResourceBudget budget)
+    {
+        var decoder = new JpegDecoder(budget);
+        decoder.ReadTables(stream);
+        return decoder.Tables();
     }
 }

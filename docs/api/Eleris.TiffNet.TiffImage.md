@@ -14,6 +14,8 @@ public sealed class TiffImage
 
 An image whose format the library does not handle (CMYK, Lab, a compression it does not read…) is still listed with the pages of its file, with its size and the reason in [`TiffImage.UnsupportedReason`](#eleris-tiffnet-tiffimage-unsupportedreason); its [`TiffImage.SampleType`](#eleris-tiffnet-tiffimage-sampletype), [`TiffImage.ColorModel`](#eleris-tiffnet-tiffimage-colormodel) and pixels throw a [`NotSupportedException`](https://learn.microsoft.com/dotnet/api/system.notsupportedexception) that gives the reason.
 
+An image can be read from several threads at once. Changing it ([`TiffImage.SetPixels`](#eleris-tiffnet-tiffimage-setpixels-1-system-readonlyspan-0-system-int32-system-int32-system-int32-system-nullable-eleris-tiffnet-tiffcolormodel-eleris-tiffnet-tiffpixelorder), [`TiffImage.SetExtraChannels`](#eleris-tiffnet-tiffimage-setextrachannels-eleris-tiffnet-tiffextrachannelkind), its [`TiffImage.Metadata`](#eleris-tiffnet-tiffimage-metadata)) must not happen while it is read.
+
 ## Properties
 
 | Member | Description |
@@ -192,7 +194,7 @@ An image in memory: no [`TiffImage.Storage`](#eleris-tiffnet-tiffimage-storage),
 
 **Exceptions**
 
-- [`ArgumentException`](https://learn.microsoft.com/dotnet/api/system.argumentexception) — The sizes do not match the pixels, the colour model is missing or does not fit the channels, or `T` is not a sample type of TIFF.
+- [`ArgumentException`](https://learn.microsoft.com/dotnet/api/system.argumentexception) — The sizes do not match the pixels, the colour model is missing or does not fit the channels, `T` is not a sample type of TIFF, or the pixels are more bytes than an array holds (write them with TiffImageWriter).
 - [`ArgumentOutOfRangeException`](https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception) — A size is not positive.
 
 <a id="eleris-tiffnet-tiffimage-readchannel-1-system-int32-eleris-tiffnet-tiffpixelscale"></a>
@@ -449,4 +451,4 @@ public void SetPixels<T>(ReadOnlySpan<T> pixels, int width, int height, int chan
 
 **Remarks**
 
-The metadata and the sub-images are kept; [`TiffImage.Storage`](#eleris-tiffnet-tiffimage-storage) still tells how the image was stored in its file. The extra channels become [`TiffExtraChannelKind.Data`](Eleris.TiffNet.TiffExtraChannelKind.md#eleris-tiffnet-tiffextrachannelkind-data).
+The metadata and the sub-images are kept; [`TiffImage.Storage`](#eleris-tiffnet-tiffimage-storage) still tells how the image was stored in its file. The extra channels become [`TiffExtraChannelKind.Data`](Eleris.TiffNet.TiffExtraChannelKind.md#eleris-tiffnet-tiffextrachannelkind-data); a reason the library could not deliver the former pixels ([`TiffImage.UnsupportedReason`](#eleris-tiffnet-tiffimage-unsupportedreason)) no longer applies. Like the other changes of an image, it must not run while the image is read on another thread.
