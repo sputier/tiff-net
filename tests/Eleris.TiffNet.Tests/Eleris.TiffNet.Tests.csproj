@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Eleris.TiffNet\Eleris.TiffNet.csproj" />
+    <ProjectReference Include="..\..\docs\examples\Eleris.TiffNet.Examples\Eleris.TiffNet.Examples.csproj" />
   </ItemGroup>
 
 </Project>
