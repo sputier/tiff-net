@@ -15,3 +15,7 @@ indent_size = 2
 
 [*.md]
 trim_trailing_whitespace = false
+
+# Tests are named as sentences (A_damaged_file_fails_with_a_TiffException).
+[tests/**.cs]
+dotnet_diagnostic.CA1707.severity = none

@@ -1,0 +1,89 @@
+name: Release
+
+# Publishes Eleris.TiffNet to nuget.org when a version tag is pushed (git tag v0.1.0 && git push origin v0.1.0).
+# The tag must match <Version> in src/Eleris.TiffNet/Eleris.TiffNet.csproj. See RELEASING.md.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: The tag is on main
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::The tag ${GITHUB_REF_NAME} is not on main"
+            exit 1
+          fi
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: The tag matches the version of the project
+        id: version
+        run: |
+          version=$(dotnet msbuild src/Eleris.TiffNet -getProperty:Version)
+          if [ "v$version" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::The tag ${GITHUB_REF_NAME} does not match the project version v$version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Build
+        run: dotnet build Eleris.TiffNet.slnx -c Release
+      - run: pip install -r tools/requirements-interop.txt
+      - name: Generate the tifffile corpus
+        run: python -I tools/make_fixtures.py
+      - name: Test (with the corpus)
+        run: dotnet test Eleris.TiffNet.slnx -c Release --no-build
+      - name: Pack
+        run: dotnet pack src/Eleris.TiffNet -c Release --no-build -o artifacts
+      - name: Check the package and use it from a new project
+        run: python tools/verify_package.py artifacts ${{ steps.version.outputs.version }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nuget-package
+          path: artifacts/
+          if-no-files-found: error
+
+  publish:
+    needs: pack
+    runs-on: ubuntu-latest
+    # Add required reviewers to this environment in the repository settings to approve each publication by hand.
+    timeout-minutes: 15
+    environment: nuget
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: nuget-package
+          path: artifacts
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: 10.0.x
+      - name: Push to nuget.org (the .snupkg symbols follow the .nupkg)
+        run: dotnet nuget push "artifacts/*.nupkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+      - name: GitHub release
+        run: gh release create "$GITHUB_REF_NAME" artifacts/* --title "$GITHUB_REF_NAME" --generate-notes ${{ contains(needs.pack.outputs.version, '-') && '--prerelease' || '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
