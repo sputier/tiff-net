@@ -28,17 +28,45 @@ internal static class Targets
         }
     }
 
-    private static void Touch(TiffImage image)
+    /// <summary>Every property of an image and of its sub-images, without recursion (a hostile chain could be deep).</summary>
+    private static void Touch(TiffImage first)
     {
-        _ = (image.Width, image.Height, image.Channels, image.ExtraChannels.Count, image.IsReducedResolution, image.UnsupportedReason);
-        if (image.UnsupportedReason is null)
+        var pending = new Stack<TiffImage>([first]);
+        while (pending.TryPop(out var image))
         {
-            _ = (image.SampleType, image.ColorModel);
-        }
+            _ = (image.Width, image.Height, image.Channels, image.ExtraChannels.Count, image.IsReducedResolution, image.UnsupportedReason);
+            if (image.UnsupportedReason is null)
+            {
+                _ = (image.SampleType, image.ColorModel);
+            }
 
-        foreach (var sub in image.SubImages)
+            _ = image.Storage;
+            var m = image.Metadata;
+            _ = (m.Description, m.Software, m.DateTime, m.Resolution, m.SampleRange, m.IccProfile, m.Xmp, m.Iptc, m.Artist, m.Copyright);
+            foreach (var tag in m.Concat(m.Exif).Concat(m.Gps))
+            {
+                TouchTag(tag);
+            }
+
+            foreach (var sub in image.SubImages)
+            {
+                pending.Push(sub);
+            }
+        }
+    }
+
+    private static void TouchTag(TiffTag tag)
+    {
+        _ = (tag.Count, tag.AsBytes().Length, tag.ToString());
+        try
         {
-            Touch(sub);
+            _ = tag.Type is TiffTagType.Ascii or TiffTagType.Undefined or TiffTagType.Byte or TiffTagType.SByte
+                ? tag.AsStrings().Count
+                : tag.AsNumbers<double>().Length;
+        }
+        catch (InvalidOperationException)
+        {
+            // A conversion the tag does not allow: documented, not a finding.
         }
     }
 

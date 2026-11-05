@@ -16,6 +16,8 @@ The tags of the structure are not here: the library computes them when it writes
 
 Text is read as UTF-8 when it is valid UTF-8 (ASCII is), as Latin-1 otherwise; it is written as UTF-8.
 
+Reading the properties of metadata from several threads is safe; changing it while another thread reads it is not, as for the .NET collections. The byte array properties return a copy on each call.
+
 ## Constructors
 
 | Member | Description |
@@ -185,7 +187,7 @@ public TiffResolution? Resolution { get; set; }
 <a id="eleris-tiffnet-tiffmetadata-samplerange"></a>
 ### `SampleRange`
 
-The smallest and largest sample values the image holds (`SMinSampleValue`, `SMaxSampleValue`; 340, 341), when the writer recorded them: for example 0 and 1 for normalised floating point data.
+The smallest and largest sample values the image holds (`SMinSampleValue`, `SMaxSampleValue`; 340, 341), when the writer recorded them: for example 0 and 1 for normalised floating point data. When the tags give one value per channel, those of the first channel; the tags themselves are in `this[340]` and `this[341]`.
 
 ```csharp
 public (double, double)? SampleRange { get; set; }

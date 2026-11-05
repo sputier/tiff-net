@@ -175,6 +175,7 @@ internal sealed class StructureReader
             throw Budget.Invalid($"the directory at offset {offset} declares {count} entries, more than the file holds.");
         }
 
+        Budget.ReserveMetadata(entriesLength + OffsetSize, $"the directory at offset {offset}");
         byte[] bytes = new byte[entriesLength + OffsetSize];
         long available = Math.Min(bytes.Length, Source.Length - entriesStart);
         Source.ReadExactly(entriesStart, bytes.AsSpan(0, (int)available));
@@ -242,10 +243,14 @@ internal sealed class StructureReader
         return new RawDirectory(offset, entries, next);
     }
 
-    /// <summary>The raw bytes of the values of a tag, within <see cref="TiffReadOptions.MaxTagBytes"/>.</summary>
+    /// <summary>
+    /// The raw bytes of the values of a tag, within <see cref="TiffReadOptions.MaxTagBytes"/>, counted in
+    /// <see cref="TiffReadOptions.MaxMetadataBytes"/>.
+    /// </summary>
     public byte[] ReadBytes(TagEntry entry)
     {
         Ensure(entry);
+        Budget.ReserveMetadata(entry.ByteLength, $"tag {entry.Code}");
         byte[] bytes = new byte[entry.ByteLength];
         Source.ReadExactly(entry.DataOffset, bytes);
         return bytes;
@@ -261,6 +266,7 @@ internal sealed class StructureReader
         }
 
         byte[] bytes = ReadBytes(entry);
+        Budget.ReserveMetadata(entry.Count * sizeof(long), $"the values of tag {entry.Code}");
         var values = new long[entry.Count];
         int size = TagTypes.Size(entry.Type);
         for (int i = 0; i < values.Length; i++)
@@ -280,6 +286,16 @@ internal sealed class StructureReader
         }
 
         return values;
+    }
+
+    /// <summary>
+    /// The first value of a tag the specification types SHORT (or LONG for <paramref name="max"/> beyond 65535), checked to be
+    /// within 0 and <paramref name="max"/>: a larger value (a 64-bit BigTIFF value, for example) is a damaged file, never narrowed.
+    /// </summary>
+    public long ReadInteger(RawDirectory directory, ushort code, long fallback, long max)
+    {
+        long value = ReadInteger(directory, code, fallback);
+        return value < 0 || value > max ? throw Budget.Invalid($"tag {code} has the value {value}, outside 0 to {max}.") : value;
     }
 
     /// <summary>The first value of an integer tag, or <paramref name="fallback"/> when the tag is absent.</summary>

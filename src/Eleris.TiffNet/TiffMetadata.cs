@@ -35,6 +35,10 @@ public sealed record TiffResolution(double X, double Y, TiffResolutionUnit Unit)
 /// <see cref="Gps"/>.
 /// </para>
 /// <para>Text is read as UTF-8 when it is valid UTF-8 (ASCII is), as Latin-1 otherwise; it is written as UTF-8.</para>
+/// <para>
+/// Reading the properties of metadata from several threads is safe; changing it while another thread reads it is not, as for the
+/// .NET collections. The byte array properties return a copy on each call.
+/// </para>
 /// </remarks>
 public sealed class TiffMetadata : IEnumerable<TiffTag>
 {
@@ -66,8 +70,8 @@ public sealed class TiffMetadata : IEnumerable<TiffTag>
             _tags[tag.Code] = tag;
         }
 
-        Exif = exif;
-        Gps = gps;
+        Exif = exif.ToList().AsReadOnly();
+        Gps = gps.ToList().AsReadOnly();
     }
 
     /// <summary>The text that describes the image (<c>ImageDescription</c>, 270). Astro-TIFF stores the FITS header here.</summary>
@@ -117,8 +121,13 @@ public sealed class TiffMetadata : IEnumerable<TiffTag>
                 return null;
             }
 
-            var unit = _tags.TryGetValue(ResolutionUnitTag, out var u) && Number(u) is { } code ? (TiffResolutionUnit)(int)code : TiffResolutionUnit.Inch;
-            return Number(x) is { } xs && Number(y) is { } ys ? new TiffResolution(xs, ys, unit) : null;
+            // An unknown unit is read as inches, as libtiff does; a value that is not a finite positive number is no resolution.
+            var unit = _tags.TryGetValue(ResolutionUnitTag, out var u) && Number(u) is { } code && code is 1 or 2 or 3
+                ? (TiffResolutionUnit)(int)code
+                : TiffResolutionUnit.Inch;
+            return Number(x) is { } xs && Number(y) is { } ys && double.IsFinite(xs) && double.IsFinite(ys) && xs > 0 && ys > 0
+                ? new TiffResolution(xs, ys, unit)
+                : null;
         }
 
         set
@@ -131,6 +140,11 @@ public sealed class TiffMetadata : IEnumerable<TiffTag>
                 return;
             }
 
+            if (!Enum.IsDefined(value.Unit))
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value.Unit, "The unit is not a TIFF resolution unit.");
+            }
+
             Put(TiffTag.FromRationals(XResolutionTag, [Rational(value.X)]));
             Put(TiffTag.FromRationals(YResolutionTag, [Rational(value.Y)]));
             Put(TiffTag.FromNumbers<ushort>(ResolutionUnitTag, [(ushort)value.Unit]));
@@ -139,7 +153,8 @@ public sealed class TiffMetadata : IEnumerable<TiffTag>
 
     /// <summary>
     /// The smallest and largest sample values the image holds (<c>SMinSampleValue</c>, <c>SMaxSampleValue</c>; 340, 341), when the
-    /// writer recorded them: for example 0 and 1 for normalised floating point data.
+    /// writer recorded them: for example 0 and 1 for normalised floating point data. When the tags give one value per channel, those
+    /// of the first channel; the tags themselves are in <c>this[340]</c> and <c>this[341]</c>.
     /// </summary>
     public (double Min, double Max)? SampleRange
     {
@@ -249,16 +264,35 @@ public sealed class TiffMetadata : IEnumerable<TiffTag>
         return tag.AsNumbers<double>()[0];
     }
 
-    private static (uint, uint) Rational(double value)
+    /// <summary>The closest fraction with a numerator and a denominator of 32 bits (continued fractions).</summary>
+    internal static (uint Numerator, uint Denominator) Rational(double value)
     {
-        if (value < 0 || double.IsNaN(value) || value > uint.MaxValue)
+        if (!double.IsFinite(value) || value <= 0 || value > uint.MaxValue)
         {
             throw new ArgumentOutOfRangeException(nameof(value), value, "A resolution is a positive number below 2^32.");
         }
 
-        // A whole number exactly, otherwise with a precision of 1/10000 while it fits.
-        return value == Math.Floor(value) || value * 10000 > uint.MaxValue
-            ? ((uint)Math.Round(value), 1u)
-            : ((uint)Math.Round(value * 10000), 10000u);
+        // Convergents h/k of the continued fraction of the value, while they fit in 32 bits and are not exact yet.
+        (double h0, double h1, double k0, double k1) = (0, 1, 1, 0);
+        double x = value;
+        for (int i = 0; i < 64; i++)
+        {
+            double a = Math.Floor(x);
+            (double h2, double k2) = (a * h1 + h0, a * k1 + k0);
+            if (h2 > uint.MaxValue || k2 > uint.MaxValue)
+            {
+                break;
+            }
+
+            (h0, h1, k0, k1) = (h1, h2, k1, k2);
+            if (Math.Abs(h1 / k1 - value) <= value * 1e-15 || x - a < 1e-12)
+            {
+                break;
+            }
+
+            x = 1 / (x - a);
+        }
+
+        return k1 == 0 ? ((uint)Math.Round(value), 1u) : ((uint)h1, (uint)k1);
     }
 }
