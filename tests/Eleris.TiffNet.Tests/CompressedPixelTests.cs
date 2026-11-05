@@ -175,6 +175,30 @@ public class CompressedPixelTests
         Assert.Equal(one.Primary.ReadRegion<float>(7, 21, 60, 100, order: TiffPixelOrder.Planar),
             many.Primary.ReadRegion<float>(7, 21, 60, 100, order: TiffPixelOrder.Planar));
     }
+
+    [Fact]
+    public void A_predictor_is_ignored_without_LZW_or_Deflate_and_horizontal_applies_to_floating_point()
+    {
+        // Uncompressed 12-bit samples with a stray predictor tag: libtiff ignores the tag, and so does the library.
+        var stray = new TiffBuilder { Data = [0xAB, 0xC1, 0x23] };
+        stray.AddDirectory().Image(2, 1, bits: 12).Add(317, TiffTagType.Short, 2);
+        using (var file = Open(stray))
+        {
+            Assert.Null(file.Primary.UnsupportedReason);
+            Assert.Equal(new ushort[] { 0xABC, 0x123 }, file.Primary.ReadRawPixels<ushort>());
+        }
+
+        // Horizontal differencing on 32-bit floating point samples, as libtiff writes it: on the bits of the samples.
+        float[] values = [1.5f, -2.25f, 1e30f];
+        uint[] bits = [.. values.Select(BitConverter.SingleToUInt32Bits)];
+        byte[] differenced = [.. bits.Select((b, i) => i == 0 ? b : b - bits[i - 1]).SelectMany(BitConverter.GetBytes)];
+        byte[] strip = Zlib(differenced);
+        var builder = new TiffBuilder { Data = strip };
+        builder.AddDirectory().Image(3, 1, bits: 32).Remove(259).Add(259, TiffTagType.Short, 8).Remove(279).Add(279, TiffTagType.Long, strip.Length)
+            .Add(317, TiffTagType.Short, 2).Add(339, TiffTagType.Short, 3);
+        using var floats = Open(builder);
+        Assert.Equal(values, floats.Primary.ReadRawPixels<float>());
+    }
 }
 
 /// <summary>Compressed data that decodes to far more than it is: a read costs what it delivers, not what the data could give.</summary>

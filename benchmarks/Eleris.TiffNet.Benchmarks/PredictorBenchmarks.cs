@@ -10,6 +10,8 @@ namespace Eleris.TiffNet.Benchmarks;
 /// on 1024 rows of 4096 samples: horizontal on 16-bit grey, floating point on 32-bit grey.
 /// </summary>
 [MemoryDiagnoser]
+[GroupBenchmarksBy(BenchmarkDotNet.Configs.BenchmarkLogicalGroupRule.ByCategory)]
+[CategoriesColumn]
 public class PredictorBenchmarks
 {
     private const int Width = 4096, Rows = 1024;
@@ -24,6 +26,7 @@ public class PredictorBenchmarks
     }
 
     [Benchmark(Baseline = true)]
+    [BenchmarkCategory("Horizontal")]
     public void HorizontalPrototype()
     {
         for (int r = 0; r < Rows; r++)
@@ -33,6 +36,7 @@ public class PredictorBenchmarks
     }
 
     [Benchmark]
+    [BenchmarkCategory("Horizontal")]
     public void Horizontal()
     {
         for (int r = 0; r < Rows; r++)
@@ -41,7 +45,8 @@ public class PredictorBenchmarks
         }
     }
 
-    [Benchmark]
+    [Benchmark(Baseline = true)]
+    [BenchmarkCategory("FloatingPoint")]
     public void FloatingPointPrototype()
     {
         for (int r = 0; r < Rows; r++)
@@ -51,6 +56,7 @@ public class PredictorBenchmarks
     }
 
     [Benchmark]
+    [BenchmarkCategory("FloatingPoint")]
     public void FloatingPoint()
     {
         for (int r = 0; r < Rows; r++)

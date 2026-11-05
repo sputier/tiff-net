@@ -270,6 +270,109 @@
       "planes": [
         "711C809EFB117B5A6C370C4076F25CE91F731B76B4A10694FDED7E99BF7F6CED"
       ]
+    },
+    "grey_q20_100x75_cut.jpg": {
+      "width": 100,
+      "height": 75,
+      "components": 1,
+      "sampling": [
+        [
+          1,
+          1
+        ]
+      ],
+      "restart": false,
+      "sha256": "169023F4A2554E9AA2E0CA760F752ADFA8AB24D929F4D234662724FBFE50FC03",
+      "planes": [
+        "5B814807C77A1F5ECF3F477C05313C563E38402BA509DE7A6AE578F8D8330671"
+      ],
+      "truncated": true
+    },
+    "grey_q100_64x64_cut.jpg": {
+      "width": 64,
+      "height": 64,
+      "components": 1,
+      "sampling": [
+        [
+          1,
+          1
+        ]
+      ],
+      "restart": false,
+      "sha256": "F6B19D53A4B6D1F54A8445B36759B40C0A73FA7403D3DCF95EC6D3C08EAEF7F1",
+      "planes": [
+        "B637CAB6071318D3D8250026284DE3B0A064DD974CA027B74CEDECB89F5904D2"
+      ],
+      "truncated": true
+    },
+    "grey_q75_restart_5_cut.jpg": {
+      "width": 61,
+      "height": 47,
+      "components": 1,
+      "sampling": [
+        [
+          1,
+          1
+        ]
+      ],
+      "restart": true,
+      "sha256": "8D9CE2C4EDD87852841451BD4D34CDF72294549F46E1A910A1D6B8F2ED49D04A",
+      "planes": [
+        "C6A55CDE0289D18AEFB705B399AD7ED55A8437C0FEA57A5280D09E8FF4E0C779"
+      ],
+      "truncated": true
+    },
+    "ycc444_q75_restart_2_cut.jpg": {
+      "width": 53,
+      "height": 31,
+      "components": 3,
+      "sampling": [
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "restart": true,
+      "sha256": "03EE0FA25EB5B31F0B1F02403426E9ECBE96F78C14EA6593B89D58994FAA1E5C",
+      "planes": [
+        "78A9A354A1F7B6A5F12E1122BF067A511AEA62D5CD8656947CA33989FE5D01AC",
+        "95B38A538F24229D61DD4AC34353851271659C46CBA161E0EDD8BE4599612D04",
+        "A8E7F18DFC82A6A9D33813A9E23AAF2F2FD59591AA97FD0BDE169B0A89FD1BC1"
+      ],
+      "truncated": true
+    },
+    "ycc420_q85_45x33_cut.jpg": {
+      "width": 45,
+      "height": 33,
+      "components": 3,
+      "sampling": [
+        [
+          2,
+          2
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "restart": false,
+      "sha256": "DBF4622030561EF5482F0AC80114621794771898217D61F0FF30BE12FF70B8D9",
+      "planes": [
+        "0C140FECFE3BFB9E8332442EF8A2BDAC60C844829629EB4781F9F55A2270F3DE"
+      ],
+      "truncated": true
     }
   }
 }

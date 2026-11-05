@@ -397,10 +397,16 @@ internal sealed record ImageDescriptor
             return $"rows of {BlockWidth} pixels of {SamplesPerPixel} samples are not supported: they are larger than an array.";
         }
 
+        // A predictor is undone after LZW and Deflate only (as libtiff does): with other compressions the tag is ignored.
+        if (Compression is not (TiffCompression.Lzw or TiffCompression.Deflate))
+        {
+            return null;
+        }
+
         return Predictor switch
         {
             TiffPredictor.None => null,
-            TiffPredictor.Horizontal when SampleFormat is not 3 && b0 is 8 or 16 or 32 or 64 => null,
+            TiffPredictor.Horizontal when b0 is 8 or 16 or 32 or 64 => null,   // on the bits of the samples, floating point included
             TiffPredictor.FloatingPoint when SampleFormat is 3 => null,
             _ => $"the predictor {(int)Predictor} is not supported for {b0}-bit {(SampleFormat == 3 ? "floating point" : "integer")} samples.",
         };

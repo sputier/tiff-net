@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, features
+from PIL import Image, ImageFile, features
 
 FOLDER = Path(__file__).resolve().parent.parent / "tests" / "Fixtures" / "jpeg"
 
@@ -48,6 +48,13 @@ CASES = [
     ("ycc420_q60_restart_3", 70, 50, 3, {"quality": 60, "subsampling": 2, "restart_marker_rows": 1}),
     ("ycc420_q95_256x192", 256, 192, 3, {"quality": 95, "subsampling": 2}),
 ]
+
+
+# Files cut at two thirds of their length, decoded as libjpeg does: the MCU where the data runs out ends with zeros, the next
+# ones (until a restart marker) are grey. Pillow feeds libjpeg the cut data with LOAD_TRUNCATED_IMAGES. The samples of the MCU
+# where the data runs out are noise in any decoder (zero bits decoded as codes): the tests allow them to differ, so the
+# expected planes are kept whole (<name>.planes) rather than as a hash.
+TRUNCATED = ["grey_q20_100x75", "grey_q100_64x64", "grey_q75_restart_5", "ycc444_q75_restart_2", "ycc420_q85_45x33"]
 
 
 def sha(data: bytes) -> str:
@@ -85,6 +92,25 @@ def main() -> int:
             "sha256": sha(path.read_bytes()),
             **expectations(path, channels, subsampled),
         }
+    ImageFile.LOAD_TRUNCATED_IMAGES = True
+    for name in TRUNCATED:
+        source = FOLDER / f"{name}.jpg"
+        path = FOLDER / f"{name}_cut.jpg"
+        if not check:
+            data = source.read_bytes()
+            path.write_bytes(data[: len(data) * 2 // 3])
+        entry = manifest["files"][source.name]
+        subsampled = entry["sampling"][0] != [1, 1]
+        manifest["files"][path.name] = {**entry, "sha256": sha(path.read_bytes()), "truncated": True,
+                                        **expectations(path, entry["components"], subsampled)}
+        if not check:
+            with Image.open(path) as im:
+                if entry["components"] == 3:
+                    im.draft("YCbCr", im.size)
+                ycc = np.asarray(im, dtype=np.uint8)
+            planes = [ycc] if ycc.ndim == 2 else [np.ascontiguousarray(ycc[..., c]) for c in range(1 if subsampled else 3)]
+            (FOLDER / f"{name}_cut.planes").write_bytes(b"".join(p.tobytes() for p in planes))
+    ImageFile.LOAD_TRUNCATED_IMAGES = False
     manifest_path = FOLDER / "manifest.json"
     text = json.dumps(manifest, indent=2) + "\n"
     if check:
@@ -92,10 +118,10 @@ def main() -> int:
         if committed["files"] != manifest["files"]:
             print("The JPEG fixtures do not decode as their manifest says.", file=sys.stderr)
             return 1
-        print(f"{len(CASES)} JPEG fixtures checked.")
+        print(f"{len(CASES) + len(TRUNCATED)} JPEG fixtures checked.")
         return 0
     manifest_path.write_text(text, encoding="utf-8", newline="\n")
-    print(f"{len(CASES)} JPEG fixtures written to {FOLDER}.")
+    print(f"{len(CASES) + len(TRUNCATED)} JPEG fixtures written to {FOLDER}.")
     return 0
 
 
