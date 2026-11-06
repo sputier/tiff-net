@@ -47,6 +47,13 @@ CASES = [
     ("ycc420_q85_45x33", 45, 33, 3, {"quality": 85, "subsampling": 2}),
     ("ycc420_q60_restart_3", 70, 50, 3, {"quality": 60, "subsampling": 2, "restart_marker_rows": 1}),
     ("ycc420_q95_256x192", 256, 192, 3, {"quality": 95, "subsampling": 2}),
+    # Progressive (libjpeg's default script: DC with successive approximation, AC bands, refinements), with optimised tables.
+    ("prog_grey_q90_61x47", 61, 47, 1, {"quality": 90, "progressive": True}),
+    ("prog_grey_q100_64x64", 64, 64, 1, {"quality": 100, "progressive": True, "optimize": True}),
+    ("prog_ycc444_q85_53x31", 53, 31, 3, {"quality": 85, "subsampling": 0, "progressive": True}),
+    ("prog_ycc420_q75_70x50", 70, 50, 3, {"quality": 75, "subsampling": 2, "progressive": True, "optimize": True}),
+    ("prog_ycc422_q90_45x33", 45, 33, 3, {"quality": 90, "subsampling": 1, "progressive": True}),
+    ("prog_ycc420_restart_256x192", 256, 192, 3, {"quality": 92, "subsampling": 2, "progressive": True, "restart_marker_rows": 1}),
 ]
 
 
@@ -54,6 +61,8 @@ CASES = [
 # ones (until a restart marker) are grey. Pillow feeds libjpeg the cut data with LOAD_TRUNCATED_IMAGES. The samples of the MCU
 # where the data runs out are noise in any decoder (zero bits decoded as codes): the tests allow them to differ, so the
 # expected planes are kept whole (<name>.planes) rather than as a hash.
+# Progressive files are not among them: libjpeg smooths the blocks of an incomplete progressive image (block smoothing, an
+# estimate of the missing coefficients), which the library does not do.
 TRUNCATED = ["grey_q20_100x75", "grey_q100_64x64", "grey_q75_restart_5", "ycc444_q75_restart_2", "ycc420_q85_45x33"]
 
 
@@ -68,7 +77,9 @@ def expectations(path: Path, channels: int, subsampled: bool) -> dict:
         im.draft("YCbCr", im.size)
         ycc = np.asarray(im.convert("YCbCr") if im.mode != "YCbCr" else im, dtype=np.uint8)
         planes = [sha(np.ascontiguousarray(ycc[..., c]).tobytes()) for c in range(3)]
-        return {"planes": planes[:1] if subsampled else planes}
+    with Image.open(path) as im:
+        rgb = sha(np.asarray(im.convert("RGB"), dtype=np.uint8).tobytes())   # upsampled and converted by libjpeg-turbo
+    return {"planes": planes[:1] if subsampled else planes, "rgb": rgb}
 
 
 def main() -> int:

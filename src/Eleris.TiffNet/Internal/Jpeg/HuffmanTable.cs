@@ -1,17 +1,19 @@
 namespace Eleris.TiffNet.Internal.Jpeg;
 
 /// <summary>
-/// A Huffman table of ITU-T T.81 (annex C), validated when it is built and decoded through a lookup table of the first
+/// A Huffman table of ITU-T T.81 (annex C), validated when it is defined and decoded through a lookup table of the first
 /// <see cref="LookupBits"/> bits of a code, with a bounded slow path for the longer codes (at most 16 bits, F.2.2.3).
 /// </summary>
 /// <remarks>
 /// A table is refused when it declares more than 256 symbols, when its codes do not fit their lengths (an over-subscribed tree),
-/// or, for a DC table, when a symbol is above 15 (the size of a DC difference): libjpeg refuses the same tables.
+/// or, for a DC table, when a symbol is above 15 (the size of a DC difference): libjpeg refuses the same tables. Defining a table
+/// (a DHT segment) only checks and copies its bytes; its lookup tables are built when a scan first uses it, into the arrays of the
+/// instance: a stream of thousands of DHT segments costs their bytes, not thousands of tables.
 /// </remarks>
 internal sealed class HuffmanTable
 {
     /// <summary>The bits of a code looked up at once; longer codes take the slow path.</summary>
-    public const int LookupBits = 9;
+    public const int LookupBits = 11;
 
     /// <summary>For the next <see cref="LookupBits"/> bits: the length of their code (high byte) and its symbol, or 0.</summary>
     private readonly ushort[] _lookup = new ushort[1 << LookupBits];
@@ -22,13 +24,38 @@ internal sealed class HuffmanTable
     /// <summary>What to add to a code of each length to get the index of its symbol in <see cref="_values"/>.</summary>
     private readonly int[] _offset = new int[17];
 
-    private readonly byte[] _values;
+    private readonly byte[] _counts = new byte[16];
+    private readonly byte[] _values = new byte[256];
 
-    private HuffmanTable(byte[] values) => _values = values;
+    /// <summary>
+    /// For an AC table, the next <see cref="LookupBits"/> bits decoded whole when the code and the bits of its value fit in them
+    /// (as stb_image does): the value (high 16 bits), the run of zeros (bits 4 to 7) and the bits consumed (low 4 bits); 0 otherwise.
+    /// Most coefficients of a photograph are small: one lookup gives a coefficient, without a second read of the bit stream.
+    /// </summary>
+    private readonly int[] _fastAc = new int[1 << LookupBits];
 
-    /// <summary>Builds a table from the counts of codes of each length (16 bytes) and the symbols, in the order of DHT.</summary>
+    private bool _dc;
+    private bool _built;
+
+    /// <summary>The lookup table of the first <see cref="LookupBits"/> bits: (length &lt;&lt; 8) | symbol, or 0 for a longer code.</summary>
+    public ReadOnlySpan<ushort> Lookup => _lookup;
+
+    /// <summary>The whole-coefficient table of an AC table (see the field).</summary>
+    public ReadOnlySpan<int> FastAc => _fastAc;
+
+    /// <summary>A table defined and built at once (the standard tables, and the tests).</summary>
     /// <exception cref="InvalidDataException">The table is not valid.</exception>
     public static HuffmanTable Create(ReadOnlySpan<byte> counts, ReadOnlySpan<byte> symbols, bool dc)
+    {
+        var table = new HuffmanTable();
+        table.Define(counts, symbols, dc);
+        table.Build();
+        return table;
+    }
+
+    /// <summary>Checks and keeps the counts of codes of each length (16 bytes) and the symbols, in the order of DHT.</summary>
+    /// <exception cref="InvalidDataException">The table is not valid.</exception>
+    public void Define(ReadOnlySpan<byte> counts, ReadOnlySpan<byte> symbols, bool dc)
     {
         int total = 0;
         foreach (byte count in counts)
@@ -41,10 +68,9 @@ internal sealed class HuffmanTable
             throw new InvalidDataException($"a Huffman table declares {total} symbols; at most 256 are allowed.");
         }
 
-        var table = new HuffmanTable(symbols[..total].ToArray());
         if (dc)
         {
-            foreach (byte symbol in table._values)
+            foreach (byte symbol in symbols[..total])
             {
                 if (symbol > 15)
                 {
@@ -53,30 +79,12 @@ internal sealed class HuffmanTable
             }
         }
 
-        // Canonical codes (C.2): consecutive within a length, doubled from one length to the next.
-        int code = 0, index = 0;
+        // Canonical codes (C.2): consecutive within a length, doubled from one length to the next. The next code must still
+        // fit its length: a full length (all its codes used, the last of all ones) is refused too, as libjpeg does.
+        int code = 0;
         for (int length = 1; length <= 16; length++)
         {
-            int count = counts[length - 1];
-            table._offset[length] = index - code;
-            table._maxCode[length] = count == 0 ? -1 : code + count - 1;
-            for (int k = 0; k < count; k++, code++, index++)
-            {
-                if (code >= 1 << length)
-                {
-                    throw new InvalidDataException("a Huffman table has more codes of a length than the length allows.");
-                }
-
-                if (length <= LookupBits)
-                {
-                    int shift = LookupBits - length;
-                    ushort entry = (ushort)(length << 8 | table._values[index]);
-                    table._lookup.AsSpan(code << shift, 1 << shift).Fill(entry);
-                }
-            }
-
-            // The next code must still fit the length: a full length (all its codes used, the last of all ones) is refused too,
-            // as libjpeg does.
+            code += counts[length - 1];
             if (code >= 1 << length)
             {
                 throw new InvalidDataException("a Huffman table has more codes of a length than the length allows.");
@@ -85,7 +93,90 @@ internal sealed class HuffmanTable
             code <<= 1;
         }
 
-        return table;
+        counts[..16].CopyTo(_counts);
+        symbols[..total].CopyTo(_values);
+        _dc = dc;
+        _built = false;
+    }
+
+    /// <summary>Builds the lookup tables of the defined table, once per definition (when a scan uses it).</summary>
+    public void Build()
+    {
+        if (_built)
+        {
+            return;
+        }
+
+        Array.Clear(_lookup);
+        Array.Clear(_fastAc);
+        int code = 0, index = 0;
+        for (int length = 1; length <= 16; length++)
+        {
+            int count = _counts[length - 1];
+            _offset[length] = index - code;
+            _maxCode[length] = count == 0 ? -1 : code + count - 1;
+            for (int k = 0; k < count; k++, code++, index++)
+            {
+                if (length <= LookupBits)
+                {
+                    int shift = LookupBits - length;
+                    _lookup.AsSpan(code << shift, 1 << shift).Fill((ushort)(length << 8 | _values[index]));
+                }
+            }
+
+            code <<= 1;
+        }
+
+        if (!_dc)
+        {
+            BuildFastAc();
+        }
+
+        _built = true;
+    }
+
+    private void BuildFastAc()
+    {
+        for (int bits = 0; bits < 1 << LookupBits; bits++)
+        {
+            int entry = _lookup[bits];
+            if (entry == 0)
+            {
+                continue;
+            }
+
+            int length = entry >> 8, symbol = entry & 0xFF;
+            int run = symbol >> 4, size = symbol & 15;
+            if (size == 0 || length + size > LookupBits)
+            {
+                continue;
+            }
+
+            // The value bits follow the code (F.2.2.1, EXTEND).
+            int value = (bits >> (LookupBits - length - size)) & ((1 << size) - 1);
+            if (value < 1 << (size - 1))
+            {
+                value -= (1 << size) - 1;
+            }
+
+            _fastAc[bits] = value << 16 | run << 4 | (length + size);
+        }
+    }
+
+    /// <summary>Decodes a code of more than <see cref="LookupBits"/> bits (the lookup table gives the others).</summary>
+    public int DecodeLong(int next16, out int length)
+    {
+        for (length = LookupBits + 1; length <= 16; length++)
+        {
+            int code = next16 >> (16 - length);
+            if (code <= _maxCode[length])
+            {
+                return _values[code + _offset[length]];
+            }
+        }
+
+        length = 16;
+        return 0;
     }
 
     /// <summary>Decodes the symbol of the code at the head of 16 bits (most significant first); gives its length.</summary>

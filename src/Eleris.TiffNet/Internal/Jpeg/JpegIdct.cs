@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace Eleris.TiffNet.Internal.Jpeg;
 
@@ -23,80 +24,107 @@ internal static class JpegIdct
     [SkipLocalsInit]
     public static void Transform(ReadOnlySpan<short> coefficients, ReadOnlySpan<ushort> quantization, Span<byte> output, int stride)
     {
+        // The bounds are checked once here; the loops then go through references (the IDCT runs for every block).
+        if (coefficients.Length < 64 || quantization.Length < 64 || output.Length < 7 * stride + 8)
+        {
+            throw new ArgumentException("A block needs 64 coefficients, 64 quantization steps and 8 rows of output.");
+        }
+
         Span<int> work = stackalloc int[64];
+        ref short co = ref MemoryMarshal.GetReference(coefficients);
+        ref ushort q = ref MemoryMarshal.GetReference(quantization);
+        ref int ws = ref MemoryMarshal.GetReference(work);
 
         // Pass 1: the columns, from the coefficients; results scaled up by 2^Pass1Bits.
         for (int c = 0; c < 8; c++)
         {
-            if (coefficients[8 + c] == 0 && coefficients[16 + c] == 0 && coefficients[24 + c] == 0 && coefficients[32 + c] == 0
-                && coefficients[40 + c] == 0 && coefficients[48 + c] == 0 && coefficients[56 + c] == 0)
+            ref short ci = ref Unsafe.Add(ref co, c);
+            ref ushort qi = ref Unsafe.Add(ref q, c);
+            ref int wi = ref Unsafe.Add(ref ws, c);
+            if (Unsafe.Add(ref ci, 8) == 0 && Unsafe.Add(ref ci, 16) == 0 && Unsafe.Add(ref ci, 24) == 0 && Unsafe.Add(ref ci, 32) == 0
+                && Unsafe.Add(ref ci, 40) == 0 && Unsafe.Add(ref ci, 48) == 0 && Unsafe.Add(ref ci, 56) == 0)
             {
                 // Only the DC term: the column is constant.
-                int dc = coefficients[c] * quantization[c] << Pass1Bits;
+                int dc = ci * qi << Pass1Bits;
                 for (int r = 0; r < 8; r++)
                 {
-                    work[r * 8 + c] = dc;
+                    Unsafe.Add(ref wi, r * 8) = dc;
                 }
 
                 continue;
             }
 
-            long z2 = coefficients[16 + c] * quantization[16 + c];
-            long z3 = coefficients[48 + c] * quantization[48 + c];
+            long z2 = Unsafe.Add(ref ci, 16) * Unsafe.Add(ref qi, 16);
+            long z3 = Unsafe.Add(ref ci, 48) * Unsafe.Add(ref qi, 48);
             long z1 = (z2 + z3) * Fix0541196100;
             long tmp2 = z1 + z3 * -Fix1847759065;
             long tmp3 = z1 + z2 * Fix0765366865;
-            z2 = coefficients[c] * quantization[c];
-            z3 = coefficients[32 + c] * quantization[32 + c];
+            z2 = ci * qi;
+            z3 = Unsafe.Add(ref ci, 32) * Unsafe.Add(ref qi, 32);
             long tmp0 = (z2 + z3) << ConstBits;
             long tmp1 = (z2 - z3) << ConstBits;
             long tmp10 = tmp0 + tmp3, tmp13 = tmp0 - tmp3, tmp11 = tmp1 + tmp2, tmp12 = tmp1 - tmp2;
 
-            Odd(coefficients[56 + c] * quantization[56 + c], coefficients[40 + c] * quantization[40 + c],
-                coefficients[24 + c] * quantization[24 + c], coefficients[8 + c] * quantization[8 + c],
+            Odd(Unsafe.Add(ref ci, 56) * Unsafe.Add(ref qi, 56), Unsafe.Add(ref ci, 40) * Unsafe.Add(ref qi, 40),
+                Unsafe.Add(ref ci, 24) * Unsafe.Add(ref qi, 24), Unsafe.Add(ref ci, 8) * Unsafe.Add(ref qi, 8),
                 out tmp0, out tmp1, out tmp2, out tmp3);
 
             const int Shift = ConstBits - Pass1Bits;
-            work[c] = Descale(tmp10 + tmp3, Shift);
-            work[56 + c] = Descale(tmp10 - tmp3, Shift);
-            work[8 + c] = Descale(tmp11 + tmp2, Shift);
-            work[48 + c] = Descale(tmp11 - tmp2, Shift);
-            work[16 + c] = Descale(tmp12 + tmp1, Shift);
-            work[40 + c] = Descale(tmp12 - tmp1, Shift);
-            work[24 + c] = Descale(tmp13 + tmp0, Shift);
-            work[32 + c] = Descale(tmp13 - tmp0, Shift);
+            wi = Descale(tmp10 + tmp3, Shift);
+            Unsafe.Add(ref wi, 56) = Descale(tmp10 - tmp3, Shift);
+            Unsafe.Add(ref wi, 8) = Descale(tmp11 + tmp2, Shift);
+            Unsafe.Add(ref wi, 48) = Descale(tmp11 - tmp2, Shift);
+            Unsafe.Add(ref wi, 16) = Descale(tmp12 + tmp1, Shift);
+            Unsafe.Add(ref wi, 40) = Descale(tmp12 - tmp1, Shift);
+            Unsafe.Add(ref wi, 24) = Descale(tmp13 + tmp0, Shift);
+            Unsafe.Add(ref wi, 32) = Descale(tmp13 - tmp0, Shift);
         }
 
         // Pass 2: the rows, into samples; the scale of pass 1 and the 8 of the transform are taken out.
+        ref byte out0 = ref MemoryMarshal.GetReference(output);
         for (int r = 0; r < 8; r++)
         {
-            Span<int> w = work.Slice(r * 8, 8);
-            Span<byte> row = output.Slice(r * stride, 8);
+            ref int w = ref Unsafe.Add(ref ws, r * 8);
+            ref byte row = ref Unsafe.Add(ref out0, r * stride);
             const int Shift = ConstBits + Pass1Bits + 3;
-            if (w[1] == 0 && w[2] == 0 && w[3] == 0 && w[4] == 0 && w[5] == 0 && w[6] == 0 && w[7] == 0)
+            if (Unsafe.Add(ref w, 1) == 0 && Unsafe.Add(ref w, 2) == 0 && Unsafe.Add(ref w, 3) == 0 && Unsafe.Add(ref w, 4) == 0
+                && Unsafe.Add(ref w, 5) == 0 && Unsafe.Add(ref w, 6) == 0 && Unsafe.Add(ref w, 7) == 0)
             {
-                row.Fill(Limit(Descale(w[0], Pass1Bits + 3)));
+                Unsafe.InitBlockUnaligned(ref row, Limit(Descale(w, Pass1Bits + 3)), 8);
                 continue;
             }
 
-            long z2 = w[2], z3 = w[6];
+            long z2 = Unsafe.Add(ref w, 2), z3 = Unsafe.Add(ref w, 6);
             long z1 = (z2 + z3) * Fix0541196100;
             long tmp2 = z1 + z3 * -Fix1847759065;
             long tmp3 = z1 + z2 * Fix0765366865;
-            long tmp0 = ((long)w[0] + w[4]) << ConstBits;
-            long tmp1 = ((long)w[0] - w[4]) << ConstBits;
+            long tmp0 = ((long)w + Unsafe.Add(ref w, 4)) << ConstBits;
+            long tmp1 = ((long)w - Unsafe.Add(ref w, 4)) << ConstBits;
             long tmp10 = tmp0 + tmp3, tmp13 = tmp0 - tmp3, tmp11 = tmp1 + tmp2, tmp12 = tmp1 - tmp2;
 
-            Odd(w[7], w[5], w[3], w[1], out tmp0, out tmp1, out tmp2, out tmp3);
+            Odd(Unsafe.Add(ref w, 7), Unsafe.Add(ref w, 5), Unsafe.Add(ref w, 3), Unsafe.Add(ref w, 1), out tmp0, out tmp1, out tmp2, out tmp3);
 
-            row[0] = Limit(Descale(tmp10 + tmp3, Shift));
-            row[7] = Limit(Descale(tmp10 - tmp3, Shift));
-            row[1] = Limit(Descale(tmp11 + tmp2, Shift));
-            row[6] = Limit(Descale(tmp11 - tmp2, Shift));
-            row[2] = Limit(Descale(tmp12 + tmp1, Shift));
-            row[5] = Limit(Descale(tmp12 - tmp1, Shift));
-            row[3] = Limit(Descale(tmp13 + tmp0, Shift));
-            row[4] = Limit(Descale(tmp13 - tmp0, Shift));
+            row = Limit(Descale(tmp10 + tmp3, Shift));
+            Unsafe.Add(ref row, 7) = Limit(Descale(tmp10 - tmp3, Shift));
+            Unsafe.Add(ref row, 1) = Limit(Descale(tmp11 + tmp2, Shift));
+            Unsafe.Add(ref row, 6) = Limit(Descale(tmp11 - tmp2, Shift));
+            Unsafe.Add(ref row, 2) = Limit(Descale(tmp12 + tmp1, Shift));
+            Unsafe.Add(ref row, 5) = Limit(Descale(tmp12 - tmp1, Shift));
+            Unsafe.Add(ref row, 3) = Limit(Descale(tmp13 + tmp0, Shift));
+            Unsafe.Add(ref row, 4) = Limit(Descale(tmp13 - tmp0, Shift));
+        }
+    }
+
+    /// <summary>
+    /// A block whose only coefficient is DC: every sample is the same, what <see cref="Transform"/> gives for it (pass 1 scales
+    /// the DC by 2^Pass1Bits, pass 2 takes out that scale and the 8 of the transform).
+    /// </summary>
+    public static void TransformDcOnly(int dcTimesQuantization, Span<byte> output, int stride)
+    {
+        byte value = Limit(Descale(dcTimesQuantization << Pass1Bits, Pass1Bits + 3));
+        for (int r = 0; r < 8; r++)
+        {
+            output.Slice(r * stride, 8).Fill(value);
         }
     }
 

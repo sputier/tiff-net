@@ -246,13 +246,17 @@ def progressive_jpeg() -> None:
         stream = jpeg(width, height, scans)
         entries = grey(width, height, compression=7, rows=height, counts=(len(stream),))
         if finding == "SEC-04":
+            # The same scan again and again: refused as refining nothing from the second, or by MaxJpegScans.
             write(name, build(entries, payload=stream), finding, f"{width} x {height} progressive JPEG with {scans} AC scans of a few bytes",
-                  outcome="TiffException:MaxJpegScans")
+                  outcome=SCAN_AMPLIFICATION)
         else:
             # 256 MB of pixels and 512 MB of coefficients: within the defaults, beyond a device that allows 64 MB.
             write(name, build(entries, payload=stream), finding, f"{width} x {height} progressive JPEG: 512 MB of coefficients",
                   outcome="TiffException:MaxPixelBytes", options=SMALL_DEVICE)
 
+
+# A progressive JPEG made of thousands of scans: refused by MaxJpegScans, or before as soon as a scan adds no bit (a damaged file).
+SCAN_AMPLIFICATION = "TiffException:MaxJpegScans|TiffException"
 
 # The files of the review (tests/Fixtures/hostile/review), measured on the first implementation; kept as they are. The fourth
 # value says whether a small device's options apply: the bombs of the review declare 2 147 024 896 bytes, just below the default
@@ -279,8 +283,8 @@ REVIEW_CASES = {
     "jpeg-prog-16k-coefbuf.tif": ("SEC-05", "16k x 16k progressive JPEG: 512 MB of coefficients", "TiffException:MaxPixelBytes", True),
     "jpeg-prog-46k-coefbuf.tif": ("SEC-05", "46k x 46k progressive JPEG: 8 GB of coefficients", "TiffException:MaxPixelBytes", False),
     "jpeg-prog-4k-10000scans.tif": ("SEC-04", "progressive JPEG with 10000 AC scans (35 s on the first implementation)",
-                                    "TiffException:MaxJpegScans", False),
-    "jpeg-prog-4k-1000scans.tif": ("SEC-04", "progressive JPEG with 1000 AC scans", "TiffException:MaxJpegScans", False),
+                                    SCAN_AMPLIFICATION, False),
+    "jpeg-prog-4k-1000scans.tif": ("SEC-04", "progressive JPEG with 1000 AC scans", SCAN_AMPLIFICATION, False),
 }
 
 

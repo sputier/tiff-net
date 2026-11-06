@@ -54,7 +54,8 @@ internal static partial class InteropCorpus
         ? dir
         : Path.Combine(RepositoryRoot(), "tests", "Fixtures", "interop", "generated");
 
-    public static InteropFile Parse(string name, IReadOnlyDictionary<string, string> datasets, IReadOnlyCollection<string> supported)
+    public static InteropFile Parse(string name, IReadOnlyDictionary<string, string> datasets, IReadOnlyCollection<string> supported,
+        IReadOnlyDictionary<string, string>? lossy = null)
     {
         var m = FileName().Match(name);
         if (!m.Success)
@@ -76,7 +77,7 @@ internal static partial class InteropCorpus
             Predictor: m.Groups["p"].Value == "1", Tiled: m.Groups["t"].Value == "1", Planar: m.Groups["pl"].Value == "1",
             BigTiff: m.Groups["b"].Value == "1", BigEndian: m.Groups["order"].Value == "be",
             Supported: supported.Contains(compression),
-            SamplesSha256: datasets[$"{type}-c{channels}"]);
+            SamplesSha256: lossy is not null && lossy.TryGetValue(name, out string? own) ? own : datasets[$"{type}-c{channels}"]);
     }
 
     private static Manifest Load()
@@ -86,7 +87,9 @@ internal static partial class InteropCorpus
         var root = document.RootElement;
         var datasets = root.GetProperty("datasets").EnumerateObject().ToDictionary(p => p.Name, p => p.Value.GetString()!);
         var supported = root.GetProperty("supportedCompressions").EnumerateArray().Select(e => e.GetString()!).ToHashSet();
-        var files = root.GetProperty("files").EnumerateArray().Select(e => Parse(e.GetString()!, datasets, supported)).ToList();
+        // A lossy file (JPEG) has its own samples, those tifffile decodes from it.
+        var lossy = root.TryGetProperty("jpeg", out var jpeg) ? jpeg.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.GetString()!) : [];
+        var files = root.GetProperty("files").EnumerateArray().Select(e => Parse(e.GetString()!, datasets, supported, lossy)).ToList();
         return new Manifest(root.GetProperty("width").GetInt32(), root.GetProperty("height").GetInt32(), datasets, files);
     }
 
@@ -103,7 +106,7 @@ internal static partial class InteropCorpus
         throw new DirectoryNotFoundException("Eleris.TiffNet.slnx was not found above " + AppContext.BaseDirectory);
     }
 
-    [GeneratedRegex(@"^(?<type>[a-z0-9]+)-c(?<channels>\d)(?<extra>[uas]?)-(?<compression>[a-z]+)-p(?<p>[01])-t(?<t>[01])-pl(?<pl>[01])-b(?<b>[01])-(?<order>le|be)\.tif$")]
+    [GeneratedRegex(@"^(?<type>[a-z0-9]+)-c(?<channels>\d)(?<extra>[uas]?)-(?<compression>[a-z0-9]+)-p(?<p>[01])-t(?<t>[01])-pl(?<pl>[01])-b(?<b>[01])-(?<order>le|be)\.tif$")]
     private static partial Regex FileName();
 
     private sealed record Manifest(int Width, int Height, Dictionary<string, string> Datasets, List<InteropFile> Files);
