@@ -107,6 +107,31 @@ public sealed record TiffWriteOptions
             : throw new ArgumentOutOfRangeException(nameof(value), value, "-1 for every core, or a positive number of threads.");
     }
 
+    /// <summary>
+    /// Options that write an image as the file it was read from was stored: the same compression (JPEG, which is not written,
+    /// becomes Deflate, as do the compressions the library does not write), predictor, layout and tile size (square tiles whose
+    /// side is a multiple of 16; 256 otherwise), planar configuration, and BigTIFF when the file was BigTIFF.
+    /// </summary>
+    /// <param name="storage">How the image was stored (<see cref="TiffImage.Storage"/>).</param>
+    /// <returns>The options; the level and the threads are the defaults.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="storage"/> is null.</exception>
+    public static TiffWriteOptions From(TiffStorage storage)
+    {
+        ArgumentNullException.ThrowIfNull(storage);
+        bool written = storage.Compression is TiffCompression.None or TiffCompression.Lzw or TiffCompression.Deflate or TiffCompression.PackBits;
+        bool squareTiles = storage.Layout == TiffLayout.Tiles && storage.TileWidth == storage.TileHeight && storage.TileWidth % 16 == 0
+            && storage.TileWidth is > 0 and <= 65536;
+        return new TiffWriteOptions
+        {
+            Compression = written ? storage.Compression : TiffCompression.Deflate,
+            Predictor = written && Enum.IsDefined(storage.Predictor) ? storage.Predictor : TiffPredictor.Auto,
+            Layout = storage.Layout,
+            TileSize = squareTiles ? storage.TileWidth : 256,
+            PlanarConfiguration = storage.PlanarConfiguration,
+            BigTiff = storage.BigTiff ? TiffBigTiff.Always : TiffBigTiff.Auto,
+        };
+    }
+
     /// <summary>The threads to use.</summary>
     internal int Degree => MaxDegreeOfParallelism == -1 ? Environment.ProcessorCount : MaxDegreeOfParallelism;
 }
