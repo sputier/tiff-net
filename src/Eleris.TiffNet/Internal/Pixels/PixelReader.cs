@@ -400,6 +400,7 @@ internal static class PixelReader
         private readonly double[]? _maxima;
         private readonly bool _identity;
         private readonly bool _direct;
+        private readonly bool _directSwap;
         private readonly bool _uniformMaxima;
 
         public Context(PixelPlan plan, TiffSource source, ResourceBudget budget, int channels, bool littleEndian)
@@ -419,9 +420,10 @@ internal static class PixelReader
             _identity = typeof(TD) == typeof(TOut) && _request.Scale == TiffPixelScale.Stored;
             // Unpacking is a plain copy: uncompressed, whole bytes of the delivered type, in the byte order of the machine, nothing
             // to invert, expand or reverse.
+            // Big-endian samples too: read in place, then their bytes swapped.
             _direct = !_compressed && _identity && _d.BitsPerSample == Unsafe.SizeOf<TD>() * 8
-                && (_d.BitsPerSample == 8 || littleEndian == BitConverter.IsLittleEndian)
                 && !_d.ReversedBits && _d.Photometric is not (TiffPhotometric.MinIsWhite or TiffPhotometric.Palette);
+            _directSwap = _direct && _d.BitsPerSample > 8 && littleEndian != BitConverter.IsLittleEndian;
             _maxima = _request.Scale == TiffPixelScale.Normalized ? Maxima(_d, channels) : null;
             _uniformMaxima = _maxima is null || Array.TrueForAll(_maxima, m => m == _maxima[0]);
         }
@@ -437,6 +439,11 @@ internal static class PixelReader
                 long at = (unit.Y0 - _request.Y) * _request.Width * _channels;
                 var target = MemoryMarshal.AsBytes(destination.Slice((int)at, unit.Rows * rowSamples));
                 _source.ReadExactly(_d.Offsets[unit.Block] + unit.FirstRow * _rowBytes, target);
+                if (_directSwap)
+                {
+                    SampleUnpacker.Swap(target, _d.BitsPerSample / 8);
+                }
+
                 return;
             }
 
