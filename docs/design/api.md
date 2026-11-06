@@ -126,9 +126,9 @@ public sealed class TiffImage
 
     // Creating
     public static TiffImage Create<T>(ReadOnlySpan<T> pixels, int width, int height, int channels = 1,
-        TiffColorModel? colorModel = null, TiffPixelOrder order = TiffPixelOrder.Interleaved) where T : unmanaged;
+        TiffColorModel? colorModel = null, TiffPixelOrder order = TiffPixelOrder.Interleaved) where T : unmanaged, INumber<T>;
     public void SetPixels<T>(ReadOnlySpan<T> pixels, int width, int height, int channels = 1,
-        TiffColorModel? colorModel = null, TiffPixelOrder order = TiffPixelOrder.Interleaved) where T : unmanaged;
+        TiffColorModel? colorModel = null, TiffPixelOrder order = TiffPixelOrder.Interleaved) where T : unmanaged, INumber<T>;
 
     // Reading pixels
     public T[] ReadRawPixels<T>(TiffPixelOrder order = TiffPixelOrder.Interleaved) where T : unmanaged;

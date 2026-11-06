@@ -13,14 +13,21 @@ public sealed record TiffExtraChannel(TiffExtraChannelKind Kind);
 /// An image whose format the library does not handle (CMYK, Lab, a compression it does not read…) is still listed with the pages
 /// of its file, with its size and the reason in <see cref="UnsupportedReason"/>; its <see cref="SampleType"/>,
 /// <see cref="ColorModel"/> and pixels throw a <see cref="NotSupportedException"/> that gives the reason.
+/// <para>
+/// An image can be read from several threads at once. Changing it (<see cref="SetPixels{T}"/>, <see cref="SetExtraChannels"/>,
+/// its <see cref="Metadata"/>) must not happen while it is read.
+/// </para>
 /// </remarks>
 public sealed partial class TiffImage
 {
-    private readonly ImageDescriptor _descriptor;
+    private ImageDescriptor _descriptor;
+
+    /// <summary>The pixels given by the application (<see cref="Create{T}"/>, <see cref="SetPixels{T}"/>), or null.</summary>
+    private Internal.TiffSource? _pixels;
 
     private readonly List<TiffImage> _subImages = [];
 
-    internal TiffImage(ImageDescriptor descriptor, TiffMetadata metadata, TiffStorage storage)
+    internal TiffImage(ImageDescriptor descriptor, TiffMetadata metadata, TiffStorage? storage)
     {
         _descriptor = descriptor;
         Metadata = metadata;
@@ -49,8 +56,8 @@ public sealed partial class TiffImage
     /// <exception cref="NotSupportedException">The library does not handle the format of the image (<see cref="UnsupportedReason"/>).</exception>
     public TiffColorModel ColorModel => _descriptor.Unsupported is null ? _descriptor.ColorModel : throw Unsupported();
 
-    /// <summary>The channels after the colour channels, with what they hold.</summary>
-    public IReadOnlyList<TiffExtraChannel> ExtraChannels { get; }
+    /// <summary>The channels after the colour channels, with what they hold (see <see cref="SetExtraChannels"/>).</summary>
+    public IReadOnlyList<TiffExtraChannel> ExtraChannels { get; private set; }
 
     /// <summary>Whether the image is a reduced-resolution version of another (a thumbnail, a level of a pyramid).</summary>
     public bool IsReducedResolution => _descriptor.IsReducedResolution;
@@ -64,7 +71,7 @@ public sealed partial class TiffImage
     /// </summary>
     public TiffMetadata Metadata { get; }
 
-    /// <summary>How the image is stored in the file it was read from.</summary>
+    /// <summary>How the image is stored in the file it was read from; <see langword="null"/> for an image created in memory.</summary>
     public TiffStorage? Storage { get; }
 
     /// <summary>Why the library cannot deliver this image, or <see langword="null"/> when it can.</summary>

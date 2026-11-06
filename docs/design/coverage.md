@@ -104,6 +104,13 @@ CFA and LinearRaw (DNG raw data) are refused with a message that points to a raw
 | 2, 3, 4 | CCITT (fax) | — | — | Not supported ([decision 4](architecture.md#decisions)); a bilevel image is read when uncompressed, LZW, Deflate or PackBits |
 | others (ZSTD 50000, LZMA 34925, WebP 50001, JPEG XL 50002, JPEG 2000 34712…) | — | — | — | Recognised and named in the error message |
 
+A JPEG image is delivered as libtiff and tifffile deliver it: each strip or tile is decoded by libjpeg's rules (the islow
+integer IDCT, "fancy" upsampling, the integer YCbCr to RGB tables; the library gives exactly the samples of libjpeg-turbo), its
+frame must be as wide as the strip or tile and cover its rows (a last strip may be higher, as some writers make it). YCbCr is
+converted to RGB with the coefficients of JPEG (as libjpeg does): `ReferenceBlackWhite` and `YCbCrCoefficients` are left in the
+metadata, not applied, as libtiff and tifffile do with JPEG. `PhotometricInterpretation = RGB` gives the components as they are.
+A strip whose data runs out decodes to grey for the rest of its blocks, as libjpeg does.
+
 JPEG is not written: it is lossy, and a TIFF meant for processing should not be. A JPEG image that is read and saved again is
 written with `TiffWriteOptions.From(storage)`, which maps JPEG to Deflate.
 
