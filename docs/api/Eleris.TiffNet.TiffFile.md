@@ -46,7 +46,7 @@ A damaged or hostile file fails with a [`TiffException`](Eleris.TiffNet.TiffExce
 | [`RemoveAt(int)`](#eleris-tiffnet-tifffile-removeat-system-int32) | Removes a page. |
 | [`Save(Stream, TiffWriteOptions)`](#eleris-tiffnet-tifffile-save-system-io-stream-eleris-tiffnet-tiffwriteoptions) | Writes the pages into a stream, from its current position; the stream is left open. |
 | [`Save(string, TiffWriteOptions)`](#eleris-tiffnet-tifffile-save-system-string-eleris-tiffnet-tiffwriteoptions) | Writes the pages into a file. |
-| [`SaveAsync(Stream, TiffWriteOptions, CancellationToken)`](#eleris-tiffnet-tifffile-saveasync-system-io-stream-eleris-tiffnet-tiffwriteoptions-system-threading-cancellationtoken) | Writes the pages into a stream on a thread of the pool (encoding and writing), as [`TiffFile.Save`](#eleris-tiffnet-tifffile-save-system-io-stream-eleris-tiffnet-tiffwriteoptions). |
+| [`SaveAsync(Stream, TiffWriteOptions, CancellationToken)`](#eleris-tiffnet-tifffile-saveasync-system-io-stream-eleris-tiffnet-tiffwriteoptions-system-threading-cancellationtoken) | Writes the pages into a stream as [`TiffFile.Save`](#eleris-tiffnet-tifffile-save-system-io-stream-eleris-tiffnet-tiffwriteoptions), encoding on the threads of the pool; a stream that cannot seek (a response body) is written asynchronously. |
 
 ## Constructor details
 
@@ -295,7 +295,7 @@ public void Save(Stream stream, TiffWriteOptions? options = null)
 <a id="eleris-tiffnet-tifffile-save-system-string-eleris-tiffnet-tiffwriteoptions"></a>
 ### `Save(string, TiffWriteOptions)`
 
-Writes the pages into a file. A temporary file is written next to it, then replaces it: a failure leaves an existing file as it was; the attributes and permissions of a replaced file are kept where the platform allows. The file this one was read from can be the target.
+Writes the pages into a file. A temporary file is written next to it (flushed to the disk), then replaces it: a failure leaves an existing file as it was; the attributes and permissions of a replaced file are kept where the platform allows, and a symbolic link is written through. The file this one was read from can be the target.
 
 ```csharp
 public void Save(string path, TiffWriteOptions? options = null)
@@ -313,10 +313,14 @@ public void Save(string path, TiffWriteOptions? options = null)
 - [`TiffException`](Eleris.TiffNet.TiffException.md) — The pixels of a page read from a file are damaged.
 - [`IOException`](https://learn.microsoft.com/dotnet/api/system.io.ioexception) — The file cannot be written.
 
+**Remarks**
+
+A file holds its pages: the sub-images of a page ([`TiffImage.SubImages`](Eleris.TiffNet.TiffImage.md#eleris-tiffnet-tiffimage-subimages)), read only in this version, are not written, nor are the EXIF and GPS sub-directories (see the coverage of the standard). The pages must not change during the save.
+
 <a id="eleris-tiffnet-tifffile-saveasync-system-io-stream-eleris-tiffnet-tiffwriteoptions-system-threading-cancellationtoken"></a>
 ### `SaveAsync(Stream, TiffWriteOptions, CancellationToken)`
 
-Writes the pages into a stream on a thread of the pool (encoding and writing), as [`TiffFile.Save`](#eleris-tiffnet-tifffile-save-system-io-stream-eleris-tiffnet-tiffwriteoptions). Every failure is reported by the task.
+Writes the pages into a stream as [`TiffFile.Save`](#eleris-tiffnet-tifffile-save-system-io-stream-eleris-tiffnet-tiffwriteoptions), encoding on the threads of the pool; a stream that cannot seek (a response body) is written asynchronously. The pages are those of the file when the method is called. Failures of the arguments are thrown, every other failure is reported by the task.
 
 ```csharp
 public Task SaveAsync(Stream stream, TiffWriteOptions? options = null, CancellationToken cancellationToken = default)

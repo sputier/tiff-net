@@ -32,7 +32,7 @@ public class ParallelEncodingTests
         int active = 0, maxActive = 0, encoded = 0, appended = 0, maxAhead = 0;
         var order = new List<int>();
 
-        BlockPipeline.Run(200, 4, block =>
+        BlockPipeline.Run<byte[]>(200, 4, block =>
         {
             int now = Interlocked.Increment(ref active);
             InterlockedMax(ref maxActive, now);
@@ -45,7 +45,7 @@ public class ParallelEncodingTests
         {
             order.Add(data[0]);
             Interlocked.Increment(ref appended);
-        }, CancellationToken.None);
+        }, _ => { }, CancellationToken.None);
 
         Assert.Equal(Enumerable.Range(0, 200).Select(i => (int)(byte)i), order);
         Assert.InRange(maxActive, 1, 4);
@@ -58,7 +58,7 @@ public class ParallelEncodingTests
         var failure = new InvalidDataException("block 37");
 
         var thrown = Assert.Throws<InvalidDataException>(() => BlockPipeline.Run(100, 4,
-            block => block == 37 ? throw failure : [1], (_, _) => { }, CancellationToken.None));
+            block => block == 37 ? throw failure : new byte[] { 1 }, (_, _) => { }, _ => { }, CancellationToken.None));
 
         Assert.Same(failure, thrown);
     }

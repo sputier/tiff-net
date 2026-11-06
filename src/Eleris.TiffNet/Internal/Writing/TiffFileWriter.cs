@@ -32,11 +32,7 @@ internal static class TiffFileWriter
         {
             var encoder = encoders[i];
             long[] offsets = new long[encoder.Blocks], counts = new long[encoder.Blocks];
-            BlockPipeline.Run(encoder.Blocks, options.Degree, encoder.Encode, (block, data) =>
-            {
-                offsets[block] = writer.Append(data);
-                counts[block] = data.Length;
-            }, cancellationToken);
+            encoder.Write(writer, offsets, counts, options.Degree, cancellationToken);
             writer.WriteDirectory(Entries(encoder.Shape(images[i]), images[i].Metadata, offsets, counts, bigTiff));
         }
     }
@@ -117,13 +113,41 @@ internal static class TiffFileWriter
 
         foreach (var tag in metadata)
         {
-            if (Writable(tag))
+            if (Writable(tag) && Fit(tag, bigTiff) is { } entry)
             {
-                entries.Add(new DirectoryEntry((ushort)tag.Code, tag.Type, tag.Count, tag.AsBytes().ToArray()));
+                entries.Add(entry);
             }
         }
 
         return entries;
+    }
+
+    /// <summary>
+    /// The entry of a tag; in classic TIFF, which has no 64-bit types, LONG8 and SLONG8 values become LONG and SLONG when they fit
+    /// (the tag is dropped otherwise).
+    /// </summary>
+    private static DirectoryEntry? Fit(TiffTag tag, bool bigTiff)
+    {
+        if (bigTiff || tag.Type is not (TiffTagType.Long8 or TiffTagType.SLong8))
+        {
+            return new DirectoryEntry((ushort)tag.Code, tag.Type, tag.Count, tag.AsBytes().ToArray());
+        }
+
+        var values = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, long>(tag.AsBytes().Span);
+        bool signed = tag.Type == TiffTagType.SLong8;
+        byte[] narrow = new byte[values.Length * 4];
+        for (int i = 0; i < values.Length; i++)
+        {
+            long v = values[i];
+            if (signed ? v is < int.MinValue or > int.MaxValue : (ulong)v > uint.MaxValue)
+            {
+                return null;
+            }
+
+            System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(narrow.AsSpan(i * 4), (int)v);
+        }
+
+        return new DirectoryEntry((ushort)tag.Code, signed ? TiffTagType.SLong : TiffTagType.Long, values.Length, narrow);
     }
 
     /// <summary>

@@ -6,10 +6,14 @@ namespace Eleris.TiffNet;
 public sealed partial class TiffFile
 {
     /// <summary>
-    /// Writes the pages into a file. A temporary file is written next to it, then replaces it: a failure leaves an existing file as
-    /// it was; the attributes and permissions of a replaced file are kept where the platform allows. The file this one was read
-    /// from can be the target.
+    /// Writes the pages into a file. A temporary file is written next to it (flushed to the disk), then replaces it: a failure
+    /// leaves an existing file as it was; the attributes and permissions of a replaced file are kept where the platform allows,
+    /// and a symbolic link is written through. The file this one was read from can be the target.
     /// </summary>
+    /// <remarks>
+    /// A file holds its pages: the sub-images of a page (<see cref="TiffImage.SubImages"/>), read only in this version, are not
+    /// written, nor are the EXIF and GPS sub-directories (see the coverage of the standard). The pages must not change during the save.
+    /// </remarks>
     /// <param name="path">The path of the file.</param>
     /// <param name="options">How to write; <see cref="TiffWriteOptions.Default"/> when <see langword="null"/>.</param>
     /// <exception cref="InvalidOperationException">The file has no page, or a classic file (<see cref="TiffBigTiff.Never"/>)
@@ -22,7 +26,8 @@ public sealed partial class TiffFile
         ArgumentException.ThrowIfNullOrEmpty(path);
         Platform.EnsureSupported();
         options ??= TiffWriteOptions.Default;
-        SafeFile.Replace(path, stream => TiffFileWriter.Write(_images, stream, options, CancellationToken.None));
+        TiffImage[] pages = [.. _images];
+        SafeFile.Replace(path, stream => TiffFileWriter.Write(pages, stream, options, CancellationToken.None));
     }
 
     /// <summary>
@@ -40,12 +45,14 @@ public sealed partial class TiffFile
         ArgumentNullException.ThrowIfNull(stream);
         Platform.EnsureSupported();
         options ??= TiffWriteOptions.Default;
-        SafeFile.ToStream(stream, output => TiffFileWriter.Write(_images, output, options, CancellationToken.None));
+        TiffImage[] pages = [.. _images];
+        SafeFile.ToStream(stream, output => TiffFileWriter.Write(pages, output, options, CancellationToken.None));
     }
 
     /// <summary>
-    /// Writes the pages into a stream on a thread of the pool (encoding and writing), as <see cref="Save(Stream, TiffWriteOptions?)"/>.
-    /// Every failure is reported by the task.
+    /// Writes the pages into a stream as <see cref="Save(Stream, TiffWriteOptions?)"/>, encoding on the threads of the pool; a
+    /// stream that cannot seek (a response body) is written asynchronously. The pages are those of the file when the method is
+    /// called. Failures of the arguments are thrown, every other failure is reported by the task.
     /// </summary>
     /// <param name="stream">The stream, left open.</param>
     /// <param name="options">How to write; <see cref="TiffWriteOptions.Default"/> when <see langword="null"/>.</param>
@@ -55,11 +62,9 @@ public sealed partial class TiffFile
     public Task SaveAsync(Stream stream, TiffWriteOptions? options = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(stream);
+        Platform.EnsureSupported();
         options ??= TiffWriteOptions.Default;
-        return Task.Run(() =>
-        {
-            Platform.EnsureSupported();
-            SafeFile.ToStream(stream, output => TiffFileWriter.Write(_images, output, options, cancellationToken));
-        }, cancellationToken);
+        TiffImage[] pages = [.. _images];
+        return SafeFile.ToStreamAsync(stream, output => TiffFileWriter.Write(pages, output, options, cancellationToken), cancellationToken);
     }
 }

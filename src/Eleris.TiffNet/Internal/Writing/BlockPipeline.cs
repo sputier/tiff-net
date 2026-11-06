@@ -12,8 +12,10 @@ internal static class BlockPipeline
     /// <param name="degree">The threads that encode at once; 1 encodes on the calling thread.</param>
     /// <param name="encode">Encodes a block; called from several threads at once.</param>
     /// <param name="append">Writes a block; called on the calling thread, in the order of the blocks.</param>
+    /// <param name="discard">Releases a block encoded but not appended (when the write fails).</param>
     /// <param name="cancellationToken">Stops between blocks.</param>
-    public static void Run(int count, int degree, Func<int, byte[]> encode, Action<int, byte[]> append, CancellationToken cancellationToken)
+    public static void Run<T>(int count, int degree, Func<int, T> encode, Action<int, T> append, Action<T> discard,
+        CancellationToken cancellationToken)
     {
         if (degree <= 1 || count <= 1)
         {
@@ -27,7 +29,7 @@ internal static class BlockPipeline
         }
 
         int window = 2 * degree;
-        var pending = new Task<byte[]>?[window];
+        var pending = new Task<T>?[window];
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         using var workers = new SemaphoreSlim(degree);
         int next = 0;
@@ -54,27 +56,29 @@ internal static class BlockPipeline
                     }, stop.Token);
                 }
 
-                byte[] data = pending[i % window]!.GetAwaiter().GetResult();
+                var task = pending[i % window]!;
                 pending[i % window] = null;
-                append(i, data);
+                append(i, task.GetAwaiter().GetResult());
             }
         }
         catch
         {
-            // Stop the blocks in flight and wait for them, so that none runs once the write has failed.
+            // Stop the blocks in flight, wait for them and release what they encoded, so that none runs once the write has failed.
             stop.Cancel();
             foreach (var task in pending)
             {
-                if (task is not null)
+                if (task is null)
                 {
-                    try
-                    {
-                        task.Wait(CancellationToken.None);
-                    }
-                    catch (AggregateException)
-                    {
-                        // Their failure (or cancellation) is not the one to report.
-                    }
+                    continue;
+                }
+
+                try
+                {
+                    discard(task.GetAwaiter().GetResult());
+                }
+                catch (Exception ex) when (ex is not OutOfMemoryException)
+                {
+                    // Their failure (or cancellation) is not the one to report.
                 }
             }
 
