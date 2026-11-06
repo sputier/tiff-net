@@ -8,9 +8,12 @@ astronomical frames are. `benchmarks/` reproduces the figures (`TargetBenchmarks
 
 | Scenario | 1 thread | 8 threads |
 | --- | --- | --- |
-| Read u16, no compression | 4.3 GB/s | 4.0 GB/s (memory bound) |
+| Read u16, no compression | 5.2 GB/s | 4.5 GB/s (memory bound) |
 | Read u16, Deflate + horizontal predictor | 300 MB/s | 1.4 to 1.5 GB/s |
-| Read f32 RGB, Deflate + floating point predictor | 450 MB/s | 2.1 to 2.2 GB/s |
+| Read f32 RGB, Deflate + floating point predictor | 650 MB/s | 2.6 GB/s |
+| Read u16 RGB uncompressed (144 MB) as a FITS cube (planar) | | 11 ms |
+| Read u16 RGB uncompressed (144 MB) normalised to `float` | | 9.6 ms |
+| Read 12-bit grey uncompressed (36 MB) | | 6.1 ms |
 | Write u16, Deflate + predictor | 0.6 s | 0.11 to 0.13 s |
 | Write f32 RGB, Deflate + predictor | 4.4 to 4.6 s | 0.8 to 0.9 s |
 | Write f32 RGB, Deflate `Fastest` + predictor | 1.8 s | 0.4 s |
