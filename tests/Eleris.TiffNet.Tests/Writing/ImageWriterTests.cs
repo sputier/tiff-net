@@ -92,6 +92,23 @@ public class ImageWriterTests
     }
 
     [Fact]
+    public void The_extra_channels_of_a_mosaic_say_what_they_hold()
+    {
+        using var output = new MemoryStream();
+        using (var writer = TiffImageWriter.Create(output, 4, 2, TiffSampleType.UInt8, channels: 5, colorModel: TiffColorModel.Rgb))
+        {
+            Assert.Throws<ArgumentException>(() => writer.SetExtraChannels(TiffExtraChannelKind.UnassociatedAlpha));
+            writer.SetExtraChannels(TiffExtraChannelKind.UnassociatedAlpha, TiffExtraChannelKind.Data);
+            writer.WriteRows<byte>(new byte[4 * 2 * 5], 2);
+            writer.Complete();
+            Assert.Throws<InvalidOperationException>(() => writer.SetExtraChannels(TiffExtraChannelKind.Data, TiffExtraChannelKind.Data));
+        }
+
+        using var file = TiffFile.Read(new MemoryStream(output.ToArray()));
+        Assert.Equal([TiffExtraChannelKind.UnassociatedAlpha, TiffExtraChannelKind.Data], file.Primary.ExtraChannels.Select(c => c.Kind));
+    }
+
+    [Fact]
     public void Images_are_at_most_what_the_library_reads_back_a_side()
     {
         var tiles = TiffWriteOptions.Default with { Layout = TiffLayout.Tiles };
