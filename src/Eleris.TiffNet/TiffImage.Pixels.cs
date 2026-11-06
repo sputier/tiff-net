@@ -206,7 +206,8 @@ public sealed partial class TiffImage
         ThrowIfLargerThanAnArray(count);
         var plan = PixelPlan.Create(d, budget, request, sizeof(ushort), parallel: true);
         var result = GC.AllocateUninitializedArray<ushort>((int)count);
-        PixelReader.Read<ushort, ushort>(plan, File!.Source, budget, d.Channels, !Storage!.BigEndian, result, result);
+        var origin = Origin;
+        PixelReader.Read<ushort, ushort>(plan, origin.Source, budget, d.Channels, origin.LittleEndian, result, result);
         return result;
     }
 
@@ -329,9 +330,11 @@ public sealed partial class TiffImage
     }
 
     /// <summary>The limits of a read: those of the file, or the defaults for pixels the application gave (they are trusted).</summary>
-    private ResourceBudget Budget(CancellationToken cancellationToken) => _pixels is not null
-        ? new(TiffReadOptions.Default, "image", cancellationToken)
-        : new(File!.Options, File.Source.Name, cancellationToken);
+    private ResourceBudget Budget(CancellationToken cancellationToken)
+    {
+        var origin = Origin;
+        return new(origin.Options, origin.Name, cancellationToken);
+    }
 
     /// <summary>
     /// Checks, before anything is allocated to write the image, that it can be read whole: an image of a file must hold the pixels
@@ -408,9 +411,8 @@ public sealed partial class TiffImage
     private void Dispatch<T>(PixelPlan plan, Span<T> destination, Memory<T>? array, ResourceBudget budget, ScratchCache? cache = null)
         where T : unmanaged, INumber<T>
     {
-        var source = _pixels ?? File!.Source;
-        bool little = _pixels is not null ? BitConverter.IsLittleEndian : !Storage!.BigEndian;
-        var visitor = new ReadVisitor<T>(plan, source, budget, Channels, little, destination, array, cache);
+        var origin = Origin;
+        var visitor = new ReadVisitor<T>(plan, origin.Source, budget, Channels, origin.LittleEndian, destination, array, cache);
         SampleTypes.Visit(SampleType, ref visitor);
     }
 
