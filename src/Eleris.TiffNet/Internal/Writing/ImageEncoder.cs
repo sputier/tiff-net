@@ -12,6 +12,9 @@ internal sealed class ImageEncoder
     /// <summary>The bytes of an uncompressed strip the writer aims at: large enough to compress well, small enough to read a region.</summary>
     internal const int StripBytes = 256 * 1024;
 
+    /// <summary>The bytes of a band beyond which it no longer covers several source blocks that do not align with the output.</summary>
+    private const long BandBudget = 64L << 20;
+
     private readonly TiffImage _image;
 
     public ImageEncoder(TiffImage image, TiffWriteOptions options)
@@ -169,14 +172,24 @@ internal sealed class ImageEncoder
     /// multiple, when it is not too large; otherwise at least 8 source blocks), and at least 16 output blocks, so that the threads have work. It does not depend on
     /// the number of threads, so that the order of the blocks in the file does not either.
     /// </summary>
-    internal int BandRows()
+    internal int BandRows(int degree = 1)
     {
         long source = Math.Min(SourceRows(_image), Height);
         long common = source * BlockHeight / (long)System.Numerics.BigInteger.GreatestCommonDivisor(source, BlockHeight);
-        // Without a common multiple of a fair size (tiles of 128 rows over strips of 262), a band covers at least 8 source blocks:
-        // the source block it ends in is decoded twice, at most 1/8 more work.
-        long aligned = common <= Math.Max(source, BlockHeight) * 16L ? common : (source * 8 + BlockHeight - 1) / BlockHeight * BlockHeight;
-        long wanted = Math.Max(aligned, (long)BlockHeight * (Tiled ? 1 : 16));
+        long aligned = common;
+        if (common > Math.Max(source, BlockHeight) * 16L)
+        {
+            // Without a common multiple of a fair size (tiles of 128 rows over strips of 262), a band covers up to 8 source blocks,
+            // within 64 MB: the source block it ends in is decoded twice, at most 1/8 more work when memory allows.
+            long rowBytes = (long)Width * Channels * BytesPerSample;
+            long blocks = Math.Clamp(BandBudget / Math.Max(1, source * rowBytes), 1, 8);
+            aligned = (source * blocks + BlockHeight - 1) / BlockHeight * BlockHeight;
+        }
+
+        // Enough blocks for the threads: 16, or 2 per thread with more. Planar files take a fixed number, since the blocks of a
+        // band are written plane after plane: the file would otherwise depend on the number of threads.
+        int blocksWanted = Tiled ? 1 : Planar ? 16 : Math.Max(16, 2 * degree);
+        long wanted = Math.Max(aligned, (long)BlockHeight * blocksWanted);
         long rows = (wanted + aligned - 1) / aligned * aligned;
         return (int)Math.Min(rows, (Height + BlockHeight - 1L) / BlockHeight * BlockHeight);
     }
@@ -187,7 +200,7 @@ internal sealed class ImageEncoder
     /// </summary>
     public void Write(FileWriter writer, long[] offsets, long[] counts, int degree, CancellationToken cancellationToken)
     {
-        int bandRows = BandRows();
+        int bandRows = BandRows(degree);
         int pixelBytes = Channels * BytesPerSample;
         long bandBytes = (long)Math.Min(bandRows, Height) * Width * pixelBytes;
         if (bandBytes > Array.MaxLength)
@@ -199,14 +212,16 @@ internal sealed class ImageEncoder
         int blockRowsPerBand = bandRows / BlockHeight;
 
         // A large band (a whole single-strip source) is allocated for the write, not rented: the pool would round it up and keep it.
+        // It is allocated once for every band.
         bool pooled = bandBytes <= 16 << 20;
+        byte[]? large = pooled ? null : GC.AllocateUninitializedArray<byte>((int)bandBytes);
         var scratch = new Pixels.ScratchCache();
         for (int bandY = 0; bandY < Height; bandY += bandRows)
         {
             int rows = Math.Min(bandRows, Height - bandY);
-            _image.ValidateBand(bandY, rows);
+            _image.ValidateBand(bandY, rows, degree);
             int bytes = rows * Width * pixelBytes;
-            byte[] band = pooled ? System.Buffers.ArrayPool<byte>.Shared.Rent(bytes) : GC.AllocateUninitializedArray<byte>(bytes);
+            byte[] band = large ?? System.Buffers.ArrayPool<byte>.Shared.Rent(bytes);
             try
             {
                 _image.ReadBand(bandY, rows, band.AsMemory(0, bytes), degree, scratch, cancellationToken);
@@ -218,9 +233,15 @@ internal sealed class ImageEncoder
                     (j, encoded) =>
                     {
                         int block = j / perPlane * Across * Down + (firstRow + j % perPlane / Across) * Across + j % perPlane % Across;
-                        offsets[block] = writer.Append(encoded.Span);
-                        counts[block] = encoded.Length;
-                        encoded.Return();
+                        try
+                        {
+                            offsets[block] = writer.Append(encoded.Span);
+                            counts[block] = encoded.Length;
+                        }
+                        finally
+                        {
+                            encoded.Return();
+                        }
                     },
                     encoded => encoded.Return(),
                     cancellationToken);

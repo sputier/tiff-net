@@ -67,7 +67,7 @@ public void Complete()
 
 **Exceptions**
 
-- [`InvalidOperationException`](https://learn.microsoft.com/dotnet/api/system.invalidoperationexception) — Rows or tiles are missing.
+- [`InvalidOperationException`](https://learn.microsoft.com/dotnet/api/system.invalidoperationexception) — Rows or tiles are missing, or an earlier write failed.
 
 <a id="eleris-tiffnet-tiffimagewriter-create-system-io-stream-system-int64-system-int64-eleris-tiffnet-tiffsampletype-system-int32-system-nullable-eleris-tiffnet-tiffcolormodel-eleris-tiffnet-tiffmetadata-eleris-tiffnet-tiffwriteoptions"></a>
 ### `Create(Stream, long, long, TiffSampleType, int, TiffColorModel?, TiffMetadata, TiffWriteOptions)`

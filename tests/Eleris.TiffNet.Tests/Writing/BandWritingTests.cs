@@ -18,8 +18,11 @@ public class BandWritingTests
         byte[] two = Bytes(image, options with { MaxDegreeOfParallelism = 2 });
         byte[] eight = Bytes(image, options with { MaxDegreeOfParallelism = 8 });
 
+        byte[] many = Bytes(image, options with { MaxDegreeOfParallelism = 32 });
+
         Assert.Equal(one, two);
         Assert.Equal(one, eight);
+        Assert.Equal(one, many);
         using var read = TiffFile.Read(new MemoryStream(one));
         Assert.Equal(image.ReadRawPixels<byte>(), read.Primary!.ReadRawPixels<byte>());
     }
@@ -113,6 +116,33 @@ public class BandWritingTests
 
         int[] sums = await Task.WhenAll(all).WaitAsync(TimeSpan.FromSeconds(60));
         Assert.All(sums, sum => Assert.Equal(64 * 63 / 2, sum));
+    }
+
+    [Fact]
+    public async Task Many_image_writers_at_once_do_not_wait_for_the_thread_pool()
+    {
+        var image = Gradient(512, 600, 1);
+        byte[] pixels = image.ReadRawPixels<byte>();
+        byte[] expected = Bytes(image, TiffWriteOptions.Default with { MaxDegreeOfParallelism = 1 });
+        var all = Enumerable.Range(0, Environment.ProcessorCount * 4).Select(_ => Task.Run(() =>
+        {
+            using var output = new MemoryStream();
+            using (var writer = TiffImageWriter.Create(output, 512, 600, TiffSampleType.UInt8,
+                options: TiffWriteOptions.Default with { MaxDegreeOfParallelism = 8 }))
+            {
+                for (int y = 0; y < 600; y += 50)
+                {
+                    writer.WriteRows<byte>(pixels.AsSpan(y * 512, 50 * 512), 50);
+                }
+
+                writer.Complete();
+            }
+
+            return output.ToArray();
+        })).ToArray();
+
+        byte[][] files = await Task.WhenAll(all).WaitAsync(TimeSpan.FromSeconds(60));
+        Assert.All(files, file => Assert.Equal(expected, file));
     }
 
     [Fact]
