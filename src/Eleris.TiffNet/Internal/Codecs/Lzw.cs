@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -84,6 +85,15 @@ internal static class Lzw
         // Locals are initialised and the loop has no condition so that every rewrite of a mutation tool still compiles.
         for (;;)
         {
+            if (typeof(TOrder) == typeof(MsbFirst) && count <= 56 && position + 8 <= source.Length)
+            {
+                // The next 8 bytes at once, below the bits waiting; the bytes taken are those that fit whole. The bits of the
+                // others, below the count, are the same bits the next refill puts there.
+                bits |= BinaryPrimitives.ReadUInt64BigEndian(source[position..]) >> count;
+                position += (63 - count) >> 3;
+                count |= 56;
+            }
+
             while (count <= 56 && position < source.Length)
             {
                 bits = TOrder.Append(bits, count, source[position++]);
