@@ -7,7 +7,8 @@ namespace Eleris.TiffNet.Benchmarks;
 
 /// <summary>
 /// The LZW decoder of the library against the prototype of the review (research/review-2026-11/performance/bench/Kernels.cs),
-/// on a strip of 8 MB: 16-bit samples of a smooth image with noise (an astronomical frame) and a flat one (long strings).
+/// on a strip of 8 MB: 16-bit samples of a smooth image with noise (an astronomical frame), the same through the horizontal
+/// predictor (as most LZW files are written: short strings of small differences) and a flat one (long strings).
 /// </summary>
 [MemoryDiagnoser]
 public class LzwBenchmarks
@@ -16,7 +17,7 @@ public class LzwBenchmarks
     private byte[] _decoded = [];
     private byte[] _output = [];
 
-    [Params("noisy", "flat")]
+    [Params("noisy", "predicted", "flat")]
     public string Image { get; set; } = "noisy";
 
     [GlobalSetup]
@@ -28,6 +29,17 @@ public class LzwBenchmarks
         {
             int x = i % 2048, y = i / 2048;
             samples[i] = Image == "flat" ? (ushort)(1000 + y / 64) : (ushort)(1000 + x / 4 + y / 8 + random.Next(16));
+        }
+
+        if (Image == "predicted")
+        {
+            for (int i = samples.Length - 1; i > 0; i--)
+            {
+                if (i % 2048 != 0)
+                {
+                    samples[i] -= samples[i - 1];
+                }
+            }
         }
 
         byte[] data = MemoryMarshal.AsBytes(samples.AsSpan()).ToArray();

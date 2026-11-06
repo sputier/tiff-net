@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics;
 
 namespace Eleris.TiffNet.Internal.Codecs;
 
@@ -79,7 +80,7 @@ internal static class Lzw
         int capacity = destination.Length;
 
         ulong bits = 0;
-        int count = 0, position = 0, written = 0, width = 9, free = FirstFree, previous = -1;
+        int count = 0, position = 0, written = 0, width = 9, free = FirstFree, previous = -1, previousLength = 0;
         overflow = false;
 
         // Locals are initialised and the loop has no condition so that every rewrite of a mutation tool still compiles.
@@ -138,11 +139,11 @@ internal static class Lzw
 
                 Unsafe.Add(ref output, written++) = (byte)code;
                 previous = code;
+                previousLength = 1;
                 continue;
             }
 
             // The previous string is the last thing written.
-            int previousLength = previous < 256 ? 1 : length[previous];
             int previousStart = written - previousLength;
             int from = 0, size = 0;
             if (code < 256)
@@ -185,7 +186,18 @@ internal static class Lzw
                     overflow = true;
                 }
 
-                if (from + size <= written && size > 16)
+                if (size <= 16 && capacity - written >= 16 && from + size <= written + 1)
+                {
+                    // A short string, almost all of them: one 16-byte copy (the bytes beyond the string, inside the output, are
+                    // written again later). The bytes of the string are before the end of the output, so the load takes them as
+                    // they are; the string being defined then gets its last byte, its own first one.
+                    Unsafe.WriteUnaligned(ref Unsafe.Add(ref output, written), Unsafe.ReadUnaligned<Vector128<byte>>(ref Unsafe.Add(ref output, from)));
+                    if (from + size == written + 1)
+                    {
+                        Unsafe.Add(ref output, written + size - 1) = Unsafe.Add(ref output, from);
+                    }
+                }
+                else if (from + size <= written && size > 16)
                 {
                     destination.Slice(from, size).CopyTo(destination.Slice(written));
                 }
@@ -217,6 +229,7 @@ internal static class Lzw
             }
 
             previous = code;
+            previousLength = size;
         }
     }
 }
