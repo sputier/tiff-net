@@ -86,7 +86,8 @@ internal interface ITiffEncoder
 
 1. **Plan**: from the descriptor and the request (whole image or region, order, type), the list of strips/tiles to decode and,
    for each, where its rows land. A region decodes only the strips/tiles it covers.
-2. **Decode in parallel**: `Parallel.ForEach` over the plan with `MaxDegreeOfParallelism`; each worker reads the compressed
+2. **Decode in parallel**: `Parallel.ForEach` over the plan with `MaxDegreeOfParallelism`, the units handed out one at a time
+   (the default partitioner's growing chunks left the last worker alone with several strips); each worker reads the compressed
    bytes (`RandomAccess` or a slice of memory), decodes, applies predictor and byte order, then copies rows to their place.
    Workers rent their buffers from `ArrayPool` and return them. Cancellation is checked between strips.
 3. **Assemble**: interleaved strips decode straight into the result when no reordering is needed; tiles, planes, regions and
@@ -203,7 +204,8 @@ bounds (elsewhere, `Unsafe.SizeOf` gives the size of a sample type, and `Unsafe.
 reinterprets a sample as itself when the stored and delivered types are the same):
 
 - `Codecs/Lzw.Decode`: every write is preceded by `written < capacity` (a string is cut to the room left), and a string is
-  copied from what is already written (`from + size <= written` + 1 for the string being defined).
+  copied from what is already written (`from + size <= written` + 1 for the string being defined); a string of at most 16
+  bytes is copied as one 16-byte vector only when `capacity - written >= 16`.
 - `Codecs/Predictors`: the loops run over the length of the row they are given (`UndoFloatingPoint` copies the row into a
   scratch buffer of at least that length, which throws otherwise).
 - `Jpeg/JpegColour.Convert`: the length of the rows is checked first; the range-limit table covers every index a sample can
