@@ -76,7 +76,6 @@ internal static class SampleUnpacker
     /// </summary>
     private static void UnpackBits<TD>(ReadOnlySpan<byte> raw, int count, int bits, Span<TD> destination) where TD : unmanaged, INumber<TD>
     {
-        _ = destination[count - 1];
         int shift = 64 - bits, i = 0;
         long bit = 0;
         for (; i < count && (bit >> 3) + 8 <= raw.Length; i++, bit += bits)

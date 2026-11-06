@@ -133,7 +133,7 @@ public static class PixelExamples
 
         // No array allocated for the pixels: the caller's buffer, decoded on every core (a Span<T> is filled on the calling thread).
         var buffer = new double[image.Width * image.Height * image.Channels];
-        image.ReadPixels<double>(buffer.AsMemory());
+        image.ReadPixels<double>(buffer);
 
         // On a thread of the pool, cancellable between strips or tiles.
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
