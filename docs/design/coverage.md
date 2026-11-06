@@ -147,6 +147,12 @@ As libtiff does, a predictor is undone after LZW and Deflate only: with no compr
 | 34665, 34853 | EXIF, GPS sub-directories | `Exif`, `Gps` (tag lists) | R | — |
 | other | | `TiffMetadata[code]` | R | W, except offset-bearing tags |
 
+Tags not written back: the structure, which the library computes (254, 256 to 259, 262, 266, 273, 274, 277 to 279, 284, 292, 293,
+317, 320, 322 to 325, 338, 339, 347, 512 to 521, 529 to 532, 32997, 32998), and the tags that hold offsets into the file, which
+would point nowhere in a new file: `FreeOffsets` and `FreeByteCounts` (288, 289), `SubIFDs` (330), the EXIF, GPS and
+Interoperability sub-directories (34665, 34853, 40965), and every tag of type `IFD` or `IFD8`. Sub-images (`SubIFDs`) are read
+only in 1.0: a saved file holds its pages.
+
 Text values: ASCII as the specification says, and UTF-8 accepted on reading (common in practice); multiple strings in one tag
 (NUL-separated) are kept. Writing: ASCII when possible, UTF-8 otherwise, without BOM.
 

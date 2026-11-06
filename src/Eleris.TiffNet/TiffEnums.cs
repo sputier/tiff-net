@@ -152,3 +152,29 @@ public enum TiffPhotometric
     /// <summary>Luminance and chrominance (with JPEG compression).</summary>
     YCbCr = 6,
 }
+
+/// <summary>How hard the compressor of a write works (Deflate): faster, or smaller files.</summary>
+public enum TiffCompressionLevel
+{
+    /// <summary>The fastest compression (zlib level 1): files somewhat larger, written several times faster.</summary>
+    Fastest = 1,
+
+    /// <summary>The balance of zlib and libtiff (level 6).</summary>
+    Optimal = 2,
+
+    /// <summary>The smallest files (zlib level 9), slower to write; reading is as fast.</summary>
+    SmallestSize = 3,
+}
+
+/// <summary>Whether a file is written as BigTIFF (64-bit offsets, files beyond 4 GB) or as classic TIFF.</summary>
+public enum TiffBigTiff
+{
+    /// <summary>BigTIFF only when the file could exceed what classic TIFF addresses (4 GB); classic otherwise, as most readers expect.</summary>
+    Auto = 0,
+
+    /// <summary>Always classic TIFF; a file that would exceed 4 GB is refused.</summary>
+    Never = 1,
+
+    /// <summary>Always BigTIFF.</summary>
+    Always = 2,
+}
