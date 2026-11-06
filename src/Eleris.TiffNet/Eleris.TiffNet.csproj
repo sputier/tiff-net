@@ -5,7 +5,8 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <IsTrimmable>true</IsTrimmable>
     <IsAotCompatible>true</IsAotCompatible>
-    <!-- SkipLocalsInit only: the tables of the LZW decoder (24 KB) are not cleared for every strip or tile. No unsafe code. -->
+    <!-- For SkipLocalsInit only (the tables of the LZW decoder, 24 KB, are not cleared for every strip or tile): no unsafe block;
+         the references of System.Runtime.CompilerServices.Unsafe are listed with their bounds in docs/design/architecture.md. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Description>Pure managed .NET library to read and write TIFF images, made for astronomy and scientific data.</Description>
   </PropertyGroup>

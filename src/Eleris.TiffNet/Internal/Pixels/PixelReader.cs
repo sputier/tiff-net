@@ -87,7 +87,7 @@ internal sealed class PixelPlan
     /// <param name="sampleBytes">The size of a delivered sample (the type the stored samples are unpacked to).</param>
     /// <param name="parallel">Whether the read may use several threads.</param>
     /// <param name="maxWorkers">The most threads the caller allows (the degree of a write), below that of the read options.</param>
-    /// <exception cref="NotSupportedException">The image is compressed with a codec or a predictor not implemented yet, or one of
+    /// <exception cref="NotSupportedException">The image is compressed with a codec or a predictor not supported, or one of
     /// its blocks is larger than an array.</exception>
     /// <exception cref="TiffException">A block is truncated, or the buffers exceed <see cref="TiffReadOptions.MaxPixelBytes"/>.</exception>
     public static PixelPlan Create(ImageDescriptor d, ResourceBudget budget, PixelRequest request, int sampleBytes, bool parallel,
@@ -96,7 +96,7 @@ internal sealed class PixelPlan
         if (d.Compression is not (TiffCompression.None or TiffCompression.Lzw or TiffCompression.Deflate or TiffCompression.PackBits
             or TiffCompression.Jpeg))
         {
-            throw new NotSupportedException($"{budget.SourceName}: reading {d.Compression} compressed images is not implemented yet.");
+            throw new NotSupportedException($"{budget.SourceName}: reading {d.Compression} compressed images is not supported.");
         }
 
         bool jpeg = d.Compression == TiffCompression.Jpeg;

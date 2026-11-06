@@ -13,7 +13,13 @@ Targets: net10.0 on Windows, Linux, NativeAOT and .NET MAUI (checked on Android)
 
 ## Build, test, documentation
 
+On a fresh clone, the tests need the tifffile corpus, which is generated with Python; without it, set `TIFFNET_SKIP_INTEROP=1`
+to run every other test:
+
 ```shell
+TIFFNET_SKIP_INTEROP=1 dotnet test Eleris.TiffNet.slnx   # every test but the interop gate
+pip install -r tools/requirements-interop.txt               # Python 3.12: tifffile, imagecodecs, Pillow
+python -I tools/make_fixtures.py                            # generate the corpus, then:
 dotnet test Eleris.TiffNet.slnx
 dotnet run -c Release --project tools/DocGen              # regenerate the API pages and the samples in the pages
 dotnet run -c Release --project tools/DocGen -- --check   # fail if they are not up to date (CI)

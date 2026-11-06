@@ -3,7 +3,7 @@
 > The issues on GitHub are the reference for progress; this page records how the work was cut. Issues are named by their
 > GitHub number only.
 
-Derived from the validated [API](api.md), [coverage](coverage.md) and [architecture](architecture.md), and from the
+Derived from the validated [API](api.md), [coverage](../standard-coverage.md) and [architecture](architecture.md), and from the
 [review](../review-2026-11-05.md) whose findings each story closes (column "Closes"). Sizes: S ≤ 1 day, M a few days, L more
 than a week.
 
