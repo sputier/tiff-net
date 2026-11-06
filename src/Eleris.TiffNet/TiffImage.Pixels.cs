@@ -196,19 +196,21 @@ public sealed partial class TiffImage
         : new(File!.Options, File.Source.Name, cancellationToken);
 
     /// <summary>Checks that rows of the image can be read (support, blocks, buffers) before the band that holds them is allocated.</summary>
-    internal void ValidateBand(int y, int rows)
+    internal void ValidateBand(int y, int rows, int degree = 1)
     {
         ThrowIfUnsupported();
         var request = new PixelRequest(0, y, Width, rows, null, TiffPixelOrder.Interleaved, TiffPixelScale.Stored);
         var budget = Budget(CancellationToken.None);
-        _ = PixelPlan.Create(Descriptor, budget, request, SampleConversion.SizeOf(SampleType), parallel: false);
+        budget.ReservePixels((long)rows * Width * Channels * SampleConversion.SizeOf(SampleType), "the rows read to be written");
+        bool parallel = degree > 1 && Descriptor.Compression != TiffCompression.None;
+        _ = PixelPlan.Create(Descriptor, budget, request, SampleConversion.SizeOf(SampleType), parallel, maxWorkers: degree);
     }
 
     /// <summary>
     /// Reads the raw samples of whole rows, interleaved, into bytes in the order of the machine: what the writer encodes. In
     /// parallel when <paramref name="degree"/> allows, within the limits of the file.
     /// </summary>
-    internal void ReadBand(int y, int rows, Memory<byte> destination, int degree, CancellationToken cancellationToken)
+    internal void ReadBand(int y, int rows, Memory<byte> destination, int degree, ScratchCache cache, CancellationToken cancellationToken)
     {
         ThrowIfUnsupported();
         if (_pixels is not null && !Descriptor.Planar)
@@ -224,48 +226,49 @@ public sealed partial class TiffImage
 
         // Several threads pay for decoding; rows stored as they are only need to be copied.
         bool parallel = degree > 1 && Descriptor.Compression != TiffCompression.None;
-        var plan = PixelPlan.Create(Descriptor, budget, request, SampleConversion.SizeOf(SampleType), parallel);
+        var plan = PixelPlan.Create(Descriptor, budget, request, SampleConversion.SizeOf(SampleType), parallel, maxWorkers: degree);
         switch (SampleType)
         {
-            case TiffSampleType.UInt8: Dispatch(plan, destination.Span, destination, budget); break;
-            case TiffSampleType.Int8: ReadBandAs<sbyte>(plan, destination, budget); break;
-            case TiffSampleType.UInt16: ReadBandAs<ushort>(plan, destination, budget); break;
-            case TiffSampleType.Int16: ReadBandAs<short>(plan, destination, budget); break;
-            case TiffSampleType.UInt32: ReadBandAs<uint>(plan, destination, budget); break;
-            case TiffSampleType.Int32: ReadBandAs<int>(plan, destination, budget); break;
-            case TiffSampleType.UInt64: ReadBandAs<ulong>(plan, destination, budget); break;
-            case TiffSampleType.Int64: ReadBandAs<long>(plan, destination, budget); break;
-            case TiffSampleType.Float16: ReadBandAs<Half>(plan, destination, budget); break;
-            case TiffSampleType.Float32: ReadBandAs<float>(plan, destination, budget); break;
-            default: ReadBandAs<double>(plan, destination, budget); break;
+            case TiffSampleType.UInt8: Dispatch(plan, destination.Span, destination, budget, cache); break;
+            case TiffSampleType.Int8: ReadBandAs<sbyte>(plan, destination, budget, cache); break;
+            case TiffSampleType.UInt16: ReadBandAs<ushort>(plan, destination, budget, cache); break;
+            case TiffSampleType.Int16: ReadBandAs<short>(plan, destination, budget, cache); break;
+            case TiffSampleType.UInt32: ReadBandAs<uint>(plan, destination, budget, cache); break;
+            case TiffSampleType.Int32: ReadBandAs<int>(plan, destination, budget, cache); break;
+            case TiffSampleType.UInt64: ReadBandAs<ulong>(plan, destination, budget, cache); break;
+            case TiffSampleType.Int64: ReadBandAs<long>(plan, destination, budget, cache); break;
+            case TiffSampleType.Float16: ReadBandAs<Half>(plan, destination, budget, cache); break;
+            case TiffSampleType.Float32: ReadBandAs<float>(plan, destination, budget, cache); break;
+            default: ReadBandAs<double>(plan, destination, budget, cache); break;
         }
     }
 
     /// <summary>Reads into the bytes of a band, seen as samples of their type (the workers of a parallel read share it as memory).</summary>
-    private void ReadBandAs<T>(PixelPlan plan, Memory<byte> destination, ResourceBudget budget) where T : unmanaged, INumber<T>
+    private void ReadBandAs<T>(PixelPlan plan, Memory<byte> destination, ResourceBudget budget, ScratchCache cache) where T : unmanaged, INumber<T>
     {
         var samples = new CastMemory<T>(destination).Memory;
-        Dispatch(plan, samples.Span, samples, budget);
+        Dispatch(plan, samples.Span, samples, budget, cache);
     }
 
-    private void Dispatch<T>(PixelPlan plan, Span<T> destination, Memory<T>? array, ResourceBudget budget) where T : unmanaged, INumber<T>
+    private void Dispatch<T>(PixelPlan plan, Span<T> destination, Memory<T>? array, ResourceBudget budget, ScratchCache? cache = null)
+        where T : unmanaged, INumber<T>
     {
         var source = _pixels ?? File!.Source;
         bool little = _pixels is not null ? BitConverter.IsLittleEndian : !Storage!.BigEndian;
         int c = Channels;
         switch (SampleType)
         {
-            case TiffSampleType.UInt8: PixelReader.Read<byte, T>(plan, source, budget, c, little, destination, array); break;
-            case TiffSampleType.Int8: PixelReader.Read<sbyte, T>(plan, source, budget, c, little, destination, array); break;
-            case TiffSampleType.UInt16: PixelReader.Read<ushort, T>(plan, source, budget, c, little, destination, array); break;
-            case TiffSampleType.Int16: PixelReader.Read<short, T>(plan, source, budget, c, little, destination, array); break;
-            case TiffSampleType.UInt32: PixelReader.Read<uint, T>(plan, source, budget, c, little, destination, array); break;
-            case TiffSampleType.Int32: PixelReader.Read<int, T>(plan, source, budget, c, little, destination, array); break;
-            case TiffSampleType.UInt64: PixelReader.Read<ulong, T>(plan, source, budget, c, little, destination, array); break;
-            case TiffSampleType.Int64: PixelReader.Read<long, T>(plan, source, budget, c, little, destination, array); break;
-            case TiffSampleType.Float16: PixelReader.Read<Half, T>(plan, source, budget, c, little, destination, array); break;
-            case TiffSampleType.Float32: PixelReader.Read<float, T>(plan, source, budget, c, little, destination, array); break;
-            default: PixelReader.Read<double, T>(plan, source, budget, c, little, destination, array); break;
+            case TiffSampleType.UInt8: PixelReader.Read<byte, T>(plan, source, budget, c, little, destination, array, cache); break;
+            case TiffSampleType.Int8: PixelReader.Read<sbyte, T>(plan, source, budget, c, little, destination, array, cache); break;
+            case TiffSampleType.UInt16: PixelReader.Read<ushort, T>(plan, source, budget, c, little, destination, array, cache); break;
+            case TiffSampleType.Int16: PixelReader.Read<short, T>(plan, source, budget, c, little, destination, array, cache); break;
+            case TiffSampleType.UInt32: PixelReader.Read<uint, T>(plan, source, budget, c, little, destination, array, cache); break;
+            case TiffSampleType.Int32: PixelReader.Read<int, T>(plan, source, budget, c, little, destination, array, cache); break;
+            case TiffSampleType.UInt64: PixelReader.Read<ulong, T>(plan, source, budget, c, little, destination, array, cache); break;
+            case TiffSampleType.Int64: PixelReader.Read<long, T>(plan, source, budget, c, little, destination, array, cache); break;
+            case TiffSampleType.Float16: PixelReader.Read<Half, T>(plan, source, budget, c, little, destination, array, cache); break;
+            case TiffSampleType.Float32: PixelReader.Read<float, T>(plan, source, budget, c, little, destination, array, cache); break;
+            default: PixelReader.Read<double, T>(plan, source, budget, c, little, destination, array, cache); break;
         }
     }
 }

@@ -26,6 +26,8 @@ def sha(array: np.ndarray) -> str:
 
 
 def pillow_supports(name: str) -> bool:
+    if name.startswith("large-"):
+        return "-planar" not in name
     kind, channels = name.split("-")[0], name.split("-")[1]
     return (kind, channels) in {("uint8", "c1"), ("uint8", "c3"), ("uint16", "c1"), ("float32", "c1")} and "-pl1-" not in name
 
