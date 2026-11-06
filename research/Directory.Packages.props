@@ -1,0 +1,6 @@
+<Project>
+  <!-- The prototypes of the review are not part of the build: they keep the versions they were measured with. -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+</Project>

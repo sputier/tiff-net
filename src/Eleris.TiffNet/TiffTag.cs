@@ -180,7 +180,7 @@ public sealed class TiffTag : IEquatable<TiffTag>
         ReadOnlySpan<byte> v = _values.AsSpan(i * size, size);
         try
         {
-        return Type switch
+            return Type switch
             {
                 TiffTagType.Byte => T.CreateChecked(v[0]),
                 TiffTagType.SByte => T.CreateChecked((sbyte)v[0]),
