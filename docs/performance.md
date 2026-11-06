@@ -20,7 +20,7 @@ JPEG (12 MP, quality 90, one thread) is decoded in 1.1 to 1.35 times the time of
 ## Memory
 
 - A whole-image read allocates its pixels and the buffers of one strip or tile per thread: 1.00 to 1.07 times the pixels
-  above about 50 MB, at most 1.1 times. `ReadPixels(Span<T>)` reads into a buffer of the application.
+  above about 50 MB, at most 1.1 times. `ReadPixels(Memory<T>)` reads into a buffer of the application.
 - A region reads only the strips or tiles under it, and decodes a compressed strip only up to the last row it needs.
 - Writing holds a band of rows of the source (the whole image when the source is one compressed strip, or stored on its
   side) and at most 2 × `MaxDegreeOfParallelism` encoded blocks; `TiffImageWriter` writes an
@@ -35,7 +35,7 @@ JPEG (12 MP, quality 90, one thread) is decoded in 1.1 to 1.35 times the time of
 | Write fastest, files largest | `Compression = TiffCompression.None` |
 | Read regions of a large image quickly | write it in tiles (`Layout = TiffLayout.Tiles`) |
 | Read one channel quickly | write it planar (`PlanarConfiguration = TiffPixelOrder.Planar`): only its plane is read |
-| Avoid an array per read | `ReadPixels(Span<T>)` into a reused buffer (decoded on the calling thread only) |
+| Avoid an array per read | `ReadPixels(Memory<T>)` into a reused buffer (on every core; the `Span<T>` overload decodes on the calling thread only) |
 | Bound memory on untrusted files | `MaxPixelBytes` (see [reliability](reliability.md)) |
 
 Deflate at the default level compresses noisy floating point data at about 60 MB/s per core (288 MB in 4.4 to 4.6 s): such files are the slowest to
