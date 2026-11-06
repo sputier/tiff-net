@@ -6,6 +6,7 @@ namespace Eleris.TiffNet.Tests.Writing;
 /// A file beyond 4 GB, written with TiffImageWriter and read back by region: BigTIFF from the geometry, offsets beyond 32 bits.
 /// It takes minutes and 4.3 GB of disk: it runs when <c>TIFFNET_HUGE=1</c>, in a dedicated CI job (huge.yml).
 /// </summary>
+[Trait("Category", "Huge")]
 public class HugeFileTests(Xunit.Abstractions.ITestOutputHelper output)
 {
     public const string Variable = "TIFFNET_HUGE";
@@ -16,13 +17,10 @@ public class HugeFileTests(Xunit.Abstractions.ITestOutputHelper output)
     /// <summary>The sample at (x, y): a function of the position, so that any region can be checked without the image.</summary>
     private static ushort Sample(long x, long y) => (ushort)((x * 2654435761L) ^ (y * 40503L) ^ (x >> 7) ^ (y << 3));
 
-    [Fact]
+    [SkippableFact]
     public void A_file_beyond_4_GB_is_written_and_read_back_by_region()
     {
-        if (Environment.GetEnvironmentVariable(Variable) != "1")
-        {
-            return;   // only in the dedicated job
-        }
+        Skip.If(Environment.GetEnvironmentVariable(Variable) != "1", $"Writes 4.4 GB: only with {Variable}=1 (the job beyond-4-gb).");
 
         string path = Path.Combine(Path.GetTempPath(), $"tiffnet-huge-{Guid.NewGuid():N}.tif");
         try

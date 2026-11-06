@@ -72,14 +72,11 @@ public class ImageDescriptorTests
         static (TiffColorModel, TiffSampleType, int) Shape(ImageDescriptor d) => (d.ColorModel, d.SampleType, d.Channels);
     }
 
-    [Fact]
+    [SkippableFact]
+    [Trait("Category", "Interop")]
     public void Every_file_of_the_interop_corpus_is_described_by_its_name()
     {
-        if (!Directory.Exists(InteropCorpus.Folder))
-        {
-            Assert.True(InteropCorpus.Skipped, $"The interop corpus is not generated; set {InteropCorpus.SkipVariable}=1 to skip.");
-            return;
-        }
+        InteropCorpus.RequireGenerated();
 
         foreach (var f in InteropCorpus.Files)
         {

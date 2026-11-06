@@ -135,14 +135,11 @@ public class TiffFileTests
         }
     }
 
-    [Fact]
+    [SkippableFact]
+    [Trait("Category", "Interop")]
     public void Every_file_of_the_interop_corpus_opens()
     {
-        if (!Directory.Exists(InteropCorpus.Folder))
-        {
-            Assert.True(InteropCorpus.Skipped, $"The interop corpus is not generated; set {InteropCorpus.SkipVariable}=1 to skip.");
-            return;
-        }
+        InteropCorpus.RequireGenerated();
 
         foreach (var f in InteropCorpus.Files)
         {
@@ -157,6 +154,7 @@ public class TiffFileTests
 public class HostileOpenTests
 {
     [Fact]
+    [Trait("Category", "Slow")]
     public void A_fuzzing_campaign_on_opening_finds_nothing()
     {
         var corpus = new Corpus([.. Directory.GetFiles(DomainFixtures.Folder, "*.tif").Order(StringComparer.Ordinal)]);
