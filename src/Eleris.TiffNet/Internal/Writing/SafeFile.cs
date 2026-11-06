@@ -97,13 +97,19 @@ internal static class SafeFile
     }
 
     /// <summary>As <see cref="ToStream"/>, the copy of a stream that cannot seek done asynchronously (a response body of a web server).</summary>
-    public static async Task ToStreamAsync(Stream stream, Action<Stream> write, CancellationToken cancellationToken)
+    /// <exception cref="ArgumentException">The stream cannot be written (thrown, not reported by the task).</exception>
+    public static Task ToStreamAsync(Stream stream, Action<Stream> write, CancellationToken cancellationToken)
     {
         if (!stream.CanWrite)
         {
             throw new ArgumentException("The stream cannot be written.", nameof(stream));
         }
 
+        return WriteAsync(stream, write, cancellationToken);
+    }
+
+    private static async Task WriteAsync(Stream stream, Action<Stream> write, CancellationToken cancellationToken)
+    {
         if (stream.CanSeek)
         {
             // Encoding is the work; the writes go to a stream that seeks, which does not block for long.

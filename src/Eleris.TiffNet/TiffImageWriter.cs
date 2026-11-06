@@ -53,6 +53,9 @@ public sealed class TiffImageWriter : IDisposable
     private bool _completed;
     private bool _disposed;
 
+    // A write failed (an encoding, the output): what is written is inconsistent, the writer only disposes.
+    private bool _faulted;
+
     private TiffImageWriter(Stream output, TemporaryFile? temporary, long width, long height, TiffSampleType sampleType, int channels,
         TiffColorModel? colorModel, TiffMetadata? metadata, TiffWriteOptions? options)
     {
@@ -88,6 +91,9 @@ public sealed class TiffImageWriter : IDisposable
         _tiled = _options.Layout == TiffLayout.Tiles;
         _planar = _options.PlanarConfiguration == TiffPixelOrder.Planar && channels > 1;
         long pixelBytes = (long)channels * _bytesPerSample;
+
+        // A strip in the file holds one channel when planar: its rows are counted with one sample.
+        long stripRowBytes = width * (_planar ? 1 : channels) * _bytesPerSample;
         if (_tiled)
         {
             _blockWidth = _blockHeight = _options.TileSize;
@@ -100,7 +106,7 @@ public sealed class TiffImageWriter : IDisposable
             }
 
             _blockWidth = (int)width;
-            _blockHeight = (int)Math.Clamp(ImageEncoder.StripBytes / (width * pixelBytes), 1, height);
+            _blockHeight = (int)Math.Clamp(ImageEncoder.StripBytes / stripRowBytes, 1, height);
         }
 
         if ((long)_blockWidth * _blockHeight * pixelBytes > Array.MaxLength)
@@ -121,12 +127,14 @@ public sealed class TiffImageWriter : IDisposable
         _written = new bool[_across * _down];
         _workers = new SemaphoreSlim(_options.Degree);
 
-        long raw = width * height * pixelBytes;
+        // The most the blocks can take once encoded (compression can expand), as the writer of a whole image decides.
+        long blockRaw = (long)_blockWidth * _blockHeight * (_planar ? 1 : channels) * _bytesPerSample;
+        long encoded = BlockCodec.MaxEncoded(_options.Compression, blockRaw, _blockHeight) * blocks;
         bool bigTiff = _options.BigTiff switch
         {
             TiffBigTiff.Always => true,
             TiffBigTiff.Never => false,
-            _ => raw + raw / 64 + blocks * 32 + _metadata.Sum(t => (long)t.AsBytes().Length + 32) + 65536 > uint.MaxValue,
+            _ => encoded + blocks * 34 + _metadata.Sum(t => (long)t.AsBytes().Length + 32) + 65536 > uint.MaxValue,
         };
         _writer = new FileWriter(output, bigTiff);
     }
@@ -218,20 +226,29 @@ public sealed class TiffImageWriter : IDisposable
 
         var bytes = MemoryMarshal.AsBytes(pixels);
         int rowBytes = (int)(rowSamples * _bytesPerSample);
-        for (int r = 0; r < rowCount; r++)
+        try
         {
-            int rowsOfStrip = (int)Math.Min(_blockHeight, Height - _rowsWritten + _stripRows);
-            _strip ??= System.Buffers.ArrayPool<byte>.Shared.Rent(rowBytes * rowsOfStrip);
-            bytes.Slice(r * rowBytes, rowBytes).CopyTo(_strip.AsSpan(_stripRows * rowBytes));
-            _stripRows++;
-            _rowsWritten++;
-            if (_stripRows == rowsOfStrip)
+            for (int r = 0; r < rowCount; r++)
             {
-                long strip = (_rowsWritten - 1) / _blockHeight;
-                Submit(strip, _strip, rowsOfStrip, (int)Width);
-                _strip = null;
-                _stripRows = 0;
+                int rowsOfStrip = (int)Math.Min(_blockHeight, Height - _rowsWritten + _stripRows);
+                _strip ??= System.Buffers.ArrayPool<byte>.Shared.Rent(rowBytes * rowsOfStrip);
+                bytes.Slice(r * rowBytes, rowBytes).CopyTo(_strip.AsSpan(_stripRows * rowBytes));
+                _stripRows++;
+                _rowsWritten++;
+                if (_stripRows == rowsOfStrip)
+                {
+                    // The buffer is handed over before it is submitted: whatever fails then, it is not returned twice.
+                    byte[] strip = _strip;
+                    _strip = null;
+                    _stripRows = 0;
+                    Submit((_rowsWritten - 1) / _blockHeight, strip, rowsOfStrip, (int)Width);
+                }
             }
+        }
+        catch
+        {
+            _faulted = true;
+            throw;
         }
     }
 
@@ -289,11 +306,19 @@ public sealed class TiffImageWriter : IDisposable
         }
 
         _written[index] = true;
-        Submit(index, tile, _blockHeight, _blockWidth);
+        try
+        {
+            Submit(index, tile, _blockHeight, _blockWidth);
+        }
+        catch
+        {
+            _faulted = true;
+            throw;
+        }
     }
 
     /// <summary>Writes what is left and the directory; for a path, puts the file in place of the target.</summary>
-    /// <exception cref="InvalidOperationException">Rows or tiles are missing.</exception>
+    /// <exception cref="InvalidOperationException">Rows or tiles are missing, or an earlier write failed.</exception>
     public void Complete()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -301,6 +326,8 @@ public sealed class TiffImageWriter : IDisposable
         {
             return;
         }
+
+        ThrowIfFaulted();
 
         if (!_tiled && _rowsWritten != Height)
         {
@@ -313,10 +340,19 @@ public sealed class TiffImageWriter : IDisposable
             throw new InvalidOperationException($"The tile {missing % _across}, {missing / _across} is not written.");
         }
 
-        Drain(0);
-        _writer.WriteDirectory(Entries());
-        _output.Flush();
-        _temporary?.Commit();
+        try
+        {
+            Drain(0);
+            _writer.WriteDirectory(Entries());
+            _output.Flush();
+            _temporary?.Commit();
+        }
+        catch
+        {
+            _faulted = true;
+            throw;
+        }
+
         _completed = true;
     }
 
@@ -359,9 +395,18 @@ public sealed class TiffImageWriter : IDisposable
             throw new InvalidOperationException("The image is completed.");
         }
 
+        ThrowIfFaulted();
         if (SampleConversion.ClrType(_sampleType) != typeof(T))
         {
             throw new ArgumentException($"The samples are declared {_sampleType}: give them as {SampleConversion.ClrType(_sampleType).Name}, not {typeof(T).Name}.");
+        }
+    }
+
+    private void ThrowIfFaulted()
+    {
+        if (_faulted)
+        {
+            throw new InvalidOperationException("An earlier write failed: the image is incomplete; dispose the writer.");
         }
     }
 
@@ -379,18 +424,23 @@ public sealed class TiffImageWriter : IDisposable
         }
 
         int pixelBytes = _channels * _bytesPerSample;
-        for (int c = 0; c < _channels; c++)
+        try
         {
-            byte[] plane = System.Buffers.ArrayPool<byte>.Shared.Rent(rows * width * _bytesPerSample);
-            for (int p = 0; p < rows * width; p++)
+            for (int c = 0; c < _channels; c++)
             {
-                raw.AsSpan(p * pixelBytes + c * _bytesPerSample, _bytesPerSample).CopyTo(plane.AsSpan(p * _bytesPerSample));
+                byte[] plane = System.Buffers.ArrayPool<byte>.Shared.Rent(rows * width * _bytesPerSample);
+                for (int p = 0; p < rows * width; p++)
+                {
+                    raw.AsSpan(p * pixelBytes + c * _bytesPerSample, _bytesPerSample).CopyTo(plane.AsSpan(p * _bytesPerSample));
+                }
+
+                Enqueue(c * perPlane + index, plane, rows, width * _bytesPerSample, 1);
             }
-
-            Enqueue(c * perPlane + index, plane, rows, width * _bytesPerSample, 1);
         }
-
-        System.Buffers.ArrayPool<byte>.Shared.Return(raw);
+        finally
+        {
+            System.Buffers.ArrayPool<byte>.Shared.Return(raw);
+        }
     }
 
     private void Enqueue(long block, byte[] raw, int rows, int rowBytes, int samples)

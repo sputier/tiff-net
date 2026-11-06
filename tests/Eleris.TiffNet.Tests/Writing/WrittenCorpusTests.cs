@@ -39,9 +39,28 @@ public class WrittenCorpusTests
         Write<Half>("float16", folder, expected);
         Write<float>("float32", folder, expected);
         Write<double>("float64", folder, expected);
+        WriteLarge(folder, expected);
         File.WriteAllText(Path.Combine(folder, "expected.json"), JsonSerializer.Serialize(expected, Indented));
 
         Assert.True(expected.Count > 1800, $"only {expected.Count} files");
+    }
+
+    /// <summary>Images of many strips and several bands of rows (the blocks small images never reach), each layout and order.</summary>
+    private static void WriteLarge(string folder, SortedDictionary<string, string> expected)
+    {
+        var image = BandWritingTests.Gradient(4096, 2100, 3);
+        foreach (var (name, options) in new[]
+        {
+            ("large-u8-c3-deflate-interleaved.tif", TiffWriteOptions.Default),
+            ("large-u8-c3-deflate-planar.tif", TiffWriteOptions.Default with { PlanarConfiguration = TiffPixelOrder.Planar }),
+            ("large-u8-c3-lzw-planar-threads1.tif", TiffWriteOptions.Default with
+                { Compression = TiffCompression.Lzw, PlanarConfiguration = TiffPixelOrder.Planar, MaxDegreeOfParallelism = 1 }),
+            ("large-u8-c3-packbits-tiles.tif", TiffWriteOptions.Default with { Compression = TiffCompression.PackBits, Layout = TiffLayout.Tiles, TileSize = 256 }),
+        })
+        {
+            new TiffFile().Add(image).Save(Path.Combine(folder, name), options);
+            expected[name] = Convert.ToHexString(SHA256.HashData(image.ReadRawPixels<byte>(options.PlanarConfiguration)));
+        }
     }
 
     private static void Write<T>(string type, string folder, SortedDictionary<string, string> expected) where T : unmanaged, System.Numerics.INumber<T>
