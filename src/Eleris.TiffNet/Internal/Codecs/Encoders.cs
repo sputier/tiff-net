@@ -7,7 +7,7 @@ namespace Eleris.TiffNet.Internal.Codecs;
 internal static class PackBitsEncoder
 {
     /// <summary>The most bytes a row of <paramref name="length"/> bytes encodes to: one header per 128 literal bytes.</summary>
-    public static int MaxEncoded(int length) => length + (length + 127) / 128;
+    public static long MaxEncoded(long length) => length + (length + 127) / 128;
 
     /// <summary>Encodes one row; returns the bytes written into <paramref name="destination"/> (at least <see cref="MaxEncoded"/>).</summary>
     public static int EncodeRow(ReadOnlySpan<byte> row, Span<byte> destination)
@@ -56,7 +56,7 @@ internal static class LzwEncoder
     private const int Clear = 256, End = 257, FirstFree = 258, Full = 4094, HashBits = 13, HashSize = 1 << HashBits;
 
     /// <summary>The most bytes <paramref name="length"/> bytes encode to (12 bits a byte at worst, the clear codes and the end).</summary>
-    public static int MaxEncoded(int length) => length * 3 / 2 + length / 2000 * 2 + 16;
+    public static long MaxEncoded(long length) => length * 3 / 2 + length / 2000 * 2 + 16;
 
     /// <summary>Encodes a strip or tile; returns the bytes written into <paramref name="destination"/> (at least <see cref="MaxEncoded"/>).</summary>
     [SkipLocalsInit]
@@ -123,9 +123,15 @@ internal static class LzwEncoder
             }
         }
 
-        // The last string; the decoder adds an entry for it before the end code, so the width may grow first.
+        // The last string, then as libtiff's LZWPostEncode: the decoder adds an entry for it before the end code, so the table
+        // may be full (a clear code, back to 9 bits) or the width may grow first.
         Put(prefix, destination);
-        if (++free > (1 << width) - 1 && width < 12)
+        if (++free == Full)
+        {
+            Put(Clear, destination);
+            width = 9;
+        }
+        else if (free > (1 << width) - 1 && width < 12)
         {
             width++;
         }
@@ -148,16 +154,29 @@ internal static class LzwEncoder
 /// <summary>The Deflate encoder: a zlib stream written by System.IO.Compression, at the level the options ask for.</summary>
 internal static class DeflateEncoder
 {
-    /// <summary>Compresses a strip or tile into a new array.</summary>
-    public static byte[] Encode(ReadOnlySpan<byte> source, TiffCompressionLevel level)
+    /// <summary>
+    /// The most bytes <paramref name="length"/> bytes compress to, at any level: zlib-ng's fastest level expands incompressible
+    /// data by about 5.5 %, stored blocks by 5 bytes in 65 535; an eighth and a header leave room for both.
+    /// </summary>
+    public static long MaxEncoded(long length) => length + length / 8 + 1024;
+
+    /// <summary>Compresses a strip or tile into <paramref name="destination"/> (at least <see cref="MaxEncoded"/>); returns its length.</summary>
+    public static int Encode(ReadOnlySpan<byte> source, byte[] destination, TiffCompressionLevel level)
     {
-        using var output = new MemoryStream(source.Length / 2 + 64);
+        using var output = new MemoryStream(destination, 0, destination.Length, writable: true);
         using (var zlib = new ZLibStream(output, Options(level), leaveOpen: true))
         {
             zlib.Write(source);
         }
 
-        return output.ToArray();
+        return (int)output.Position;
+    }
+
+    /// <summary>Compresses into a new array (the tests).</summary>
+    public static byte[] Encode(ReadOnlySpan<byte> source, TiffCompressionLevel level)
+    {
+        byte[] destination = new byte[MaxEncoded(source.Length)];
+        return destination[..Encode(source, destination, level)];
     }
 
     /// <summary>zlib levels 1 (fastest), 6 (the default of zlib and libtiff) and 9 (smallest).</summary>

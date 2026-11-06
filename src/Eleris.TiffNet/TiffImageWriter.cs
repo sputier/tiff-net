@@ -43,7 +43,7 @@ public sealed class TiffImageWriter : IDisposable
     private readonly long[] _offsets;
     private readonly long[] _counts;
     private readonly bool[] _written;
-    private readonly Queue<(long Block, Task<byte[]> Encoding)> _pending = new();
+    private readonly Queue<(long Block, Task<EncodedBlock> Encoding)> _pending = new();
     private readonly SemaphoreSlim _workers;
 
     // Strips: the rows of the strip being filled.
@@ -221,7 +221,7 @@ public sealed class TiffImageWriter : IDisposable
         for (int r = 0; r < rowCount; r++)
         {
             int rowsOfStrip = (int)Math.Min(_blockHeight, Height - _rowsWritten + _stripRows);
-            _strip ??= GC.AllocateUninitializedArray<byte>(rowBytes * rowsOfStrip);
+            _strip ??= System.Buffers.ArrayPool<byte>.Shared.Rent(rowBytes * rowsOfStrip);
             bytes.Slice(r * rowBytes, rowBytes).CopyTo(_strip.AsSpan(_stripRows * rowBytes));
             _stripRows++;
             _rowsWritten++;
@@ -266,13 +266,17 @@ public sealed class TiffImageWriter : IDisposable
         int height = (int)Math.Min(_blockHeight, Height - tileY * _blockHeight);
         int pixelBytes = _channels * _bytesPerSample;
         var bytes = MemoryMarshal.AsBytes(pixels);
-        byte[] tile = new byte[_blockWidth * _blockHeight * pixelBytes];
+        int tileBytes = _blockWidth * _blockHeight * pixelBytes;
+        byte[] tile;
         if (pixels.Length == (long)_blockWidth * _blockHeight * _channels)
         {
+            tile = System.Buffers.ArrayPool<byte>.Shared.Rent(tileBytes);
             bytes.CopyTo(tile);
         }
         else if (pixels.Length == (long)width * height * _channels)
         {
+            tile = System.Buffers.ArrayPool<byte>.Shared.Rent(tileBytes);
+            tile.AsSpan(0, tileBytes).Clear();
             for (int r = 0; r < height; r++)
             {
                 bytes.Slice(r * width * pixelBytes, width * pixelBytes).CopyTo(tile.AsSpan(r * _blockWidth * pixelBytes));
@@ -329,12 +333,18 @@ public sealed class TiffImageWriter : IDisposable
         {
             try
             {
-                encoding.Wait();
+                encoding.GetAwaiter().GetResult().Return();
             }
-            catch (AggregateException)
+            catch (Exception ex) when (ex is not OutOfMemoryException)
             {
                 // Abandoned.
             }
+        }
+
+        if (_strip is not null)
+        {
+            System.Buffers.ArrayPool<byte>.Shared.Return(_strip);
+            _strip = null;
         }
 
         _temporary?.Dispose();
@@ -371,7 +381,7 @@ public sealed class TiffImageWriter : IDisposable
         int pixelBytes = _channels * _bytesPerSample;
         for (int c = 0; c < _channels; c++)
         {
-            byte[] plane = new byte[rows * width * _bytesPerSample];
+            byte[] plane = System.Buffers.ArrayPool<byte>.Shared.Rent(rows * width * _bytesPerSample);
             for (int p = 0; p < rows * width; p++)
             {
                 raw.AsSpan(p * pixelBytes + c * _bytesPerSample, _bytesPerSample).CopyTo(plane.AsSpan(p * _bytesPerSample));
@@ -379,6 +389,8 @@ public sealed class TiffImageWriter : IDisposable
 
             Enqueue(c * perPlane + index, plane, rows, width * _bytesPerSample, 1);
         }
+
+        System.Buffers.ArrayPool<byte>.Shared.Return(raw);
     }
 
     private void Enqueue(long block, byte[] raw, int rows, int rowBytes, int samples)
@@ -388,7 +400,7 @@ public sealed class TiffImageWriter : IDisposable
         var compression = _options.Compression;
         var level = _options.Level;
         int bytes = _bytesPerSample;
-        Task<byte[]> encoding = _options.Degree <= 1
+        Task<EncodedBlock> encoding = _options.Degree <= 1
             ? Task.FromResult(BlockCodec.Encode(raw, rows, rowBytes, samples, bytes, predictor, compression, level))
             : Task.Run(async () =>
             {
@@ -411,9 +423,10 @@ public sealed class TiffImageWriter : IDisposable
         while (_pending.Count > keep)
         {
             var (block, encoding) = _pending.Dequeue();
-            byte[] data = encoding.GetAwaiter().GetResult();
-            _offsets[block] = _writer.Append(data);
-            _counts[block] = data.Length;
+            var encoded = encoding.GetAwaiter().GetResult();
+            _offsets[block] = _writer.Append(encoded.Span);
+            _counts[block] = encoded.Length;
+            encoded.Return();
         }
     }
 

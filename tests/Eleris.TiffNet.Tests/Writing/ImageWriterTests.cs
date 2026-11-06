@@ -114,7 +114,7 @@ public class ImageWriterTests
             }
 
             Assert.Equal(new byte[] { 1, 2, 3 }, File.ReadAllBytes(path));
-            Assert.Empty(Directory.GetFiles(Path.GetTempPath(), $".{Path.GetFileName(path)}.*"));
+            Assert.Empty(Directory.GetFiles(Path.GetTempPath(), ".tiff-*.tmp*"));
 
             using (var writer = TiffImageWriter.Create(path, 4, 4, TiffSampleType.UInt8))
             {

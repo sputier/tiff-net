@@ -293,12 +293,12 @@ internal readonly record struct StoredRect(long X0, long Y0, long X1, long Y1)
 internal static class PixelReader
 {
     public static void Read<TD, TOut>(PixelPlan plan, TiffSource source, ResourceBudget budget, int channels, bool littleEndian,
-        Span<TOut> destination, TOut[]? array)
+        Span<TOut> destination, Memory<TOut>? memory)
         where TD : unmanaged, INumber<TD>
         where TOut : unmanaged, INumber<TOut>
     {
         var context = new Context<TD, TOut>(plan, source, budget, channels, littleEndian);
-        if (array is null || plan.Workers == 1)
+        if (memory is not { } array || plan.Workers == 1)
         {
             var scratch = new Scratch<TD>(plan);
             foreach (var unit in plan.Units())
@@ -316,7 +316,7 @@ internal static class PixelReader
                 (unit, _, scratch) =>
                 {
                     budget.ThrowIfCancelled();
-                    context.Process(unit, array, scratch);
+                    context.Process(unit, array.Span, scratch);
                     return scratch;
                 },
                 _ => { });

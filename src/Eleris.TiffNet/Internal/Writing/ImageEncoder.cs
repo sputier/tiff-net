@@ -1,4 +1,3 @@
-using Eleris.TiffNet.Internal.Codecs;
 using Eleris.TiffNet.Internal.Pixels;
 
 namespace Eleris.TiffNet.Internal.Writing;
@@ -92,18 +91,7 @@ internal sealed class ImageEncoder
         [.. image.ExtraChannels.Select(c => c.Kind)], image.Descriptor.SubfileType, Tiled, Planar, BlockWidth, BlockHeight, Compression, Predictor);
 
     /// <summary>The most bytes the encoded image can take, to decide between classic TIFF and BigTIFF before writing.</summary>
-    public long MaxEncodedBytes()
-    {
-        long raw = RowBytes * BlockHeight;
-        long perBlock = Compression switch
-        {
-            TiffCompression.None => raw,
-            TiffCompression.PackBits => raw + (raw + 127) / 128 + BlockHeight,
-            TiffCompression.Lzw => LzwEncoder.MaxEncoded((int)Math.Min(raw, int.MaxValue / 2)),
-            _ => raw + raw / 1000 * 5 + 1024,
-        };
-        return perBlock * Blocks + 2L * Blocks;
-    }
+    public long MaxEncodedBytes() => BlockCodec.MaxEncoded(Compression, RowBytes * BlockHeight, BlockHeight) * Blocks + 2L * Blocks;
 
     /// <summary>
     /// The predictor written. Auto: horizontal differencing for integers of 8 to 32 bits, the floating point predictor for floating
@@ -128,35 +116,109 @@ internal sealed class ImageEncoder
         };
     }
 
-    /// <summary>Encodes block <paramref name="block"/>: reads its pixels, applies the predictor, compresses.</summary>
-    public byte[] Encode(int block)
+    /// <summary>
+    /// The rows of the image read at once, a multiple of the block height. Each block of the source is decoded once: a band covers
+    /// whole source strips or tiles (an image stored on its side, Orientation 5 to 8, is read whole, since each of its rows crosses
+    /// every source block); a source in memory or uncompressed needs only enough blocks to keep the threads busy.
+    /// </summary>
+    private int BandRows(int degree)
     {
-        int plane = block / (Across * Down);
-        int index = block % (Across * Down);
-        int bx = index % Across, by = index / Across;
+        long sourceRows = 1;
+        if (_image.File is not null && _image.Storage is { } storage && storage.Compression != TiffCompression.None)
+        {
+            var d = _image.Descriptor;
+            sourceRows = d.Orientation >= 5 ? Height : d.BlockHeight;
+        }
+        else if (_image.File is not null && _image.Descriptor.Orientation >= 5)
+        {
+            sourceRows = Height;
+        }
+
+        long wanted = Math.Max(sourceRows, (long)BlockHeight * (Tiled ? 1 : 2 * Math.Max(1, degree)));
+        long rows = (wanted + BlockHeight - 1) / BlockHeight * BlockHeight;
+        return (int)Math.Min(rows, (Height + BlockHeight - 1L) / BlockHeight * BlockHeight);
+    }
+
+    /// <summary>
+    /// Encodes the blocks of the image and appends them: band after band of rows, each read once from the image (in parallel),
+    /// its blocks encoded in parallel and appended in order (every plane of a band before the next band).
+    /// </summary>
+    public void Write(FileWriter writer, long[] offsets, long[] counts, int degree, CancellationToken cancellationToken)
+    {
+        int bandRows = BandRows(degree);
+        int pixelBytes = Channels * BytesPerSample;
+        long bandBytes = (long)bandRows * Width * pixelBytes;
+        if (bandBytes > Array.MaxLength)
+        {
+            throw new NotSupportedException(
+                $"Writing this image reads {bandRows} rows at once ({bandBytes} bytes), more than an array holds: write it with TiffImageWriter.");
+        }
+
+        int blockRowsPerBand = bandRows / BlockHeight;
+        for (int bandY = 0; bandY < Height; bandY += bandRows)
+        {
+            int rows = Math.Min(bandRows, Height - bandY);
+            _image.ValidateBand(bandY, rows);
+            byte[] band = System.Buffers.ArrayPool<byte>.Shared.Rent(rows * Width * pixelBytes);
+            try
+            {
+                _image.ReadBand(bandY, rows, band.AsMemory(0, rows * Width * pixelBytes), degree, cancellationToken);
+                int firstRow = bandY / BlockHeight;
+                int blockRows = Math.Min(blockRowsPerBand, Down - firstRow);
+                int perPlane = blockRows * Across;
+                BlockPipeline.Run(perPlane * Planes, degree,
+                    j => EncodeFromBand(band, bandY, j / perPlane, firstRow + j % perPlane / Across, j % perPlane % Across),
+                    (j, encoded) =>
+                    {
+                        int block = j / perPlane * Across * Down + (firstRow + j % perPlane / Across) * Across + j % perPlane % Across;
+                        offsets[block] = writer.Append(encoded.Span);
+                        counts[block] = encoded.Length;
+                        encoded.Return();
+                    },
+                    encoded => encoded.Return(),
+                    cancellationToken);
+            }
+            finally
+            {
+                System.Buffers.ArrayPool<byte>.Shared.Return(band);
+            }
+        }
+    }
+
+    /// <summary>Cuts block (<paramref name="bx"/>, <paramref name="by"/>) of a plane out of a band, then predicts and compresses it.</summary>
+    private EncodedBlock EncodeFromBand(byte[] band, int bandY, int plane, int by, int bx)
+    {
         int x0 = bx * BlockWidth, y0 = by * BlockHeight;
         int width = Math.Min(BlockWidth, Width - x0), height = Math.Min(BlockHeight, Height - y0);
 
         // A tile is whole (its part beyond the image is zeros); a strip has the rows it holds.
         int rows = Tiled ? BlockHeight : height;
         int rowBytes = (int)RowBytes;
-        byte[] raw = new byte[rowBytes * rows];
-        int samples = Planar ? 1 : Channels;
-        if (width == BlockWidth)
+        int pixelBytes = Channels * BytesPerSample;
+        int bandRow = Width * pixelBytes;
+        byte[] raw = System.Buffers.ArrayPool<byte>.Shared.Rent(rowBytes * rows);
+        if (width < BlockWidth || height < rows)
         {
-            _image.ReadBlock(x0, y0, width, height, Planar ? plane : null, raw.AsSpan(0, rowBytes * height));
+            raw.AsSpan(0, rowBytes * rows).Clear();
         }
-        else
+
+        for (int r = 0; r < height; r++)
         {
-            int pieceRow = width * samples * BytesPerSample;
-            byte[] piece = new byte[pieceRow * height];
-            _image.ReadBlock(x0, y0, width, height, Planar ? plane : null, piece);
-            for (int r = 0; r < height; r++)
+            var source = band.AsSpan((y0 - bandY + r) * bandRow + x0 * pixelBytes, width * pixelBytes);
+            var target = raw.AsSpan(r * rowBytes, rowBytes);
+            if (!Planar)
             {
-                piece.AsSpan(r * pieceRow, pieceRow).CopyTo(raw.AsSpan(r * rowBytes));
+                source.CopyTo(target);
+                continue;
+            }
+
+            // One channel of interleaved pixels.
+            for (int x = 0; x < width; x++)
+            {
+                source.Slice(x * pixelBytes + plane * BytesPerSample, BytesPerSample).CopyTo(target[(x * BytesPerSample)..]);
             }
         }
 
-        return BlockCodec.Encode(raw, rows, rowBytes, samples, BytesPerSample, Predictor, Compression, Level);
+        return BlockCodec.Encode(raw, rows, rowBytes, Planar ? 1 : Channels, BytesPerSample, Predictor, Compression, Level);
     }
 }

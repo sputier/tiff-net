@@ -195,33 +195,60 @@ public sealed partial class TiffImage
         ? new(TiffReadOptions.Default, "image", cancellationToken)
         : new(File!.Options, File.Source.Name, cancellationToken);
 
-    /// <summary>
-    /// Reads the raw samples of a region (one channel, or all of them interleaved) into bytes, in the order of the machine: what
-    /// the writer encodes. On the calling thread, within the limits of the file.
-    /// </summary>
-    internal void ReadBlock(int x, int y, int width, int height, int? channel, Span<byte> destination)
+    /// <summary>Checks that rows of the image can be read (support, blocks, buffers) before the band that holds them is allocated.</summary>
+    internal void ValidateBand(int y, int rows)
     {
         ThrowIfUnsupported();
-        var request = new PixelRequest(x, y, width, height, channel, TiffPixelOrder.Interleaved, TiffPixelScale.Stored);
+        var request = new PixelRequest(0, y, Width, rows, null, TiffPixelOrder.Interleaved, TiffPixelScale.Stored);
         var budget = Budget(CancellationToken.None);
-        var plan = PixelPlan.Create(Descriptor, budget, request, SampleConversion.SizeOf(SampleType), parallel: false);
+        _ = PixelPlan.Create(Descriptor, budget, request, SampleConversion.SizeOf(SampleType), parallel: false);
+    }
+
+    /// <summary>
+    /// Reads the raw samples of whole rows, interleaved, into bytes in the order of the machine: what the writer encodes. In
+    /// parallel when <paramref name="degree"/> allows, within the limits of the file.
+    /// </summary>
+    internal void ReadBand(int y, int rows, Memory<byte> destination, int degree, CancellationToken cancellationToken)
+    {
+        ThrowIfUnsupported();
+        if (_pixels is not null && !Descriptor.Planar)
+        {
+            // Pixels of the application, interleaved, in the order of the machine: the rows are a copy, nothing to decode.
+            long rowBytes = (long)Width * Channels * SampleConversion.SizeOf(SampleType);
+            _pixels.ReadExactly(y * rowBytes, destination.Span);
+            return;
+        }
+
+        var request = new PixelRequest(0, y, Width, rows, null, TiffPixelOrder.Interleaved, TiffPixelScale.Stored);
+        var budget = Budget(cancellationToken);
+
+        // Several threads pay for decoding; rows stored as they are only need to be copied.
+        bool parallel = degree > 1 && Descriptor.Compression != TiffCompression.None;
+        var plan = PixelPlan.Create(Descriptor, budget, request, SampleConversion.SizeOf(SampleType), parallel);
         switch (SampleType)
         {
-            case TiffSampleType.UInt8: Dispatch(plan, destination, null, budget); break;
-            case TiffSampleType.Int8: Dispatch(plan, MemoryMarshal.Cast<byte, sbyte>(destination), null, budget); break;
-            case TiffSampleType.UInt16: Dispatch(plan, MemoryMarshal.Cast<byte, ushort>(destination), null, budget); break;
-            case TiffSampleType.Int16: Dispatch(plan, MemoryMarshal.Cast<byte, short>(destination), null, budget); break;
-            case TiffSampleType.UInt32: Dispatch(plan, MemoryMarshal.Cast<byte, uint>(destination), null, budget); break;
-            case TiffSampleType.Int32: Dispatch(plan, MemoryMarshal.Cast<byte, int>(destination), null, budget); break;
-            case TiffSampleType.UInt64: Dispatch(plan, MemoryMarshal.Cast<byte, ulong>(destination), null, budget); break;
-            case TiffSampleType.Int64: Dispatch(plan, MemoryMarshal.Cast<byte, long>(destination), null, budget); break;
-            case TiffSampleType.Float16: Dispatch(plan, MemoryMarshal.Cast<byte, Half>(destination), null, budget); break;
-            case TiffSampleType.Float32: Dispatch(plan, MemoryMarshal.Cast<byte, float>(destination), null, budget); break;
-            default: Dispatch(plan, MemoryMarshal.Cast<byte, double>(destination), null, budget); break;
+            case TiffSampleType.UInt8: Dispatch(plan, destination.Span, destination, budget); break;
+            case TiffSampleType.Int8: ReadBandAs<sbyte>(plan, destination, budget); break;
+            case TiffSampleType.UInt16: ReadBandAs<ushort>(plan, destination, budget); break;
+            case TiffSampleType.Int16: ReadBandAs<short>(plan, destination, budget); break;
+            case TiffSampleType.UInt32: ReadBandAs<uint>(plan, destination, budget); break;
+            case TiffSampleType.Int32: ReadBandAs<int>(plan, destination, budget); break;
+            case TiffSampleType.UInt64: ReadBandAs<ulong>(plan, destination, budget); break;
+            case TiffSampleType.Int64: ReadBandAs<long>(plan, destination, budget); break;
+            case TiffSampleType.Float16: ReadBandAs<Half>(plan, destination, budget); break;
+            case TiffSampleType.Float32: ReadBandAs<float>(plan, destination, budget); break;
+            default: ReadBandAs<double>(plan, destination, budget); break;
         }
     }
 
-    private void Dispatch<T>(PixelPlan plan, Span<T> destination, T[]? array, ResourceBudget budget) where T : unmanaged, INumber<T>
+    /// <summary>Reads into the bytes of a band, seen as samples of their type (the workers of a parallel read share it as memory).</summary>
+    private void ReadBandAs<T>(PixelPlan plan, Memory<byte> destination, ResourceBudget budget) where T : unmanaged, INumber<T>
+    {
+        var samples = new CastMemory<T>(destination).Memory;
+        Dispatch(plan, samples.Span, samples, budget);
+    }
+
+    private void Dispatch<T>(PixelPlan plan, Span<T> destination, Memory<T>? array, ResourceBudget budget) where T : unmanaged, INumber<T>
     {
         var source = _pixels ?? File!.Source;
         bool little = _pixels is not null ? BitConverter.IsLittleEndian : !Storage!.BigEndian;

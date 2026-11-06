@@ -54,7 +54,7 @@ public class SaveTests
             using var back = TiffFile.Open(path);
             Assert.Equal(TiffCompression.Lzw, back.Primary.Storage!.Compression);
             Assert.Equal(expected, back.Primary.ReadRawPixels<ushort>());
-            Assert.Empty(Directory.GetFiles(Path.GetDirectoryName(path)!, $".{Path.GetFileName(path)}.*"));
+            Assert.Empty(Directory.GetFiles(Path.GetDirectoryName(path)!, ".tiff-*.tmp*"));
         }
         finally
         {
@@ -75,7 +75,7 @@ public class SaveTests
 
             Assert.Throws<NotSupportedException>(() => file.Save(path));
             Assert.Equal(new byte[] { 1, 2, 3 }, File.ReadAllBytes(path));
-            Assert.Empty(Directory.GetFiles(Path.GetDirectoryName(path)!, $".{Path.GetFileName(path)}.*"));
+            Assert.Empty(Directory.GetFiles(Path.GetDirectoryName(path)!, ".tiff-*.tmp*"));
         }
         finally
         {
