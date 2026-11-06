@@ -48,6 +48,9 @@ internal abstract class TiffSource : IDisposable
         }
     }
 
+    /// <summary>The bytes from <paramref name="offset"/> to <paramref name="offset"/> + <paramref name="length"/>, as a stream read in order.</summary>
+    public Stream OpenRange(long offset, long length) => new RangeStream(this, offset, length);
+
     /// <summary>Reads exactly <paramref name="destination"/>.Length bytes at <paramref name="offset"/>, which are within bounds.</summary>
     protected abstract void ReadCore(long offset, Span<byte> destination);
 
@@ -234,4 +237,44 @@ internal abstract class TiffSource : IDisposable
             }
         }
     }
+}
+
+/// <summary>A range of a source read in order (a compressed block inflated as a stream), in reads of what the caller asks.</summary>
+internal sealed class RangeStream(TiffSource source, long offset, long length) : Stream
+{
+    private long _position;
+
+    public override bool CanRead => true;
+
+    public override bool CanSeek => false;
+
+    public override bool CanWrite => false;
+
+    public override long Length => length;
+
+    public override long Position
+    {
+        get => _position;
+        set => throw new NotSupportedException();
+    }
+
+    public override int Read(Span<byte> buffer)
+    {
+        int count = (int)Math.Min(buffer.Length, length - _position);
+        source.ReadExactly(offset + _position, buffer[..count]);
+        _position += count;
+        return count;
+    }
+
+    public override int Read(byte[] buffer, int offset, int count) => Read(buffer.AsSpan(offset, count));
+
+    public override void Flush()
+    {
+    }
+
+    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+    public override void SetLength(long value) => throw new NotSupportedException();
+
+    public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
 }
