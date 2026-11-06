@@ -86,10 +86,12 @@ internal sealed class PixelPlan
     /// <param name="request">The region, channels, order and scale asked for.</param>
     /// <param name="sampleBytes">The size of a delivered sample (the type the stored samples are unpacked to).</param>
     /// <param name="parallel">Whether the read may use several threads.</param>
+    /// <param name="maxWorkers">The most threads the caller allows (the degree of a write), below that of the read options.</param>
     /// <exception cref="NotSupportedException">The image is compressed with a codec or a predictor not implemented yet, or one of
     /// its blocks is larger than an array.</exception>
     /// <exception cref="TiffException">A block is truncated, or the buffers exceed <see cref="TiffReadOptions.MaxPixelBytes"/>.</exception>
-    public static PixelPlan Create(ImageDescriptor d, ResourceBudget budget, PixelRequest request, int sampleBytes, bool parallel)
+    public static PixelPlan Create(ImageDescriptor d, ResourceBudget budget, PixelRequest request, int sampleBytes, bool parallel,
+        int maxWorkers = int.MaxValue)
     {
         if (d.Compression is not (TiffCompression.None or TiffCompression.Lzw or TiffCompression.Deflate or TiffCompression.PackBits
             or TiffCompression.Jpeg))
@@ -165,7 +167,7 @@ internal sealed class PixelPlan
         // The scratch buffers of the workers are counted, so that a huge row or tile cannot make them allocate more than allowed.
         int degree = budget.Options.MaxDegreeOfParallelism is -1 ? Environment.ProcessorCount : budget.Options.MaxDegreeOfParallelism;
         // They are allocated once per worker, of exactly these sizes (never rounded up by a pool, never kept after the read).
-        plan.Workers = parallel ? (int)Math.Max(1, Math.Min(degree, units)) : 1;
+        plan.Workers = parallel ? (int)Math.Max(1, Math.Min(Math.Min(degree, maxWorkers), units)) : 1;
         plan.JpegTables = jpegTables;
         plan.ReadBytes = compressed ? largestCompressed : rowsPerUnit * rowBytes;
         plan.DecodedBytes = largestDecoded;
@@ -293,18 +295,29 @@ internal readonly record struct StoredRect(long X0, long Y0, long X1, long Y1)
 internal static class PixelReader
 {
     public static void Read<TD, TOut>(PixelPlan plan, TiffSource source, ResourceBudget budget, int channels, bool littleEndian,
-        Span<TOut> destination, Memory<TOut>? memory)
+        Span<TOut> destination, Memory<TOut>? memory, ScratchCache? cache = null)
         where TD : unmanaged, INumber<TD>
         where TOut : unmanaged, INumber<TOut>
     {
+        // The buffers of the workers come from a cache: the read's own, or the caller's (the writer reads band after band with
+        // the same buffers). Parallel.ForEach starts new tasks as it goes; each takes buffers from the cache and puts them back,
+        // so that there are never more than one set per worker running at once (as reserved by the plan).
+        cache ??= new ScratchCache();
         var context = new Context<TD, TOut>(plan, source, budget, channels, littleEndian);
         if (memory is not { } array || plan.Workers == 1)
         {
-            var scratch = new Scratch<TD>(plan);
-            foreach (var unit in plan.Units())
+            var scratch = Scratch<TD>.Take(cache, plan);
+            try
             {
-                budget.ThrowIfCancelled();
-                context.Process(unit, destination, scratch);
+                foreach (var unit in plan.Units())
+                {
+                    budget.ThrowIfCancelled();
+                    context.Process(unit, destination, scratch);
+                }
+            }
+            finally
+            {
+                cache.Put(scratch);
             }
 
             return;
@@ -312,18 +325,14 @@ internal static class PixelReader
 
         try
         {
-            // Parallel.ForEach starts new tasks as it goes, each with its own local state: the buffers are taken from a pool of
-            // the read and put back, so that there are never more than one per worker running at once (as reserved by the plan).
-            var buffers = new System.Collections.Concurrent.ConcurrentBag<Scratch<TD>>();
-            Parallel.ForEach(plan.Units(), new ParallelOptions { MaxDegreeOfParallelism = plan.Workers },
-                () => buffers.TryTake(out var reused) ? reused : new Scratch<TD>(plan),
+            Parallel.ForEach(plan.Units(), new ParallelOptions { MaxDegreeOfParallelism = plan.Workers }, () => Scratch<TD>.Take(cache, plan),
                 (unit, _, scratch) =>
                 {
                     budget.ThrowIfCancelled();
                     context.Process(unit, array.Span, scratch);
                     return scratch;
                 },
-                buffers.Add);
+                cache.Put);
         }
         catch (AggregateException ex) when (ex.InnerExceptions.Count > 0)
         {
@@ -336,20 +345,43 @@ internal static class PixelReader
     /// The buffers of one worker, allocated when first needed, of the sizes the plan reserved, and reused for every unit the worker
     /// decodes. Their contents are never read before they are written.
     /// </summary>
-    private sealed class Scratch<TD>(PixelPlan plan) where TD : unmanaged
+    private sealed class Scratch<TD> where TD : unmanaged
     {
+        private PixelPlan _plan;
         private byte[]? _read;
         private byte[]? _decoded;
         private TD[]? _row;
         private byte[]? _predictor;
 
-        public byte[] Read => _read ??= GC.AllocateUninitializedArray<byte>((int)plan.ReadBytes);
+        private Scratch(PixelPlan plan) => _plan = plan;
 
-        public byte[] Decoded => _decoded ??= GC.AllocateUninitializedArray<byte>((int)plan.DecodedBytes);
+        public byte[] Read => _read = Fit(_read, _plan.ReadBytes);
 
-        public TD[] Row => _row ??= GC.AllocateUninitializedArray<TD>((int)plan.RowSamples);
+        public byte[] Decoded => _decoded = Fit(_decoded, _plan.DecodedBytes);
 
-        public byte[] Predictor => _predictor ??= GC.AllocateUninitializedArray<byte>((int)plan.PredictorBytes);
+        public TD[] Row => _row is { } row && row.Length >= _plan.RowSamples ? row : _row = GC.AllocateUninitializedArray<TD>((int)_plan.RowSamples);
+
+        public byte[] Predictor => _predictor = Fit(_predictor, _plan.PredictorBytes);
+
+        /// <summary>Buffers from the cache (large enough ones are reused for another plan of the same read or writer), or new ones.</summary>
+        public static Scratch<TD> Take(ScratchCache cache, PixelPlan plan)
+        {
+            if (cache.TryTake(out object? item))
+            {
+                if (item is Scratch<TD> scratch)
+                {
+                    scratch._plan = plan;
+                    return scratch;
+                }
+
+                cache.Put(item!);
+            }
+
+            return new Scratch<TD>(plan);
+        }
+
+        private static byte[] Fit(byte[]? buffer, long size) =>
+            buffer is not null && buffer.Length >= size ? buffer : GC.AllocateUninitializedArray<byte>((int)size);
     }
 
     /// <summary>The state of one read, shared by its workers (read only).</summary>
@@ -668,4 +700,14 @@ internal static class PixelReader
             return maxima;
         }
     }
+}
+
+/// <summary>Buffers of the workers of reads, kept between the reads of one caller (the bands of a write).</summary>
+internal sealed class ScratchCache
+{
+    private readonly System.Collections.Concurrent.ConcurrentBag<object> _items = [];
+
+    public bool TryTake(out object? item) => _items.TryTake(out item);
+
+    public void Put(object item) => _items.Add(item);
 }
