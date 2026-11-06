@@ -15,10 +15,17 @@ namespace Eleris.TiffNet;
 /// </para>
 /// <para>A damaged or hostile file fails with a <see cref="TiffException"/>, within the limits of <see cref="TiffReadOptions"/>.</para>
 /// </remarks>
-public sealed class TiffFile : IReadOnlyList<TiffImage>, IDisposable
+public sealed partial class TiffFile : IReadOnlyList<TiffImage>, IDisposable
 {
     private readonly List<TiffImage> _images;
-    private readonly TiffSource _source;
+    private readonly TiffSource? _source;
+
+    /// <summary>Creates an empty file, to build with <see cref="Add"/> and write with <c>Save</c>.</summary>
+    public TiffFile()
+    {
+        Options = TiffReadOptions.Default;
+        _images = [];
+    }
 
     private TiffFile(TiffSource source, TiffReadOptions options, List<TiffImage> images)
     {
@@ -38,12 +45,14 @@ public sealed class TiffFile : IReadOnlyList<TiffImage>, IDisposable
     /// The main image: the first page that is neither a reduced-resolution version of another (a thumbnail) nor a transparency
     /// mask, as <c>NewSubfileType</c> says; the first page when every page is one of those.
     /// </summary>
-    public TiffImage Primary => _images.FirstOrDefault(i => i.IsFullResolution) ?? _images[0];
+    /// <exception cref="InvalidOperationException">The file has no page.</exception>
+    public TiffImage Primary => _images.FirstOrDefault(i => i.IsFullResolution)
+        ?? (_images.Count > 0 ? _images[0] : throw new InvalidOperationException("The file has no page."));
 
     /// <summary>The options the file was read with.</summary>
     public TiffReadOptions Options { get; }
 
-    internal TiffSource Source => _source;
+    internal TiffSource Source => _source ?? throw new InvalidOperationException("The file was not read from a file or a stream.");
 
     /// <summary>Opens a file and reads its directories; the pixels are read on demand, until the file is disposed.</summary>
     /// <param name="path">The path of the file.</param>
@@ -97,7 +106,7 @@ public sealed class TiffFile : IReadOnlyList<TiffImage>, IDisposable
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     /// <summary>Closes the file opened by <see cref="Open"/>; its pixels can no longer be read. The metadata stays available.</summary>
-    public void Dispose() => _source.Dispose();
+    public void Dispose() => _source?.Dispose();
 
     private static string NameOf(Stream stream) => stream is FileStream file ? file.Name : "stream";
 

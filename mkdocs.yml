@@ -36,8 +36,10 @@ nav:
   - API reference:
     - Overview: api/index.md
     - Eleris.TiffNet:
+      - "TiffBigTiff": api/Eleris.TiffNet.TiffBigTiff.md
       - "TiffColorModel": api/Eleris.TiffNet.TiffColorModel.md
       - "TiffCompression": api/Eleris.TiffNet.TiffCompression.md
+      - "TiffCompressionLevel": api/Eleris.TiffNet.TiffCompressionLevel.md
       - "TiffException": api/Eleris.TiffNet.TiffException.md
       - "TiffExtraChannel": api/Eleris.TiffNet.TiffExtraChannel.md
       - "TiffExtraChannelKind": api/Eleris.TiffNet.TiffExtraChannelKind.md
@@ -56,4 +58,5 @@ nav:
       - "TiffStorage": api/Eleris.TiffNet.TiffStorage.md
       - "TiffTag": api/Eleris.TiffNet.TiffTag.md
       - "TiffTagType": api/Eleris.TiffNet.TiffTagType.md
+      - "TiffWriteOptions": api/Eleris.TiffNet.TiffWriteOptions.md
   # END API NAVIGATION
