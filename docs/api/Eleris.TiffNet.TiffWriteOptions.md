@@ -36,6 +36,12 @@ Change an option with a `with` expression: `TiffWriteOptions.Default with { Layo
 | [`Predictor`](#eleris-tiffnet-tiffwriteoptions-predictor) | The predictor, with LZW and Deflate: [`TiffPredictor.Auto`](Eleris.TiffNet.TiffPredictor.md#eleris-tiffnet-tiffpredictor-auto) (the default) chooses horizontal differencing for integers of 8 to 32 bits, the floating point predictor for floating point samples, and none for 64-bit integers (where it gains nothing). |
 | [`TileSize`](#eleris-tiffnet-tiffwriteoptions-tilesize) | The width and height of the tiles, a multiple of 16 (TIFF 6.0): 256 by default. |
 
+## Methods
+
+| Member | Description |
+| --- | --- |
+| [`From(TiffStorage)`](#eleris-tiffnet-tiffwriteoptions-from-eleris-tiffnet-tiffstorage) | Options that write an image as the file it was read from was stored: the same compression (JPEG, which is not written, becomes Deflate, as do the compressions the library does not write), predictor, layout and tile size (square tiles whose side is a multiple of 16; 256 otherwise), planar configuration, and BigTIFF when the file was BigTIFF. |
+
 ## Constructor details
 
 <a id="eleris-tiffnet-tiffwriteoptions-ctor"></a>
@@ -162,3 +168,26 @@ public int TileSize { get; init; }
 **Exceptions**
 
 - [`ArgumentOutOfRangeException`](https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception) — The value is not a positive multiple of 16.
+
+## Method details
+
+<a id="eleris-tiffnet-tiffwriteoptions-from-eleris-tiffnet-tiffstorage"></a>
+### `From(TiffStorage)`
+
+Options that write an image as the file it was read from was stored: the same compression (JPEG, which is not written, becomes Deflate, as do the compressions the library does not write), predictor, layout and tile size (square tiles whose side is a multiple of 16; 256 otherwise), planar configuration, and BigTIFF when the file was BigTIFF.
+
+```csharp
+public static TiffWriteOptions From(TiffStorage storage)
+```
+
+**Parameters**
+
+- `storage` — How the image was stored ([`TiffImage.Storage`](Eleris.TiffNet.TiffImage.md#eleris-tiffnet-tiffimage-storage)).
+
+**Returns**
+
+The options; the level and the threads are the defaults.
+
+**Exceptions**
+
+- [`ArgumentNullException`](https://learn.microsoft.com/dotnet/api/system.argumentnullexception) — `storage` is null.

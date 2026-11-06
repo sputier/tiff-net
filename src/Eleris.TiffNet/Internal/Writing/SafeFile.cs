@@ -12,24 +12,9 @@ internal static class SafeFile
     /// </summary>
     public static void Replace(string path, Action<Stream> write)
     {
-        string full = Path.GetFullPath(path);
-        string folder = Path.GetDirectoryName(full) ?? ".";
-        string temporary = Path.Combine(folder, $".{Path.GetFileName(full)}.{Guid.NewGuid():N}.tmp");
-        try
-        {
-            using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, 1 << 16))
-            {
-                write(stream);
-                stream.Flush(flushToDisk: true);
-            }
-
-            Move(temporary, full);
-        }
-        catch
-        {
-            TryDelete(temporary);
-            throw;
-        }
+        using var file = TemporaryFile.Next(path);
+        write(file.Stream);
+        file.Commit();
     }
 
     /// <summary>
@@ -37,7 +22,7 @@ internal static class SafeFile
     /// rights (Windows, through File.Replace) to the new one. A target this process holds open (the file being saved over) is
     /// first moved aside, which Windows allows for a file opened with FileShare.Delete, then removed.
     /// </summary>
-    private static void Move(string temporary, string target)
+    internal static void Move(string temporary, string target)
     {
         if (!File.Exists(target))
         {
@@ -90,7 +75,7 @@ internal static class SafeFile
         stream.Flush();
     }
 
-    private static void TryDelete(string path)
+    internal static void TryDelete(string path)
     {
         try
         {
@@ -102,6 +87,46 @@ internal static class SafeFile
         }
         catch (UnauthorizedAccessException)
         {
+        }
+    }
+}
+
+/// <summary>A temporary file next to a target, which replaces it on <see cref="Commit"/> and is removed otherwise.</summary>
+internal sealed class TemporaryFile : IDisposable
+{
+    private readonly string _target;
+    private readonly string _path;
+    private bool _committed;
+
+    private TemporaryFile(string target)
+    {
+        _target = Path.GetFullPath(target);
+        string folder = Path.GetDirectoryName(_target) ?? ".";
+        _path = Path.Combine(folder, $".{Path.GetFileName(_target)}.{Guid.NewGuid():N}.tmp");
+        Stream = new FileStream(_path, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, 1 << 16);
+    }
+
+    public FileStream Stream { get; }
+
+    /// <summary>Creates the temporary file of a target.</summary>
+    public static TemporaryFile Next(string target) => new(target);
+
+    /// <summary>Flushes the file to the disk and puts it in place of the target.</summary>
+    public void Commit()
+    {
+        Stream.Flush(flushToDisk: true);
+        Stream.Dispose();
+        SafeFile.Move(_path, _target);
+        _committed = true;
+    }
+
+    /// <summary>Removes the temporary file unless it was committed; a failure to remove it hides nothing.</summary>
+    public void Dispose()
+    {
+        if (!_committed)
+        {
+            Stream.Dispose();
+            SafeFile.TryDelete(_path);
         }
     }
 }
