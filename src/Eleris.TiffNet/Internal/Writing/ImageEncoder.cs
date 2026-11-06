@@ -17,8 +17,13 @@ internal sealed class ImageEncoder
 
     private readonly TiffImage _image;
 
+    /// <exception cref="NotSupportedException">The image cannot be read, or has more blocks than an array holds.</exception>
+    /// <exception cref="TiffException">The image comes from a file that does not hold its pixels, or whose pixels exceed
+    /// <see cref="TiffReadOptions.MaxPixelBytes"/>.</exception>
     public ImageEncoder(TiffImage image, TiffWriteOptions options)
     {
+        // Before anything is allocated for it: an image of a file is checked whole, as reading it would be.
+        image.ValidateForWrite();
         _image = image;
         Width = image.Width;
         Height = image.Height;
@@ -42,9 +47,16 @@ internal sealed class ImageEncoder
             BlockHeight = StripRows((int)Math.Clamp(StripBytes / Math.Max(1, rowBytes), 1, Height), SourceRows(image), Height);
         }
 
-        Across = (Width + BlockWidth - 1) / BlockWidth;
-        Down = (Height + BlockHeight - 1) / BlockHeight;
+        long across = (Width + (long)BlockWidth - 1) / BlockWidth, down = (Height + (long)BlockHeight - 1) / BlockHeight;
         Planes = Planar ? Channels : 1;
+        if (across * down * Planes > Array.MaxLength)
+        {
+            throw new NotSupportedException(
+                $"The image would have {across * down * Planes} strips or tiles, more than a table holds: use larger tiles.");
+        }
+
+        Across = (int)across;
+        Down = (int)down;
         RowBytes = (long)BlockWidth * samples * BytesPerSample;
         if (RowBytes * BlockHeight > Array.MaxLength)
         {
@@ -215,15 +227,20 @@ internal sealed class ImageEncoder
         int blockRowsPerBand = bandRows / BlockHeight;
 
         // A large band (a whole single-strip source) is allocated for the write, not rented: the pool would round it up and keep it.
-        // It is allocated once for every band.
+        // It is allocated once for every band, after the first band is checked against the limits.
         bool pooled = bandBytes <= 16 << 20;
-        byte[]? large = pooled ? null : GC.AllocateUninitializedArray<byte>((int)bandBytes);
+        byte[]? large = null;
         var scratch = new Pixels.ScratchCache();
         for (int bandY = 0; bandY < Height; bandY += bandRows)
         {
             int rows = Math.Min(bandRows, Height - bandY);
             _image.ValidateBand(bandY, rows, degree);
             int bytes = rows * Width * pixelBytes;
+            if (!pooled)
+            {
+                large ??= GC.AllocateUninitializedArray<byte>((int)bandBytes);
+            }
+
             byte[] band = large ?? System.Buffers.ArrayPool<byte>.Shared.Rent(bytes);
             try
             {
