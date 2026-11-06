@@ -32,6 +32,17 @@ public sealed record TiffReadOptions
     public static TiffReadOptions Default { get; } = new();
 
     /// <summary>
+    /// Limits for a phone, or a server reading files that come from anywhere: 256 MB for the pixels of an image and the buffers
+    /// that decode them, 64 MB of a stream held in memory, two decoding threads; the other limits as by default.
+    /// </summary>
+    public static TiffReadOptions Constrained { get; } = new()
+    {
+        MaxPixelBytes = 256L << 20,
+        MaxInputBytes = 64L << 20,
+        MaxDegreeOfParallelism = 2,
+    };
+
+    /// <summary>
     /// Refuses the defects that are tolerated by default (directory entries out of order, duplicate tags, tiles whose size is not
     /// a multiple of 16, a tag whose values do not fit in the file) with a <see cref="TiffException"/>.
     /// </summary>
