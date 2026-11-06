@@ -7,14 +7,17 @@ namespace Eleris.TiffNet.Internal.Pixels;
 /// <summary>
 /// Converts runs of samples of a row from the unpacked type <typeparamref name="TD"/> to the delivered type
 /// <typeparamref name="TOut"/>: unchanged (a copy), converted (<c>TOut.CreateTruncating</c>), or divided by the largest value of
-/// their channel then converted (normalised). The common conversions of astronomical data (8 and 16-bit integers to
-/// <see cref="float"/> or <see cref="double"/>, 32-bit integers and floats to <see cref="double"/>) go through vectors; every
-/// result is the one of the scalar conversion, bit for bit.
+/// their channel then converted (normalised). The common conversions of astronomical data (8, 16 and 32-bit integers to
+/// <see cref="float"/> or <see cref="double"/>, floats to <see cref="double"/>) go through vectors; every result is the one of
+/// the scalar conversion, bit for bit.
 /// </summary>
 /// <remarks>
 /// A normalised 8 or 16-bit sample is divided in <see cref="float"/> when the result is a <see cref="float"/>: the quotient of
 /// two numbers of 24 bits rounded once to <see cref="float"/> equals the quotient rounded to <see cref="double"/> then to
-/// <see cref="float"/> (double rounding is harmless when 53 ≥ 2 × 24 + 2), which is what the scalar conversion computes.
+/// <see cref="float"/> (double rounding is harmless when 53 ≥ 2 × 24 + 2), which is what the scalar conversion computes. A
+/// 32-bit integer is exact in <see cref="double"/>: it is divided there, then rounded to <see cref="float"/>, as the scalar
+/// conversion does. A floating-point image read normalised to its own type does not come here: every maximum is 1, so its
+/// samples are given as they are, every bit (a signalling NaN keeps its payload, where a conversion would make it quiet).
 /// </remarks>
 internal static class RowConversion<TD, TOut>
     where TD : unmanaged, INumber<TD>
@@ -135,6 +138,16 @@ internal static class RowConversion<TD, TOut>
     /// <summary>The samples converted with vectors (whole vectors only); the number done.</summary>
     private static int Vectorised(ReadOnlySpan<TD> source, Span<TOut> destination, double maximum)
     {
+        if (typeof(TOut) == typeof(float) && typeof(TD) == typeof(int))
+        {
+            return Wide.ToSingle(MemoryMarshal.Cast<TD, int>(source), MemoryMarshal.Cast<TOut, float>(destination), maximum);
+        }
+
+        if (typeof(TOut) == typeof(float) && typeof(TD) == typeof(uint))
+        {
+            return Wide.ToSingle(MemoryMarshal.Cast<TD, uint>(source), MemoryMarshal.Cast<TOut, float>(destination), maximum);
+        }
+
         if (typeof(TOut) == typeof(float) && (double.IsNaN(maximum) || (float)maximum == maximum))
         {
             var target = MemoryMarshal.Cast<TOut, float>(destination);
@@ -174,6 +187,16 @@ internal static class RowConversion<TD, TOut>
             if (typeof(TD) == typeof(float))
             {
                 return Wide.ToDouble(MemoryMarshal.Cast<TD, float>(source), target, maximum);
+            }
+
+            if (typeof(TD) == typeof(int))
+            {
+                return Wide.ToDouble(MemoryMarshal.Cast<TD, int>(source), target, maximum);
+            }
+
+            if (typeof(TD) == typeof(uint))
+            {
+                return Wide.ToDouble(MemoryMarshal.Cast<TD, uint>(source), target, maximum);
             }
         }
 
@@ -297,7 +320,7 @@ internal static class Wide
     public static int ToDouble(ReadOnlySpan<float> source, Span<double> destination, double maximum)
     {
         int lanes = Vector<float>.Count, i = 0;
-        bool divide = !double.IsNaN(maximum);
+        bool divide = !double.IsNaN(maximum) && maximum != 1;   // a quotient by 1 is the value (a float normalised to double)
         var max = new Vector<double>(maximum);
         for (; i <= source.Length - lanes; i += lanes)
         {
@@ -307,6 +330,85 @@ internal static class Wide
         }
 
         return i;
+    }
+
+    // 32-bit integers are exact in double: each is put in the mantissa of 2^52 (the sign bit flipped for signed ones, so that
+    // every value is positive), and 2^52 (plus 2^31) taken off; the vectors need no conversion of 64-bit lanes (AVX-512).
+    public static int ToDouble(ReadOnlySpan<int> source, Span<double> destination, double maximum)
+    {
+        int lanes = Vector<int>.Count, i = 0;
+        bool divide = !double.IsNaN(maximum);
+        var max = new Vector<double>(maximum);
+        for (; i <= source.Length - lanes; i += lanes)
+        {
+            Exact(new Vector<int>(source[i..]), out var low, out var high);
+            Store(low, destination[i..], divide, max);
+            Store(high, destination[(i + lanes / 2)..], divide, max);
+        }
+
+        return i;
+    }
+
+    public static int ToDouble(ReadOnlySpan<uint> source, Span<double> destination, double maximum)
+    {
+        int lanes = Vector<uint>.Count, i = 0;
+        bool divide = !double.IsNaN(maximum);
+        var max = new Vector<double>(maximum);
+        for (; i <= source.Length - lanes; i += lanes)
+        {
+            Exact(new Vector<uint>(source[i..]), out var low, out var high);
+            Store(low, destination[i..], divide, max);
+            Store(high, destination[(i + lanes / 2)..], divide, max);
+        }
+
+        return i;
+    }
+
+    // To float: in double (exact, and the quotient by the maximum as the scalar conversion computes it), then rounded once.
+    public static int ToSingle(ReadOnlySpan<int> source, Span<float> destination, double maximum)
+    {
+        int lanes = Vector<int>.Count, i = 0;
+        bool divide = !double.IsNaN(maximum);
+        var max = new Vector<double>(maximum);
+        for (; i <= source.Length - lanes; i += lanes)
+        {
+            Exact(new Vector<int>(source[i..]), out var low, out var high);
+            Vector.Narrow(divide ? low / max : low, divide ? high / max : high).CopyTo(destination[i..]);
+        }
+
+        return i;
+    }
+
+    public static int ToSingle(ReadOnlySpan<uint> source, Span<float> destination, double maximum)
+    {
+        int lanes = Vector<uint>.Count, i = 0;
+        bool divide = !double.IsNaN(maximum);
+        var max = new Vector<double>(maximum);
+        for (; i <= source.Length - lanes; i += lanes)
+        {
+            Exact(new Vector<uint>(source[i..]), out var low, out var high);
+            Vector.Narrow(divide ? low / max : low, divide ? high / max : high).CopyTo(destination[i..]);
+        }
+
+        return i;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void Exact(Vector<int> values, out Vector<double> low, out Vector<double> high)
+    {
+        Vector.Widen(Vector.AsVectorUInt32(values) ^ new Vector<uint>(0x8000_0000), out Vector<ulong> a, out Vector<ulong> b);
+        var bias = new Vector<double>(4503601774854144.0);   // 2^52 + 2^31
+        low = Vector.AsVectorDouble(a | new Vector<ulong>(0x4330_0000_0000_0000)) - bias;
+        high = Vector.AsVectorDouble(b | new Vector<ulong>(0x4330_0000_0000_0000)) - bias;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void Exact(Vector<uint> values, out Vector<double> low, out Vector<double> high)
+    {
+        Vector.Widen(values, out Vector<ulong> a, out Vector<ulong> b);
+        var bias = new Vector<double>(4503599627370496.0);   // 2^52
+        low = Vector.AsVectorDouble(a | new Vector<ulong>(0x4330_0000_0000_0000)) - bias;
+        high = Vector.AsVectorDouble(b | new Vector<ulong>(0x4330_0000_0000_0000)) - bias;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
