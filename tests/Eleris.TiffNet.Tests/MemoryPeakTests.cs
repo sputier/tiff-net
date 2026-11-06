@@ -58,7 +58,6 @@ public class MemoryPeakTests
         {
             const int width = 4000;
             var rows = new float[width * 16];
-            new Random(height).NextSingle();
             for (int i = 0; i < rows.Length; i++)
             {
                 rows[i] = i % 977;

@@ -366,15 +366,11 @@ internal static class PixelReader
         /// <summary>Buffers from the cache (large enough ones are reused for another plan of the same read or writer), or new ones.</summary>
         public static Scratch<TD> Take(ScratchCache cache, PixelPlan plan)
         {
-            if (cache.TryTake(out object? item))
+            // Buffers of another sample type are left to the collector: a cache serves one image, of one type.
+            if (cache.TryTake(out object? item) && item is Scratch<TD> scratch)
             {
-                if (item is Scratch<TD> scratch)
-                {
-                    scratch._plan = plan;
-                    return scratch;
-                }
-
-                cache.Put(item!);
+                scratch._plan = plan;
+                return scratch;
             }
 
             return new Scratch<TD>(plan);
@@ -422,7 +418,8 @@ internal static class PixelReader
             _identity = typeof(TD) == typeof(TOut) && _request.Scale == TiffPixelScale.Stored;
             // Unpacking is a plain copy: uncompressed, whole bytes of the delivered type, in the byte order of the machine, nothing
             // to invert, expand or reverse.
-            _direct = !_compressed && _identity && _d.BitsPerSample == Unsafe.SizeOf<TD>() * 8 && littleEndian == BitConverter.IsLittleEndian
+            _direct = !_compressed && _identity && _d.BitsPerSample == Unsafe.SizeOf<TD>() * 8
+                && (_d.BitsPerSample == 8 || littleEndian == BitConverter.IsLittleEndian)
                 && !_d.ReversedBits && _d.Photometric is not (TiffPhotometric.MinIsWhite or TiffPhotometric.Palette);
             _maxima = _request.Scale == TiffPixelScale.Normalized ? Maxima(_d, channels) : null;
         }
