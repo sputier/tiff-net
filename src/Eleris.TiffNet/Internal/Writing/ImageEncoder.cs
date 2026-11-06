@@ -169,8 +169,8 @@ internal sealed class ImageEncoder
 
     /// <summary>
     /// The rows of the image read at once: a multiple of the output block height that ends on source blocks (their least common
-    /// multiple, when it is not too large; otherwise at least 8 source blocks), and at least 16 output blocks, so that the threads have work. It does not depend on
-    /// the number of threads, so that the order of the blocks in the file does not either.
+    /// multiple, when it is not too large; otherwise up to 8 source blocks), with enough output blocks for the threads. The
+    /// blocks are appended in order whatever the band, so the file does not depend on the number of threads.
     /// </summary>
     internal int BandRows(int degree = 1)
     {
@@ -186,9 +186,12 @@ internal sealed class ImageEncoder
             aligned = (source * blocks + BlockHeight - 1) / BlockHeight * BlockHeight;
         }
 
-        // Enough blocks for the threads: 16, or 2 per thread with more. Planar files take a fixed number, since the blocks of a
-        // band are written plane after plane: the file would otherwise depend on the number of threads.
-        int blocksWanted = Tiled ? 1 : Planar ? 16 : Math.Max(16, 2 * degree);
+        // Enough blocks for the threads: 8 per thread, so that the pause between bands (the read of the next one) costs little.
+        // Planar files take a fixed number, since the blocks of a band are written plane after plane: the file would otherwise
+        // depend on the number of threads.
+        // The threads ask for more blocks only within the budget of a band (a very wide image has large strips).
+        long blockBytes = Math.Max(1, RowBytes * BlockHeight * Planes);
+        int blocksWanted = Tiled ? 1 : Planar ? 16 : (int)Math.Max(16, Math.Min(8L * degree, BandBudget / blockBytes));
         long wanted = Math.Max(aligned, (long)BlockHeight * blocksWanted);
         long rows = (wanted + aligned - 1) / aligned * aligned;
         return (int)Math.Min(rows, (Height + BlockHeight - 1L) / BlockHeight * BlockHeight);

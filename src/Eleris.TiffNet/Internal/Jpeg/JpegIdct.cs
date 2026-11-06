@@ -6,7 +6,9 @@ namespace Eleris.TiffNet.Internal.Jpeg;
 /// <summary>
 /// The inverse DCT of libjpeg's "islow" method (jidctint.c, the default of libjpeg and libjpeg-turbo), reproduced bit for bit: a
 /// separable integer algorithm (Loeffler, Ligtenberg and Moschytz) with 13-bit constants, columns first with 2 extra bits of
-/// precision, then rows, and the same range limiting of the result (a 10-bit wrap, then a clamp to 0..255).
+/// precision, then rows, and the same range limiting of the result (a 10-bit wrap, then a clamp to 0..255). The arithmetic is
+/// in 32 bits, wrapping as libjpeg-turbo's does, so that the scalar and the vectorised transforms give the same samples for any
+/// block, a hostile one included (16-bit quantization steps can make the sums overflow): the pixels do not depend on the machine.
 /// </summary>
 internal static class JpegIdct
 {
@@ -15,6 +17,13 @@ internal static class JpegIdct
     private const int Fix0298631336 = 2446, Fix0390180644 = 3196, Fix0541196100 = 4433, Fix0765366865 = 6270, Fix0899976223 = 7373,
         Fix1175875602 = 9633, Fix1501321110 = 12299, Fix1847759065 = 15137, Fix1961570560 = 16069, Fix2053119869 = 16819,
         Fix2562915447 = 20995, Fix3072711026 = 25172;
+
+    /// <summary>The scalar transform, whatever the machine (the reference of the vectorised one).</summary>
+    internal static void TransformScalar(ReadOnlySpan<short> coefficients, ReadOnlySpan<ushort> quantization, Span<byte> output, int stride)
+    {
+        CheckBounds(coefficients, quantization, output, stride);
+        Scalar(coefficients, quantization, output, stride);
+    }
 
     /// <summary>Transforms one block of coefficients (natural order) with its quantization table into 8 x 8 samples.</summary>
     /// <param name="coefficients">64 quantized coefficients, in natural (row by row) order.</param>
@@ -25,11 +34,28 @@ internal static class JpegIdct
     public static void Transform(ReadOnlySpan<short> coefficients, ReadOnlySpan<ushort> quantization, Span<byte> output, int stride)
     {
         // The bounds are checked once here; the loops then go through references (the IDCT runs for every block).
-        if (coefficients.Length < 64 || quantization.Length < 64 || output.Length < 7 * stride + 8)
+        CheckBounds(coefficients, quantization, output, stride);
+        if (JpegIdctAvx2.IsSupported)
+        {
+            JpegIdctAvx2.TransformChecked(coefficients, quantization, output, stride);
+            return;
+        }
+
+        Scalar(coefficients, quantization, output, stride);
+    }
+
+    internal static void CheckBounds(ReadOnlySpan<short> coefficients, ReadOnlySpan<ushort> quantization, Span<byte> output, int stride)
+    {
+        if (coefficients.Length < 64 || quantization.Length < 64 || stride < 8 || output.Length < 7L * stride + 8)
         {
             throw new ArgumentException("A block needs 64 coefficients, 64 quantization steps and 8 rows of output.");
         }
+    }
 
+    /// <summary>The scalar transform, the bounds checked by the caller.</summary>
+    [SkipLocalsInit]
+    private static void Scalar(ReadOnlySpan<short> coefficients, ReadOnlySpan<ushort> quantization, Span<byte> output, int stride)
+    {
         Span<int> work = stackalloc int[64];
         ref short co = ref MemoryMarshal.GetReference(coefficients);
         ref ushort q = ref MemoryMarshal.GetReference(quantization);
@@ -44,8 +70,8 @@ internal static class JpegIdct
             if (Unsafe.Add(ref ci, 8) == 0 && Unsafe.Add(ref ci, 16) == 0 && Unsafe.Add(ref ci, 24) == 0 && Unsafe.Add(ref ci, 32) == 0
                 && Unsafe.Add(ref ci, 40) == 0 && Unsafe.Add(ref ci, 48) == 0 && Unsafe.Add(ref ci, 56) == 0)
             {
-                // Only the DC term: the column is constant.
-                int dc = ci * qi << Pass1Bits;
+                // Only the DC term: the column is constant, the value the full pass gives (its wrap included).
+                int dc = Descale(ci * qi << ConstBits, ConstBits - Pass1Bits);
                 for (int r = 0; r < 8; r++)
                 {
                     Unsafe.Add(ref wi, r * 8) = dc;
@@ -54,16 +80,16 @@ internal static class JpegIdct
                 continue;
             }
 
-            long z2 = Unsafe.Add(ref ci, 16) * Unsafe.Add(ref qi, 16);
-            long z3 = Unsafe.Add(ref ci, 48) * Unsafe.Add(ref qi, 48);
-            long z1 = (z2 + z3) * Fix0541196100;
-            long tmp2 = z1 + z3 * -Fix1847759065;
-            long tmp3 = z1 + z2 * Fix0765366865;
+            int z2 = Unsafe.Add(ref ci, 16) * Unsafe.Add(ref qi, 16);
+            int z3 = Unsafe.Add(ref ci, 48) * Unsafe.Add(ref qi, 48);
+            int z1 = (z2 + z3) * Fix0541196100;
+            int tmp2 = z1 + z3 * -Fix1847759065;
+            int tmp3 = z1 + z2 * Fix0765366865;
             z2 = ci * qi;
             z3 = Unsafe.Add(ref ci, 32) * Unsafe.Add(ref qi, 32);
-            long tmp0 = (z2 + z3) << ConstBits;
-            long tmp1 = (z2 - z3) << ConstBits;
-            long tmp10 = tmp0 + tmp3, tmp13 = tmp0 - tmp3, tmp11 = tmp1 + tmp2, tmp12 = tmp1 - tmp2;
+            int tmp0 = (z2 + z3) << ConstBits;
+            int tmp1 = (z2 - z3) << ConstBits;
+            int tmp10 = tmp0 + tmp3, tmp13 = tmp0 - tmp3, tmp11 = tmp1 + tmp2, tmp12 = tmp1 - tmp2;
 
             Odd(Unsafe.Add(ref ci, 56) * Unsafe.Add(ref qi, 56), Unsafe.Add(ref ci, 40) * Unsafe.Add(ref qi, 40),
                 Unsafe.Add(ref ci, 24) * Unsafe.Add(ref qi, 24), Unsafe.Add(ref ci, 8) * Unsafe.Add(ref qi, 8),
@@ -90,17 +116,17 @@ internal static class JpegIdct
             if (Unsafe.Add(ref w, 1) == 0 && Unsafe.Add(ref w, 2) == 0 && Unsafe.Add(ref w, 3) == 0 && Unsafe.Add(ref w, 4) == 0
                 && Unsafe.Add(ref w, 5) == 0 && Unsafe.Add(ref w, 6) == 0 && Unsafe.Add(ref w, 7) == 0)
             {
-                Unsafe.InitBlockUnaligned(ref row, Limit(Descale(w, Pass1Bits + 3)), 8);
+                Unsafe.InitBlockUnaligned(ref row, Limit(Descale(w << ConstBits, Shift)), 8);
                 continue;
             }
 
-            long z2 = Unsafe.Add(ref w, 2), z3 = Unsafe.Add(ref w, 6);
-            long z1 = (z2 + z3) * Fix0541196100;
-            long tmp2 = z1 + z3 * -Fix1847759065;
-            long tmp3 = z1 + z2 * Fix0765366865;
-            long tmp0 = ((long)w + Unsafe.Add(ref w, 4)) << ConstBits;
-            long tmp1 = ((long)w - Unsafe.Add(ref w, 4)) << ConstBits;
-            long tmp10 = tmp0 + tmp3, tmp13 = tmp0 - tmp3, tmp11 = tmp1 + tmp2, tmp12 = tmp1 - tmp2;
+            int z2 = Unsafe.Add(ref w, 2), z3 = Unsafe.Add(ref w, 6);
+            int z1 = (z2 + z3) * Fix0541196100;
+            int tmp2 = z1 + z3 * -Fix1847759065;
+            int tmp3 = z1 + z2 * Fix0765366865;
+            int tmp0 = (w + Unsafe.Add(ref w, 4)) << ConstBits;
+            int tmp1 = (w - Unsafe.Add(ref w, 4)) << ConstBits;
+            int tmp10 = tmp0 + tmp3, tmp13 = tmp0 - tmp3, tmp11 = tmp1 + tmp2, tmp12 = tmp1 - tmp2;
 
             Odd(Unsafe.Add(ref w, 7), Unsafe.Add(ref w, 5), Unsafe.Add(ref w, 3), Unsafe.Add(ref w, 1), out tmp0, out tmp1, out tmp2, out tmp3);
 
@@ -121,7 +147,8 @@ internal static class JpegIdct
     /// </summary>
     public static void TransformDcOnly(int dcTimesQuantization, Span<byte> output, int stride)
     {
-        byte value = Limit(Descale(dcTimesQuantization << Pass1Bits, Pass1Bits + 3));
+        int column = Descale(dcTimesQuantization << ConstBits, ConstBits - Pass1Bits);
+        byte value = Limit(Descale(column << ConstBits, ConstBits + Pass1Bits + 3));
         for (int r = 0; r < 8; r++)
         {
             output.Slice(r * stride, 8).Fill(value);
@@ -130,10 +157,10 @@ internal static class JpegIdct
 
     /// <summary>The odd part of the 8-point transform, from the inputs 7, 5, 3 and 1.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void Odd(long in7, long in5, long in3, long in1, out long tmp0, out long tmp1, out long tmp2, out long tmp3)
+    private static void Odd(int in7, int in5, int in3, int in1, out int tmp0, out int tmp1, out int tmp2, out int tmp3)
     {
-        long z1 = in7 + in1, z2 = in5 + in3, z3 = in7 + in3, z4 = in5 + in1;
-        long z5 = (z3 + z4) * Fix1175875602;
+        int z1 = in7 + in1, z2 = in5 + in3, z3 = in7 + in3, z4 = in5 + in1;
+        int z5 = (z3 + z4) * Fix1175875602;
         tmp0 = in7 * Fix0298631336;
         tmp1 = in5 * Fix2053119869;
         tmp2 = in3 * Fix3072711026;
@@ -150,7 +177,7 @@ internal static class JpegIdct
 
     /// <summary>Divides by 2^<paramref name="n"/>, rounding (DESCALE): an arithmetic shift of the value plus a half.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int Descale(long value, int n) => (int)((value + (1L << (n - 1))) >> n);
+    private static int Descale(int value, int n) => (value + (1 << (n - 1))) >> n;
 
     /// <summary>libjpeg's range limit after the IDCT: the value plus 128, wrapped to 10 bits as a signed value, clamped to a byte.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

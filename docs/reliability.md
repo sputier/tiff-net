@@ -47,7 +47,8 @@ Console.WriteLine($"Pixels: {untrusted.MaxPixelBytes >> 20} MB, threads: {untrus
 
 Every hostile file the library is tested with (crafted, and from its security review) fails with the expected error within its
 time and memory bounds, and every change to the code that reads untrusted bytes is fuzzed in continuous integration: no
-exception other than `TiffException` and `NotSupportedException` comes out of reading a file.
+exception other than `TiffException` and `NotSupportedException` comes out of reading a file. A longer campaign of 148 million
+inputs over the directories, the pixels and the JPEG decoder found nothing ([report](fuzzing-2026-11.md)).
 
 ## Compressed data
 
