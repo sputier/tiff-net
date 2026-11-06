@@ -2,6 +2,9 @@ using System.Buffers.Binary;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics;
+using System.Runtime.Intrinsics.Arm;
+using System.Runtime.Intrinsics.X86;
 
 namespace Eleris.TiffNet.Internal.Codecs;
 
@@ -76,7 +79,7 @@ internal static class Predictors
 
                 break;
             case 4:
-                for (int i = 0; i < count; i++)
+                for (int i = littleEndian && BitConverter.IsLittleEndian ? Interleave4(scratch, row, count) : 0; i < count; i++)
                 {
                     uint v = (uint)Unsafe.Add(ref planes, i) << 24 | (uint)Unsafe.Add(ref planes, count + i) << 16
                         | (uint)Unsafe.Add(ref planes, 2 * count + i) << 8 | Unsafe.Add(ref planes, 3 * count + i);
@@ -106,6 +109,51 @@ internal static class Predictors
         }
     }
 
+    /// <summary>
+    /// Puts the four byte planes of 32-bit samples (most significant first) back together as little-endian samples, 16 samples at
+    /// once (SSE2 or AdvSimd); returns the number done.
+    /// </summary>
+    private static int Interleave4(ReadOnlySpan<byte> planes, Span<byte> output, int count)
+    {
+        if (!Sse2.IsSupported && !AdvSimd.Arm64.IsSupported)
+        {
+            return 0;
+        }
+
+        int i = 0;
+        for (; i + 16 <= count; i += 16)
+        {
+            // Little endian: the least significant byte (plane 3) first.
+            var p0 = Vector128.Create<byte>(planes[i..]);
+            var p1 = Vector128.Create<byte>(planes[(count + i)..]);
+            var p2 = Vector128.Create<byte>(planes[(2 * count + i)..]);
+            var p3 = Vector128.Create<byte>(planes[(3 * count + i)..]);
+            var low32 = ZipLow(p3, p2).AsUInt16();
+            var low10 = ZipLow(p1, p0).AsUInt16();
+            var high32 = ZipHigh(p3, p2).AsUInt16();
+            var high10 = ZipHigh(p1, p0).AsUInt16();
+            var target = output[(i * 4)..];
+            ZipLow(low32, low10).AsByte().CopyTo(target);
+            ZipHigh(low32, low10).AsByte().CopyTo(target[16..]);
+            ZipLow(high32, high10).AsByte().CopyTo(target[32..]);
+            ZipHigh(high32, high10).AsByte().CopyTo(target[48..]);
+        }
+
+        return i;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector128<byte> ZipLow(Vector128<byte> a, Vector128<byte> b) => Sse2.IsSupported ? Sse2.UnpackLow(a, b) : AdvSimd.Arm64.ZipLow(a, b);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector128<byte> ZipHigh(Vector128<byte> a, Vector128<byte> b) => Sse2.IsSupported ? Sse2.UnpackHigh(a, b) : AdvSimd.Arm64.ZipHigh(a, b);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector128<ushort> ZipLow(Vector128<ushort> a, Vector128<ushort> b) => Sse2.IsSupported ? Sse2.UnpackLow(a, b) : AdvSimd.Arm64.ZipLow(a, b);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector128<ushort> ZipHigh(Vector128<ushort> a, Vector128<ushort> b) => Sse2.IsSupported ? Sse2.UnpackHigh(a, b) : AdvSimd.Arm64.ZipHigh(a, b);
+
     /// <summary>The samples of the row in the order of the machine (swapped in place when needed).</summary>
     private static Span<T> Native<T>(Span<byte> row, bool swap) where T : unmanaged
     {
@@ -119,6 +167,12 @@ internal static class Predictors
 
     private static void Accumulate<T>(Span<T> values, int stride) where T : unmanaged, IBinaryInteger<T>
     {
+        if (PrefixSum.Vectorised<T>(stride))
+        {
+            PrefixSum.Run(values, stride);
+            return;
+        }
+
         ref T v = ref MemoryMarshal.GetReference(values);
         int n = values.Length;
         if (stride == 1)
