@@ -61,6 +61,26 @@ public class CodecBoundaryTests
     }
 
     [Fact]
+    public void The_LZW_encoder_ends_right_whatever_the_state_of_its_table()
+    {
+        // Each byte more adds at most one code: the lengths 0 to 9 000 of noise end the stream with the table at every size,
+        // including the last string filling it (a clear code before the end code) or widening the codes, as libtiff does.
+        byte[] noise = new byte[9_000];
+        new Random(7).NextBytes(noise);
+        byte[] encoded = new byte[LzwEncoder.MaxEncoded(noise.Length)];
+        byte[] decoded = new byte[noise.Length];
+        for (int length = 0; length <= noise.Length; length++)
+        {
+            int size = LzwEncoder.Encode(noise.AsSpan(0, length), encoded);
+            int written = Lzw.Decode(encoded.AsSpan(0, size), decoded.AsSpan(0, length), out bool overflow);
+            if (written != length || overflow || !decoded.AsSpan(0, length).SequenceEqual(noise.AsSpan(0, length)))
+            {
+                Assert.Fail($"{length} bytes do not decode back");
+            }
+        }
+    }
+
+    [Fact]
     public void The_LZW_decoder_reports_a_string_cut_by_the_end_of_the_destination()
     {
         // Runs encode into long strings: a destination one byte short cuts the last one.
