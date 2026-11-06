@@ -30,11 +30,14 @@ internal static class TiffFileWriter
     public static void Write(IReadOnlyList<TiffImage> images, Stream output, TiffWriteOptions options, CancellationToken cancellationToken) =>
         Write(images, Prepare(images, options, cancellationToken), output, options, cancellationToken);
 
+    /// <summary>A counter of the blocks the encoders write, for a caller that follows the progress of a save; none otherwise.</summary>
+    public static ProgressCounter? Counter(List<ImageEncoder> encoders, IProgress<double>? progress) =>
+        ProgressCounter.Of(progress, encoders.Sum(e => (long)e.Blocks));
+
     /// <summary>Writes the images, planned by <see cref="Prepare"/>, as one file into a stream that seeks.</summary>
     public static void Write(IReadOnlyList<TiffImage> images, List<ImageEncoder> encoders, Stream output, TiffWriteOptions options,
-        CancellationToken cancellationToken, IProgress<double>? progress = null)
+        CancellationToken cancellationToken, ProgressCounter? counter = null)
     {
-        var counter = ProgressCounter.Of(progress, encoders.Sum(e => (long)e.Blocks));
         bool bigTiff = options.BigTiff switch
         {
             TiffBigTiff.Always => true,

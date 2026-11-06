@@ -284,9 +284,10 @@ public sealed partial class TiffFile : IReadOnlyList<TiffImage>, IDisposable
             BitsPerSample = descriptor.BitsPerSample,
         };
         var metadata = MetadataReader.Read(reader, directory);
-        if (descriptor.Photometric == TiffPhotometric.MinIsWhite)
+        if (descriptor.Photometric is TiffPhotometric.MinIsWhite or TiffPhotometric.Palette or TiffPhotometric.YCbCr)
         {
-            // The values are delivered inverted (as MinIsBlack): the ranges of the file describe the values it stores.
+            // The values are delivered inverted (MinIsWhite), expanded to RGB (palette) or converted to RGB (YCbCr): the ranges of
+            // the file describe the values it stores.
             foreach (int code in TiffMetadata.PixelTags)
             {
                 metadata.Remove(code);

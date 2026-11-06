@@ -160,7 +160,7 @@ public TiffPredictor Predictor { get; init; }
 <a id="eleris-tiffnet-tiffwriteoptions-skipunsupportedpages"></a>
 ### `SkipUnsupportedPages`
 
-Whether a save leaves out the pages the library cannot read ([`TiffImage.UnsupportedReason`](Eleris.TiffNet.TiffImage.md#eleris-tiffnet-tiffimage-unsupportedreason): a CMYK thumbnail beside the main image, for example) instead of failing with a [`NotSupportedException`](https://learn.microsoft.com/dotnet/api/system.notsupportedexception); false by default, so that no page is lost without the application asking.
+Whether a save leaves out the pages the library cannot read ([`TiffImage.UnsupportedReason`](Eleris.TiffNet.TiffImage.md#eleris-tiffnet-tiffimage-unsupportedreason): a CMYK thumbnail beside the main image, for example) instead of failing with a [`NotSupportedException`](https://learn.microsoft.com/dotnet/api/system.notsupportedexception); false by default, so that no page is lost without the application asking. It concerns the pages: sub-images are not written in this version.
 
 ```csharp
 public bool SkipUnsupportedPages { get; init; }

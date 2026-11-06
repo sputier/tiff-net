@@ -291,6 +291,7 @@ public class MetadataTests
         source.Metadata.SampleRange = (0, 255);
         var target = TiffImage.Create<byte>(new byte[4], 2, 2);
         target.Metadata.Artist = "replaced";
+        target.Metadata.SampleRange = (1, 2);   // excluded: not kept either
 
         target.Metadata.CopyFrom(source.Metadata, TiffMetadata.PixelTags);
 
