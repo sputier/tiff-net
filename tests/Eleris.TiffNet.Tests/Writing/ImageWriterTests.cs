@@ -92,6 +92,15 @@ public class ImageWriterTests
     }
 
     [Fact]
+    public void Images_are_at_most_what_the_library_reads_back_a_side()
+    {
+        var tiles = TiffWriteOptions.Default with { Layout = TiffLayout.Tiles };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => TiffImageWriter.Create(new MemoryStream(), int.MaxValue + 1L, 16, TiffSampleType.UInt8, options: tiles));
+        Assert.Throws<ArgumentOutOfRangeException>(() => TiffImageWriter.Create(new MemoryStream(), 16, int.MaxValue + 1L, TiffSampleType.UInt8, options: tiles));
+    }
+
+    [Fact]
     public void The_samples_must_be_of_the_declared_type()
     {
         using var writer = TiffImageWriter.Create(new MemoryStream(), 4, 4, TiffSampleType.Float32);

@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- A .NET MAUI application that writes and reads a TIFF file in its data folder: the library on Android (and Windows).
+  <!-- A .NET MAUI application that writes and reads a TIFF file in its data folder: the library on Android (built in CI), and
+       on Windows (built by hand).
        dotnet build samples/Eleris.TiffNet.MauiSample -f net10.0-android -->
   <PropertyGroup>
     <TargetFrameworks>net10.0-android</TargetFrameworks>

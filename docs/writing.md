@@ -17,8 +17,8 @@ file could exceed 4 GB: lossless, compact, readable by every TIFF reader. JPEG i
 ```csharp
 var options = TiffWriteOptions.Default with
 {
-    Compression = TiffCompression.Lzw,              // Deflate (default), LZW, PackBits or None
-    Level = TiffCompressionLevel.Fastest,           // for Deflate
+    Compression = TiffCompression.Deflate,          // Deflate (default), LZW, PackBits or None
+    Level = TiffCompressionLevel.Fastest,           // of Deflate: faster, files larger
     Layout = TiffLayout.Tiles,                      // 256 x 256 tiles (TileSize)
     PlanarConfiguration = TiffPixelOrder.Planar,    // each channel in its own plane
 };

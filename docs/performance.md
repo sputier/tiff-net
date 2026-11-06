@@ -1,8 +1,8 @@
 # Performance
 
 Measured on an 8-core x64 laptop (AVX2, .NET 10), warm cache, with images of 24 MP (6 000 x 4 000) smooth with noise, as
-astronomical frames are. `benchmarks/` reproduces every figure (`TargetBenchmarks`, `JpegBenchmarks`, `tools/bench_jpeg.py`);
-the measurements are kept in `benchmarks/results`.
+astronomical frames are. `benchmarks/` reproduces the figures (`TargetBenchmarks`, with `Fastest` included, `JpegBenchmarks`,
+`tools/bench_jpeg.py`); the measurements are kept in `benchmarks/results`.
 
 ## Throughput
 
@@ -22,7 +22,8 @@ JPEG (12 MP, quality 90, one thread) is decoded in 1.1 to 1.35 times the time of
 - A whole-image read allocates its pixels and the buffers of one strip or tile per thread: 1.00 to 1.07 times the pixels
   above about 50 MB, at most 1.1 times. `ReadPixels(Span<T>)` reads into a buffer of the application.
 - A region reads only the strips or tiles under it, and decodes a compressed strip only up to the last row it needs.
-- Writing holds a band of rows of the source and at most 2 × `MaxDegreeOfParallelism` encoded blocks; `TiffImageWriter` writes an
+- Writing holds a band of rows of the source (the whole image when the source is one compressed strip, or stored on its
+  side) and at most 2 × `MaxDegreeOfParallelism` encoded blocks; `TiffImageWriter` writes an
   image of any size with a bounded window (under 16 MB for 64 MB of pixels).
 
 ## Tuning
@@ -34,8 +35,8 @@ JPEG (12 MP, quality 90, one thread) is decoded in 1.1 to 1.35 times the time of
 | Write fastest, files largest | `Compression = TiffCompression.None` |
 | Read regions of a large image quickly | write it in tiles (`Layout = TiffLayout.Tiles`) |
 | Read one channel quickly | write it planar (`PlanarConfiguration = TiffPixelOrder.Planar`): only its plane is read |
-| Avoid an array per read | `ReadPixels(Span<T>)` into a reused buffer |
+| Avoid an array per read | `ReadPixels(Span<T>)` into a reused buffer (decoded on the calling thread only) |
 | Bound memory on untrusted files | `MaxPixelBytes` (see [reliability](reliability.md)) |
 
-Deflate at the default level compresses noisy floating point data at about 50 MB/s per core: such files are the slowest to
+Deflate at the default level compresses noisy floating point data at about 60 MB/s per core (288 MB in 4.4 to 4.6 s): such files are the slowest to
 write, and the predictor matters more than the level for their size.
