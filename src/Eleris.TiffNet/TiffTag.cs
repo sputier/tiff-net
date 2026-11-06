@@ -122,6 +122,7 @@ public sealed class TiffTag : IEquatable<TiffTag>
     }
 
     /// <summary>The texts of a tag that holds several, separated by NUL bytes.</summary>
+    /// <remarks>A string per text: a tag of a file from anywhere can hold millions (up to <see cref="TiffReadOptions.MaxTagBytes"/>).</remarks>
     /// <exception cref="InvalidOperationException">The tag holds numbers.</exception>
     public IReadOnlyList<string> AsStrings()
     {
@@ -141,47 +142,64 @@ public sealed class TiffTag : IEquatable<TiffTag>
     }
 
     /// <summary>The values as numbers of type <typeparamref name="T"/>.</summary>
+    /// <remarks>An array of <see cref="Count"/> values: check it first for a tag of a file from anywhere, which can hold millions.</remarks>
     /// <typeparam name="T">A numeric type that can hold every value: any for integers that fit, <see cref="float"/> or
     /// <see cref="double"/> for floating point values and rationals (numerator divided by denominator).</typeparam>
     /// <returns>The values.</returns>
     /// <exception cref="InvalidOperationException">A value cannot be represented as <typeparamref name="T"/>, or the tag holds text.</exception>
     public T[] AsNumbers<T>() where T : unmanaged, System.Numerics.INumber<T>
     {
+        EnsureNumbers();
+        var result = new T[Count];
+        for (int i = 0; i < result.Length; i++)
+        {
+            result[i] = NumberAt<T>(i);
+        }
+
+        return result;
+    }
+
+    /// <summary>The first value, without the others (a resolution of a hostile file may hold millions).</summary>
+    internal T FirstNumber<T>() where T : unmanaged, System.Numerics.INumber<T>
+    {
+        EnsureNumbers();
+        return NumberAt<T>(0);
+    }
+
+    private void EnsureNumbers()
+    {
         if (Type is TiffTagType.Ascii or TiffTagType.Undefined)
         {
             throw new InvalidOperationException($"Tag {Code} holds {Type} values, not numbers.");
         }
+    }
 
+    private T NumberAt<T>(int i) where T : unmanaged, System.Numerics.INumber<T>
+    {
         int size = TagTypes.Size(Type);
-        var result = new T[Count];
-        for (int i = 0; i < result.Length; i++)
+        ReadOnlySpan<byte> v = _values.AsSpan(i * size, size);
+        try
         {
-            ReadOnlySpan<byte> v = _values.AsSpan(i * size, size);
-            try
+        return Type switch
             {
-                result[i] = Type switch
-                {
-                    TiffTagType.Byte => T.CreateChecked(v[0]),
-                    TiffTagType.SByte => T.CreateChecked((sbyte)v[0]),
-                    TiffTagType.Short => T.CreateChecked(BinaryPrimitives.ReadUInt16LittleEndian(v)),
-                    TiffTagType.SShort => T.CreateChecked(BinaryPrimitives.ReadInt16LittleEndian(v)),
-                    TiffTagType.Long or TiffTagType.Ifd => T.CreateChecked(BinaryPrimitives.ReadUInt32LittleEndian(v)),
-                    TiffTagType.SLong => T.CreateChecked(BinaryPrimitives.ReadInt32LittleEndian(v)),
-                    TiffTagType.Long8 or TiffTagType.Ifd8 => T.CreateChecked(BinaryPrimitives.ReadUInt64LittleEndian(v)),
-                    TiffTagType.SLong8 => T.CreateChecked(BinaryPrimitives.ReadInt64LittleEndian(v)),
-                    TiffTagType.Float => Real(BinaryPrimitives.ReadSingleLittleEndian(v)),
-                    TiffTagType.Double => Real(BinaryPrimitives.ReadDoubleLittleEndian(v)),
-                    TiffTagType.Rational => Real((double)BinaryPrimitives.ReadUInt32LittleEndian(v) / BinaryPrimitives.ReadUInt32LittleEndian(v[4..])),
-                    _ => Real((double)BinaryPrimitives.ReadInt32LittleEndian(v) / BinaryPrimitives.ReadInt32LittleEndian(v[4..])),
-                };
-            }
-            catch (OverflowException)
-            {
-                throw new InvalidOperationException($"Value {i} of tag {Code} ({Type}) does not fit in {typeof(T).Name}.");
-            }
+                TiffTagType.Byte => T.CreateChecked(v[0]),
+                TiffTagType.SByte => T.CreateChecked((sbyte)v[0]),
+                TiffTagType.Short => T.CreateChecked(BinaryPrimitives.ReadUInt16LittleEndian(v)),
+                TiffTagType.SShort => T.CreateChecked(BinaryPrimitives.ReadInt16LittleEndian(v)),
+                TiffTagType.Long or TiffTagType.Ifd => T.CreateChecked(BinaryPrimitives.ReadUInt32LittleEndian(v)),
+                TiffTagType.SLong => T.CreateChecked(BinaryPrimitives.ReadInt32LittleEndian(v)),
+                TiffTagType.Long8 or TiffTagType.Ifd8 => T.CreateChecked(BinaryPrimitives.ReadUInt64LittleEndian(v)),
+                TiffTagType.SLong8 => T.CreateChecked(BinaryPrimitives.ReadInt64LittleEndian(v)),
+                TiffTagType.Float => Real(BinaryPrimitives.ReadSingleLittleEndian(v)),
+                TiffTagType.Double => Real(BinaryPrimitives.ReadDoubleLittleEndian(v)),
+                TiffTagType.Rational => Real((double)BinaryPrimitives.ReadUInt32LittleEndian(v) / BinaryPrimitives.ReadUInt32LittleEndian(v[4..])),
+                _ => Real((double)BinaryPrimitives.ReadInt32LittleEndian(v) / BinaryPrimitives.ReadInt32LittleEndian(v[4..])),
+            };
         }
-
-        return result;
+        catch (OverflowException)
+        {
+            throw new InvalidOperationException($"Value {i} of tag {Code} ({Type}) does not fit in {typeof(T).Name}.");
+        }
 
         T Real(double value) => typeof(T) == typeof(double) || typeof(T) == typeof(float) || typeof(T) == typeof(Half)
             ? T.CreateChecked(value)

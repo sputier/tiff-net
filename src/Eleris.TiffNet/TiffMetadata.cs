@@ -261,7 +261,7 @@ public sealed class TiffMetadata : IEnumerable<TiffTag>
             return null;
         }
 
-        return tag.AsNumbers<double>()[0];
+        return tag.FirstNumber<double>();
     }
 
     /// <summary>The closest fraction with a numerator and a denominator of 32 bits (continued fractions).</summary>
