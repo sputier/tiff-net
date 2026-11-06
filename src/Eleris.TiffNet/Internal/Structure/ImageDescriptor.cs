@@ -324,6 +324,9 @@ internal sealed record ImageDescriptor
     /// <summary>The same image with the NewSubfileType bits of another (an image whose pixels are replaced stays what it was).</summary>
     public ImageDescriptor WithSubfileType(int subfileType) => this with { SubfileType = subfileType };
 
+    /// <summary>A palette image as its indices: grey samples of the stored depth, no colour map to expand.</summary>
+    public ImageDescriptor AsIndices() => this with { Photometric = TiffPhotometric.MinIsBlack, ColorMap = null, Channels = SamplesPerPixel };
+
     /// <summary>Bytes of one row of <paramref name="width"/> pixels of <paramref name="samples"/> samples, padded to a byte.</summary>
     public static long BytesPerRow(long width, int samples, int bits) => (width * samples * bits + 7) / 8;
 

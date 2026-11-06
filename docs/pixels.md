@@ -1,7 +1,7 @@
 # Reading pixels
 
 Pixels are delivered **top-down, left to right**, whatever the `Orientation` of the file, interleaved (`[y][x][c]`) or planar
-(`[c][y][x]`, the order of a FITS cube). Palettes are expanded to 16-bit RGB, MinIsWhite is inverted, samples of 1 to 16 bits
+(`[c][y][x]`, the order of a FITS cube). Palettes are expanded to 16-bit RGB (`ReadIndices` gives the indices themselves, for classification maps and label images), MinIsWhite is inverted, samples of 1 to 16 bits
 are unpacked to bytes or 16-bit words with their values unchanged.
 
 | Method | Gives |

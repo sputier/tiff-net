@@ -30,7 +30,7 @@ public sealed partial class TiffFile
         ArgumentException.ThrowIfNullOrEmpty(path);
         Platform.EnsureSupported();
         options ??= TiffWriteOptions.Default;
-        TiffImage[] pages = [.. _images];
+        TiffImage[] pages = Pages(options);
         var encoders = TiffFileWriter.Prepare(pages, options, cancellationToken);
         SafeFile.Replace(path, stream => TiffFileWriter.Write(pages, encoders, stream, options, cancellationToken));
     }
@@ -55,7 +55,7 @@ public sealed partial class TiffFile
         ArgumentNullException.ThrowIfNull(stream);
         Platform.EnsureSupported();
         options ??= TiffWriteOptions.Default;
-        TiffImage[] pages = [.. _images];
+        TiffImage[] pages = Pages(options);
         var encoders = TiffFileWriter.Prepare(pages, options, cancellationToken);
         SafeFile.ToStream(stream, output => TiffFileWriter.Write(pages, encoders, output, options, cancellationToken));
     }
@@ -77,7 +77,7 @@ public sealed partial class TiffFile
         ArgumentNullException.ThrowIfNull(stream);
         Platform.EnsureSupported();
         options ??= TiffWriteOptions.Default;
-        TiffImage[] pages = [.. _images];
+        TiffImage[] pages = Pages(options);
         return SafeFile.ToStreamAsync(stream,
             output => TiffFileWriter.Write(pages, TiffFileWriter.Prepare(pages, options, cancellationToken), output, options, cancellationToken, progress),
             cancellationToken);
@@ -100,11 +100,15 @@ public sealed partial class TiffFile
         ArgumentException.ThrowIfNullOrEmpty(path);
         Platform.EnsureSupported();
         options ??= TiffWriteOptions.Default;
-        TiffImage[] pages = [.. _images];
+        TiffImage[] pages = Pages(options);
         return Task.Run(() =>
         {
             var encoders = TiffFileWriter.Prepare(pages, options, cancellationToken);
             SafeFile.Replace(path, stream => TiffFileWriter.Write(pages, encoders, stream, options, cancellationToken, progress));
         }, cancellationToken);
     }
+
+    /// <summary>The pages a save writes: all, or those the library can read when <see cref="TiffWriteOptions.SkipUnsupportedPages"/>.</summary>
+    private TiffImage[] Pages(TiffWriteOptions options) =>
+        options.SkipUnsupportedPages ? [.. _images.Where(i => i.UnsupportedReason is null)] : [.. _images];
 }
