@@ -136,6 +136,12 @@ internal sealed class StructureReader
 
     private int CountSize => Header.BigTiff ? 8 : 2;
 
+    /// <summary>
+    /// The memory an entry takes in the table of a directory: 48 bytes of entry (key, value, links) and 4 of bucket, for a table
+    /// that grows up to twice its entries.
+    /// </summary>
+    private const int EntryMemory = 104;
+
     private int EntrySize => Header.BigTiff ? 20 : 12;
 
     private int OffsetSize => Header.BigTiff ? 8 : 4;
@@ -175,7 +181,8 @@ internal sealed class StructureReader
             throw Budget.Invalid($"the directory at offset {offset} declares {count} entries, more than the file holds.");
         }
 
-        Budget.ReserveMetadata(entriesLength + OffsetSize, $"the directory at offset {offset}");
+        // The bytes of the entries, and the table that holds them once read.
+        Budget.ReserveMetadata(entriesLength + OffsetSize + (long)count * EntryMemory, $"the directory at offset {offset}");
         byte[] bytes = new byte[entriesLength + OffsetSize];
         long available = Math.Min(bytes.Length, Source.Length - entriesStart);
         Source.ReadExactly(entriesStart, bytes.AsSpan(0, (int)available));
@@ -191,7 +198,7 @@ internal sealed class StructureReader
             throw Budget.Invalid($"the directory at offset {offset} has no offset of the next directory.");
         }
 
-        var entries = new Dictionary<ushort, TagEntry>((int)count);
+        var entries = new Dictionary<ushort, TagEntry>((int)Math.Min(count, 64));
         int previous = -1;
         for (int i = 0; i < (int)count; i++)
         {

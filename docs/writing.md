@@ -6,9 +6,14 @@ accident. `SetPixels` replaces the pixels of an image, `SetExtraChannels` says w
 `TiffFile.Save` writes the pages:
 
 - **To a path**: a temporary file next to the target replaces it, so that a failure leaves an existing file as it was; the
-  permissions of a replaced file are kept; the file being read can be the target.
-- **To a stream**: from its position, left open; a stream that cannot seek is written through a temporary file. `SaveAsync`
-  encodes on the threads of the pool.
+  permissions of a replaced file are kept, and on Unix the temporary file has them from its creation (a private file is never
+  readable by others while it is written); the file being read can be the target. A symbolic link is written through: do not
+  save into a folder that other users can write.
+- **An image opened from a file** is saved band after band, but its pixels count in the `MaxPixelBytes` the file was opened
+  with, as reading the whole image would: open a file larger than 2 GB of pixels with a larger limit to save it again, or copy
+  it by region into a `TiffImageWriter`.
+- **To a stream**: from its position, left open; a stream that cannot seek is written through a temporary file (readable by
+  its owner only on Unix). `SaveAsync` encodes on the threads of the pool.
 
 The defaults write **Deflate with the predictor that suits the samples**, in strips of about 256 KB, as classic TIFF unless the
 file could exceed 4 GB: lossless, compact, readable by every TIFF reader. JPEG is not written.
