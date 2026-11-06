@@ -38,14 +38,16 @@ An image can be read from several threads at once. Changing it ([`TiffImage.SetP
 | --- | --- |
 | [`Create<T>(ReadOnlySpan<T>, int, int, int, TiffColorModel?, TiffPixelOrder)`](#eleris-tiffnet-tiffimage-create-1-system-readonlyspan-0-system-int32-system-int32-system-int32-system-nullable-eleris-tiffnet-tiffcolormodel-eleris-tiffnet-tiffpixelorder) | Creates an image from pixels of the application, which are copied once. |
 | [`ReadChannel<T>(int, TiffPixelScale)`](#eleris-tiffnet-tiffimage-readchannel-1-system-int32-eleris-tiffnet-tiffpixelscale) | One channel of the image, converted as by [`TiffImage.ReadPixels`](#eleris-tiffnet-tiffimage-readpixels-1-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder). |
+| [`ReadChannelAsync<T>(int, TiffPixelScale, IProgress<double>, CancellationToken)`](#eleris-tiffnet-tiffimage-readchannelasync-1-system-int32-eleris-tiffnet-tiffpixelscale-system-iprogress-system-double-system-threading-cancellationtoken) | Reads one channel on a thread of the pool, as [`TiffImage.ReadChannel`](#eleris-tiffnet-tiffimage-readchannel-1-system-int32-eleris-tiffnet-tiffpixelscale). |
 | [`ReadPixels<T>(TiffPixelScale, TiffPixelOrder)`](#eleris-tiffnet-tiffimage-readpixels-1-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder) | The samples, converted to `T`, as stored or normalised. |
 | [`ReadPixels<T>(Memory<T>, TiffPixelScale, TiffPixelOrder)`](#eleris-tiffnet-tiffimage-readpixels-1-system-memory-0-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder) | Reads the samples into a buffer of the caller, decoding on every core, without allocating an array for them. |
 | [`ReadPixels<T>(Span<T>, TiffPixelScale, TiffPixelOrder)`](#eleris-tiffnet-tiffimage-readpixels-1-system-span-0-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder) | Reads the samples into a buffer of the caller, on the calling thread, without allocating an array for them; the [`Memory`](https://learn.microsoft.com/dotnet/api/system.memory-1) overload decodes on every core. |
 | [`ReadPixels<T>(T[], TiffPixelScale, TiffPixelOrder)`](#eleris-tiffnet-tiffimage-readpixels-1-0-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder) | Reads the samples into an array of the caller, decoding on every core, without allocating one. |
-| [`ReadPixelsAsync<T>(TiffPixelScale, TiffPixelOrder, CancellationToken)`](#eleris-tiffnet-tiffimage-readpixelsasync-1-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder-system-threading-cancellationtoken) | Reads the samples on a thread of the pool, as [`TiffImage.ReadPixels`](#eleris-tiffnet-tiffimage-readpixels-1-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder). |
+| [`ReadPixelsAsync<T>(TiffPixelScale, TiffPixelOrder, IProgress<double>, CancellationToken)`](#eleris-tiffnet-tiffimage-readpixelsasync-1-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder-system-iprogress-system-double-system-threading-cancellationtoken) | Reads the samples on a thread of the pool, as [`TiffImage.ReadPixels`](#eleris-tiffnet-tiffimage-readpixels-1-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder). |
 | [`ReadRawPixels<T>(TiffPixelOrder)`](#eleris-tiffnet-tiffimage-readrawpixels-1-eleris-tiffnet-tiffpixelorder) | The samples as stored (orientation applied, palette expanded, MinIsWhite inverted), of exactly their type. |
 | [`ReadRawRegion<T>(int, int, int, int, TiffPixelOrder)`](#eleris-tiffnet-tiffimage-readrawregion-1-system-int32-system-int32-system-int32-system-int32-eleris-tiffnet-tiffpixelorder) | The samples of a region of the image, of exactly their stored type. |
 | [`ReadRegion<T>(int, int, int, int, TiffPixelScale, TiffPixelOrder)`](#eleris-tiffnet-tiffimage-readregion-1-system-int32-system-int32-system-int32-system-int32-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder) | The samples of a region of the image (in the delivered orientation), converted as by [`TiffImage.ReadPixels`](#eleris-tiffnet-tiffimage-readpixels-1-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder). |
+| [`ReadRegionAsync<T>(int, int, int, int, TiffPixelScale, TiffPixelOrder, IProgress<double>, CancellationToken)`](#eleris-tiffnet-tiffimage-readregionasync-1-system-int32-system-int32-system-int32-system-int32-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder-system-iprogress-system-double-system-threading-cancellationtoken) | Reads a region on a thread of the pool, as [`TiffImage.ReadRegion`](#eleris-tiffnet-tiffimage-readregion-1-system-int32-system-int32-system-int32-system-int32-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder). |
 | [`SetExtraChannels(TiffExtraChannelKind[])`](#eleris-tiffnet-tiffimage-setextrachannels-eleris-tiffnet-tiffextrachannelkind) | Sets what each extra channel holds: alpha, associated (premultiplied) or not, or other data. |
 | [`SetPixels<T>(ReadOnlySpan<T>, int, int, int, TiffColorModel?, TiffPixelOrder)`](#eleris-tiffnet-tiffimage-setpixels-1-system-readonlyspan-0-system-int32-system-int32-system-int32-system-nullable-eleris-tiffnet-tiffcolormodel-eleris-tiffnet-tiffpixelorder) | Replaces the pixels of the image (and so its size, channels and sample type) by pixels of the application, copied once. |
 
@@ -228,6 +230,38 @@ A new array of `Width × Height` samples. For an image stored in planes, only th
 - [`NotSupportedException`](https://learn.microsoft.com/dotnet/api/system.notsupportedexception) — The library does not handle the format of the image.
 - [`TiffException`](Eleris.TiffNet.TiffException.md) — The pixel data is damaged.
 
+<a id="eleris-tiffnet-tiffimage-readchannelasync-1-system-int32-eleris-tiffnet-tiffpixelscale-system-iprogress-system-double-system-threading-cancellationtoken"></a>
+### `ReadChannelAsync<T>(int, TiffPixelScale, IProgress<double>, CancellationToken)`
+
+Reads one channel on a thread of the pool, as [`TiffImage.ReadChannel`](#eleris-tiffnet-tiffimage-readchannel-1-system-int32-eleris-tiffnet-tiffpixelscale).
+
+```csharp
+public Task<T[]> ReadChannelAsync<T>(int channel, TiffPixelScale scale = TiffPixelScale.Stored, IProgress<double>? progress = null, CancellationToken cancellationToken = default) where T : unmanaged, INumber<T>
+```
+
+**Type parameters**
+
+- `T` — As for [`TiffImage.ReadPixels`](#eleris-tiffnet-tiffimage-readpixels-1-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder).
+
+**Parameters**
+
+- `channel` — The channel: 0 for grey or red, 1 for green…, then the extra channels.
+- `scale` — The stored values, or values normalised to \[0, 1\].
+- `progress` — Receives the fraction read, 0 to 1, at most once a percent.
+- `cancellationToken` — Stops the read between strips or tiles.
+
+**Returns**
+
+A new array of `Width × Height` samples; every failure is reported by the task.
+
+**Exceptions**
+
+- [`ArgumentOutOfRangeException`](https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception) — There is no such channel.
+- [`InvalidOperationException`](https://learn.microsoft.com/dotnet/api/system.invalidoperationexception) — The conversion could lose values.
+- [`NotSupportedException`](https://learn.microsoft.com/dotnet/api/system.notsupportedexception) — The library does not handle the format of the image.
+- [`TiffException`](Eleris.TiffNet.TiffException.md) — The pixel data is damaged.
+- [`OperationCanceledException`](https://learn.microsoft.com/dotnet/api/system.operationcanceledexception) — `cancellationToken` was cancelled.
+
 <a id="eleris-tiffnet-tiffimage-readpixels-1-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder"></a>
 ### `ReadPixels<T>(TiffPixelScale, TiffPixelOrder)`
 
@@ -338,13 +372,13 @@ public void ReadPixels<T>(T[] destination, TiffPixelScale scale = TiffPixelScale
 - [`TiffException`](Eleris.TiffNet.TiffException.md) — The pixel data is damaged, or the decoding buffers exceed [`TiffReadOptions.MaxPixelBytes`](Eleris.TiffNet.TiffReadOptions.md#eleris-tiffnet-tiffreadoptions-maxpixelbytes).
 - [`ObjectDisposedException`](https://learn.microsoft.com/dotnet/api/system.objectdisposedexception) — The file is disposed.
 
-<a id="eleris-tiffnet-tiffimage-readpixelsasync-1-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder-system-threading-cancellationtoken"></a>
-### `ReadPixelsAsync<T>(TiffPixelScale, TiffPixelOrder, CancellationToken)`
+<a id="eleris-tiffnet-tiffimage-readpixelsasync-1-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder-system-iprogress-system-double-system-threading-cancellationtoken"></a>
+### `ReadPixelsAsync<T>(TiffPixelScale, TiffPixelOrder, IProgress<double>, CancellationToken)`
 
 Reads the samples on a thread of the pool, as [`TiffImage.ReadPixels`](#eleris-tiffnet-tiffimage-readpixels-1-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder).
 
 ```csharp
-public Task<T[]> ReadPixelsAsync<T>(TiffPixelScale scale = TiffPixelScale.Stored, TiffPixelOrder order = TiffPixelOrder.Interleaved, CancellationToken cancellationToken = default) where T : unmanaged, INumber<T>
+public Task<T[]> ReadPixelsAsync<T>(TiffPixelScale scale = TiffPixelScale.Stored, TiffPixelOrder order = TiffPixelOrder.Interleaved, IProgress<double>? progress = null, CancellationToken cancellationToken = default) where T : unmanaged, INumber<T>
 ```
 
 **Type parameters**
@@ -355,6 +389,7 @@ public Task<T[]> ReadPixelsAsync<T>(TiffPixelScale scale = TiffPixelScale.Stored
 
 - `scale` — The stored values, or values normalised to \[0, 1\].
 - `order` — Interleaved or planar.
+- `progress` — Receives the fraction read, 0 to 1, at most once a percent (from the threads that decode).
 - `cancellationToken` — Stops the read between strips or tiles.
 
 **Returns**
@@ -460,6 +495,42 @@ A new array of `width × height × Channels` samples. Only the strips or tiles u
 - [`InvalidOperationException`](https://learn.microsoft.com/dotnet/api/system.invalidoperationexception) — The conversion could lose values.
 - [`NotSupportedException`](https://learn.microsoft.com/dotnet/api/system.notsupportedexception) — The library does not handle the format of the image.
 - [`TiffException`](Eleris.TiffNet.TiffException.md) — The pixel data is damaged.
+
+<a id="eleris-tiffnet-tiffimage-readregionasync-1-system-int32-system-int32-system-int32-system-int32-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder-system-iprogress-system-double-system-threading-cancellationtoken"></a>
+### `ReadRegionAsync<T>(int, int, int, int, TiffPixelScale, TiffPixelOrder, IProgress<double>, CancellationToken)`
+
+Reads a region on a thread of the pool, as [`TiffImage.ReadRegion`](#eleris-tiffnet-tiffimage-readregion-1-system-int32-system-int32-system-int32-system-int32-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder).
+
+```csharp
+public Task<T[]> ReadRegionAsync<T>(int x, int y, int width, int height, TiffPixelScale scale = TiffPixelScale.Stored, TiffPixelOrder order = TiffPixelOrder.Interleaved, IProgress<double>? progress = null, CancellationToken cancellationToken = default) where T : unmanaged, INumber<T>
+```
+
+**Type parameters**
+
+- `T` — As for [`TiffImage.ReadPixels`](#eleris-tiffnet-tiffimage-readpixels-1-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder).
+
+**Parameters**
+
+- `x` — The first column.
+- `y` — The first row, from the top.
+- `width` — The number of columns.
+- `height` — The number of rows.
+- `scale` — The stored values, or values normalised to \[0, 1\].
+- `order` — Interleaved or planar.
+- `progress` — Receives the fraction read, 0 to 1, at most once a percent.
+- `cancellationToken` — Stops the read between strips or tiles.
+
+**Returns**
+
+A new array of `width × height × Channels` samples; every failure is reported by the task.
+
+**Exceptions**
+
+- [`ArgumentOutOfRangeException`](https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception) — The region is empty or not within the image.
+- [`InvalidOperationException`](https://learn.microsoft.com/dotnet/api/system.invalidoperationexception) — The conversion could lose values.
+- [`NotSupportedException`](https://learn.microsoft.com/dotnet/api/system.notsupportedexception) — The library does not handle the format of the image.
+- [`TiffException`](Eleris.TiffNet.TiffException.md) — The pixel data is damaged.
+- [`OperationCanceledException`](https://learn.microsoft.com/dotnet/api/system.operationcanceledexception) — `cancellationToken` was cancelled.
 
 <a id="eleris-tiffnet-tiffimage-setextrachannels-eleris-tiffnet-tiffextrachannelkind"></a>
 ### `SetExtraChannels(TiffExtraChannelKind[])`

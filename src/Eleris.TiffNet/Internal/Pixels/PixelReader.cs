@@ -78,6 +78,9 @@ internal sealed class PixelPlan
     /// <summary>The bytes of the buffer a worker reads stored data into: rows of a strip, or the compressed bytes of a block.</summary>
     public long ReadBytes { get; private set; }
 
+    /// <summary>Counts the units read, for a caller that follows the progress of the read; none otherwise.</summary>
+    public ProgressCounter? Progress { get; set; }
+
     /// <summary>The bytes of the buffer a worker decodes a compressed block into (0 for uncompressed data).</summary>
     public long DecodedBytes { get; private set; }
 
@@ -379,6 +382,7 @@ internal static class PixelReader
                 {
                     budget.ThrowIfCancelled();
                     context.Process(unit, destination, scratch);
+                    plan.Progress?.Add();
                 }
             }
             finally
@@ -396,6 +400,7 @@ internal static class PixelReader
                 {
                     budget.ThrowIfCancelled();
                     context.Process(unit, array.Span, scratch);
+                    plan.Progress?.Add();
                     return scratch;
                 },
                 cache.Put);

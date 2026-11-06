@@ -68,5 +68,8 @@ Console.WriteLine($"{buffer.Length} and {pixels.Length} samples");
 ```
 <!-- /example -->
 
+`ReadPixelsAsync`, `ReadRegionAsync` and `ReadChannelAsync` read on the threads of the pool, can be cancelled between strips or
+tiles, and report their progress (0 to 1, at most once a percent) to an `IProgress<double>`.
+
 An array holds at most 2 147 483 591 elements, and a read is also bounded by `MaxPixelBytes` (2 147 483 591 bytes by
 default, so 536 million `float` samples): raise it for a larger array, or read by region.

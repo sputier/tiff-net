@@ -13,7 +13,7 @@ accident. `SetPixels` replaces the pixels of an image, `SetExtraChannels` says w
   with, as reading the whole image would: open a file larger than 2 GB of pixels with a larger limit to save it again, or copy
   it by region into a `TiffImageWriter`.
 - **To a stream**: from its position, left open; a stream that cannot seek is written through a temporary file (readable by
-  its owner only on Unix). `SaveAsync` encodes on the threads of the pool.
+  its owner only on Unix). `SaveAsync` (to a stream or a path) encodes on the threads of the pool and reports its progress to an `IProgress<double>`.
 
 The defaults write **Deflate with the predictor that suits the samples**, in strips of about 256 KB, as classic TIFF unless the
 file could exceed 4 GB: lossless, compact, readable by every TIFF reader. JPEG is not written.

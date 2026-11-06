@@ -67,15 +67,44 @@ public sealed partial class TiffFile
     /// </summary>
     /// <param name="stream">The stream, left open.</param>
     /// <param name="options">How to write; <see cref="TiffWriteOptions.Default"/> when <see langword="null"/>.</param>
+    /// <param name="progress">Receives the fraction written, 0 to 1, at most once a percent.</param>
     /// <param name="cancellationToken">Stops the write between strips or tiles; what is written of the stream is then incomplete.</param>
     /// <returns>The task of the write.</returns>
     /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled.</exception>
-    public Task SaveAsync(Stream stream, TiffWriteOptions? options = null, CancellationToken cancellationToken = default)
+    public Task SaveAsync(Stream stream, TiffWriteOptions? options = null, IProgress<double>? progress = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(stream);
         Platform.EnsureSupported();
         options ??= TiffWriteOptions.Default;
         TiffImage[] pages = [.. _images];
-        return SafeFile.ToStreamAsync(stream, output => TiffFileWriter.Write(pages, output, options, cancellationToken), cancellationToken);
+        return SafeFile.ToStreamAsync(stream,
+            output => TiffFileWriter.Write(pages, TiffFileWriter.Prepare(pages, options, cancellationToken), output, options, cancellationToken, progress),
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Writes the pages into a file as <see cref="Save(string, TiffWriteOptions?, CancellationToken)"/> does, on a thread of the
+    /// pool: a temporary file next to the target replaces it, a failure or a cancellation leaves an existing file as it was. The
+    /// pages are those of the file when the method is called. Failures of the arguments are thrown, every other failure is
+    /// reported by the task.
+    /// </summary>
+    /// <param name="path">The path of the file.</param>
+    /// <param name="options">How to write; <see cref="TiffWriteOptions.Default"/> when <see langword="null"/>.</param>
+    /// <param name="progress">Receives the fraction written, 0 to 1, at most once a percent.</param>
+    /// <param name="cancellationToken">Stops the write between strips or tiles.</param>
+    /// <returns>The task of the write.</returns>
+    public Task SaveAsync(string path, TiffWriteOptions? options = null, IProgress<double>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(path);
+        Platform.EnsureSupported();
+        options ??= TiffWriteOptions.Default;
+        TiffImage[] pages = [.. _images];
+        return Task.Run(() =>
+        {
+            var encoders = TiffFileWriter.Prepare(pages, options, cancellationToken);
+            SafeFile.Replace(path, stream => TiffFileWriter.Write(pages, encoders, stream, options, cancellationToken, progress));
+        }, cancellationToken);
     }
 }
