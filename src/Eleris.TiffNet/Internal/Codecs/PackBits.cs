@@ -1,3 +1,7 @@
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics;
+
 namespace Eleris.TiffNet.Internal.Codecs;
 
 /// <summary>The PackBits decoder of TIFF 6.0 (section 9): runs of a repeated byte and runs of literal bytes.</summary>
@@ -26,7 +30,17 @@ internal static class PackBits
                 // header + 1 literal bytes.
                 int size = Math.Min(Math.Min(header + 1, source.Length - position), destination.Length - written);
                 overflow = size < header + 1 && position + size < source.Length;
-                source.Slice(position, size).CopyTo(destination[written..]);
+                if (size <= 16 && source.Length - position >= 16 && destination.Length - written >= 16)
+                {
+                    // A short literal run: one 16-byte copy (the bytes beyond it, inside the destination, are written again later).
+                    Unsafe.WriteUnaligned(ref Unsafe.Add(ref MemoryMarshal.GetReference(destination), written),
+                        Unsafe.ReadUnaligned<Vector128<byte>>(ref Unsafe.Add(ref MemoryMarshal.GetReference(source), position)));
+                }
+                else
+                {
+                    source.Slice(position, size).CopyTo(destination[written..]);
+                }
+
                 position += size;
                 written += size;
             }
@@ -40,7 +54,16 @@ internal static class PackBits
 
                 int size = Math.Min(1 - header, destination.Length - written);
                 overflow = size < 1 - header;
-                destination.Slice(written, size).Fill(source[position++]);
+                if (size <= 16 && destination.Length - written >= 16)
+                {
+                    // A short repeat: one 16-byte store.
+                    Unsafe.WriteUnaligned(ref Unsafe.Add(ref MemoryMarshal.GetReference(destination), written), Vector128.Create(source[position++]));
+                }
+                else
+                {
+                    destination.Slice(written, size).Fill(source[position++]);
+                }
+
                 written += size;
             }
 
