@@ -29,7 +29,7 @@ public class MetadataBoundsTests
     [Fact]
     public void A_directory_counts_the_table_of_its_entries()
     {
-        // 4 000 entries: 48 KB in the file, about 190 KB once read into a table, which is what MaxMetadataBytes bounds.
+        // 4 000 entries: 48 KB in the file, counted with the table that holds them once read (about 100 bytes an entry).
         var builder = new TiffBuilder { Data = new byte[16] };
         var directory = builder.AddDirectory().Image(4, 4);
         for (int i = 0; i < 4_000; i++)
@@ -40,9 +40,9 @@ public class MetadataBoundsTests
         directory.Sorted();
         byte[] bytes = builder.Build();
 
-        var thrown = Assert.Throws<TiffException>(() => TiffFile.Read(new MemoryStream(bytes), TiffReadOptions.Default with { MaxMetadataBytes = 120 << 10 }));
+        var thrown = Assert.Throws<TiffException>(() => TiffFile.Read(new MemoryStream(bytes), TiffReadOptions.Default with { MaxMetadataBytes = 200 << 10 }));
         Assert.Equal("MaxMetadataBytes", thrown.Limit);
-        using var file = TiffFile.Read(new MemoryStream(bytes), TiffReadOptions.Default with { MaxMetadataBytes = 512 << 10 });
+        using var file = TiffFile.Read(new MemoryStream(bytes), TiffReadOptions.Default with { MaxMetadataBytes = 1 << 20 });
         Assert.Equal(4_000, file.Primary.Metadata.Count(t => t.Code >= 60_000));
     }
 }

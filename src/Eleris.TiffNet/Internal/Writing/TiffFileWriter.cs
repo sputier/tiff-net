@@ -11,8 +11,11 @@ internal static class TiffFileWriter
         PlanarConfiguration = 284, PredictorTag = 317, TileWidth = 322, TileLength = 323, TileOffsets = 324, TileByteCounts = 325,
         ExtraSamples = 338, SampleFormat = 339;
 
-    /// <summary>Writes the images as one file into a stream that seeks.</summary>
-    public static void Write(IReadOnlyList<TiffImage> images, Stream output, TiffWriteOptions options, CancellationToken cancellationToken)
+    /// <summary>
+    /// Checks the images and plans their blocks, before the output is created: an image that cannot be written fails without a
+    /// temporary file made and removed for nothing.
+    /// </summary>
+    public static List<ImageEncoder> Prepare(IReadOnlyList<TiffImage> images, TiffWriteOptions options, CancellationToken cancellationToken)
     {
         if (images.Count == 0)
         {
@@ -20,7 +23,17 @@ internal static class TiffFileWriter
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        var encoders = images.Select(i => new ImageEncoder(i, options)).ToList();
+        return [.. images.Select(i => new ImageEncoder(i, options))];
+    }
+
+    /// <summary>Writes the images as one file into a stream that seeks.</summary>
+    public static void Write(IReadOnlyList<TiffImage> images, Stream output, TiffWriteOptions options, CancellationToken cancellationToken) =>
+        Write(images, Prepare(images, options, cancellationToken), output, options, cancellationToken);
+
+    /// <summary>Writes the images, planned by <see cref="Prepare"/>, as one file into a stream that seeks.</summary>
+    public static void Write(IReadOnlyList<TiffImage> images, List<ImageEncoder> encoders, Stream output, TiffWriteOptions options,
+        CancellationToken cancellationToken)
+    {
         bool bigTiff = options.BigTiff switch
         {
             TiffBigTiff.Always => true,
