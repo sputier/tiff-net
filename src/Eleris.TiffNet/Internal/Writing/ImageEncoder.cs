@@ -87,6 +87,10 @@ internal sealed class ImageEncoder
 
     public int Blocks => Across * Down * Planes;
 
+    /// <summary>The structure the directory of the image describes.</summary>
+    public ImageShape Shape(TiffImage image) => new(Width, Height, Channels, SampleType, image.ColorModel,
+        [.. image.ExtraChannels.Select(c => c.Kind)], image.Descriptor.SubfileType, Tiled, Planar, BlockWidth, BlockHeight, Compression, Predictor);
+
     /// <summary>The most bytes the encoded image can take, to decide between classic TIFF and BigTIFF before writing.</summary>
     public long MaxEncodedBytes()
     {
@@ -153,47 +157,6 @@ internal sealed class ImageEncoder
             }
         }
 
-        if (Predictor != TiffPredictor.None)
-        {
-            byte[]? scratch = Predictor == TiffPredictor.FloatingPoint ? new byte[rowBytes] : null;
-            for (int r = 0; r < rows; r++)
-            {
-                var row = raw.AsSpan(r * rowBytes, rowBytes);
-                if (Predictor == TiffPredictor.Horizontal)
-                {
-                    PredictorEncoder.Horizontal(row, BytesPerSample, samples);
-                }
-                else
-                {
-                    PredictorEncoder.FloatingPoint(row, scratch, BytesPerSample, samples);
-                }
-            }
-        }
-
-        return Compression switch
-        {
-            TiffCompression.None => raw,
-            TiffCompression.PackBits => PackBits(raw, rowBytes, rows),
-            TiffCompression.Lzw => Lzw(raw),
-            _ => DeflateEncoder.Encode(raw, Level),
-        };
-    }
-
-    private static byte[] PackBits(byte[] raw, int rowBytes, int rows)
-    {
-        byte[] output = new byte[PackBitsEncoder.MaxEncoded(rowBytes) * rows];
-        int length = 0;
-        for (int r = 0; r < rows; r++)
-        {
-            length += PackBitsEncoder.EncodeRow(raw.AsSpan(r * rowBytes, rowBytes), output.AsSpan(length));
-        }
-
-        return output[..length];
-    }
-
-    private static byte[] Lzw(byte[] raw)
-    {
-        byte[] output = new byte[LzwEncoder.MaxEncoded(raw.Length)];
-        return output[..LzwEncoder.Encode(raw, output)];
+        return BlockCodec.Encode(raw, rows, rowBytes, samples, BytesPerSample, Predictor, Compression, Level);
     }
 }
