@@ -34,12 +34,22 @@ public class RowConversionTests
         Same<float, double>(floats, 1);
         Same<float, float>(floats, 1);
 
-        int[] ints = [.. Enumerable.Range(0, 10_000).Select(_ => random.Next(int.MinValue, int.MaxValue)), int.MinValue, int.MaxValue];
-        Same<int, double>(ints, double.NaN);
-        Same<int, float>(ints, int.MaxValue);
-        uint[] uints = [.. ints.Select(v => unchecked((uint)v))];
-        Same<uint, double>(uints, uint.MaxValue);
-        Same<uint, float>(uints, uint.MaxValue);
+        // 32-bit integers, with those around the precision of float (2^24) and the extremes, where rounding shows.
+        int[] ints = [.. Enumerable.Range(0, 10_000).Select(_ => random.Next(int.MinValue, int.MaxValue)), int.MinValue, int.MaxValue,
+            0, -1, 1, (1 << 24) + 1, (1 << 24) + 3, -(1 << 24) - 1, int.MaxValue - 64, int.MinValue + 64, (1 << 30) + 65];
+        uint[] uints = [.. ints.Select(v => unchecked((uint)v)), uint.MaxValue, uint.MaxValue - 128, 1u << 31, (1u << 31) + 129];
+        foreach (double maximum in new[] { double.NaN, int.MaxValue, 4095, 1 })
+        {
+            Same<int, double>(ints, maximum);
+            Same<int, float>(ints, maximum);
+        }
+
+        foreach (double maximum in new[] { double.NaN, uint.MaxValue, 4095, 1 })
+        {
+            Same<uint, double>(uints, maximum);
+            Same<uint, float>(uints, maximum);
+        }
+
         Same<ushort, int>([0, 1, 65535], double.NaN);
     }
 
