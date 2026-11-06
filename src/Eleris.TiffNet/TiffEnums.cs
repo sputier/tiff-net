@@ -156,7 +156,7 @@ public enum TiffPhotometric
 /// <summary>How hard the compressor of a write works (Deflate): faster, or smaller files.</summary>
 public enum TiffCompressionLevel
 {
-    /// <summary>The fastest compression (zlib level 1): files somewhat larger, written several times faster.</summary>
+    /// <summary>The fastest compression (zlib level 1): files 15 to 50 % larger, written 2 to 2.5 times faster with Deflate.</summary>
     Fastest = 1,
 
     /// <summary>The balance of zlib and libtiff (level 6).</summary>

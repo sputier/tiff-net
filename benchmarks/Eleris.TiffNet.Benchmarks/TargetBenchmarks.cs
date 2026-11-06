@@ -5,7 +5,7 @@ namespace Eleris.TiffNet.Benchmarks;
 /// <summary>
 /// The scenarios of the performance targets (docs/design/architecture.md): 24 MP u16 grey and f32 RGB, written and read with
 /// Deflate and the predictor that suits them (and u16 uncompressed), on one thread and on every core. The images are smooth with
-/// noise, as astronomical frames are. Results: benchmarks/results.
+/// noise, as astronomical frames are; f32 RGB also at the level Fastest. Results: benchmarks/results.
 /// </summary>
 [MemoryDiagnoser]
 public class TargetBenchmarks
@@ -14,20 +14,24 @@ public class TargetBenchmarks
     private TiffImage _image = null!;
     private string _path = "";
 
-    [Params("u16", "u16-none", "f32-rgb")]
+    [Params("u16", "u16-none", "f32-rgb", "f32-rgb-fastest")]
     public string Scenario { get; set; } = "u16";
 
     [Params(1, -1)]
     public int Threads { get; set; }
 
-    private TiffWriteOptions Options => (Scenario == "u16-none" ? TiffWriteOptions.Default with { Compression = TiffCompression.None }
-        : TiffWriteOptions.Default) with { MaxDegreeOfParallelism = Threads };
+    private TiffWriteOptions Options => Scenario switch
+    {
+        "u16-none" => TiffWriteOptions.Default with { Compression = TiffCompression.None },
+        "f32-rgb-fastest" => TiffWriteOptions.Default with { Level = TiffCompressionLevel.Fastest },
+        _ => TiffWriteOptions.Default,
+    } with { MaxDegreeOfParallelism = Threads };
 
     [GlobalSetup]
     public void Setup()
     {
         var random = new Random(1);
-        int channels = Scenario == "f32-rgb" ? 3 : 1;
+        int channels = Scenario.StartsWith("f32-rgb", StringComparison.Ordinal) ? 3 : 1;
         double Value(int x, int y, int c) => 1000 + 800 * Math.Sin(x / 50.0 + c) * Math.Cos(y / 70.0) + random.Next(40);
         if (channels == 3)
         {
@@ -69,6 +73,6 @@ public class TargetBenchmarks
     public int Read()
     {
         using var file = TiffFile.Open(_path, TiffReadOptions.Default with { MaxDegreeOfParallelism = Threads });
-        return Scenario == "f32-rgb" ? file.Primary.ReadRawPixels<float>().Length : file.Primary.ReadRawPixels<ushort>().Length;
+        return file.Primary.SampleType == TiffSampleType.Float32 ? file.Primary.ReadRawPixels<float>().Length : file.Primary.ReadRawPixels<ushort>().Length;
     }
 }

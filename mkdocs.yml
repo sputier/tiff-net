@@ -25,7 +25,17 @@ exclude_docs: |
 nav:
   - Home: index.md
   - Guide:
+    - Getting started: getting-started.md
+    - Files and pages: files.md
+    - Reading pixels: pixels.md
+    - Metadata and Astro-TIFF: metadata.md
+    - Writing: writing.md
+    - Large images: large-images.md
+    - Threads and memory: threads.md
     - Reliability and limits: reliability.md
+    - Performance: performance.md
+    - Platforms: platforms.md
+    - Coverage of the standard: standard-coverage.md
   - Design:
     - Public API: design/api.md
     - TIFF coverage: design/coverage.md
