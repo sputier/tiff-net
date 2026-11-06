@@ -188,4 +188,16 @@ public class ResourceBudgetTests
         // A path given by a caller (FileStream.Name, for example) is reduced to the file name too.
         Assert.Equal("m42.tif", new ResourceBudget(TiffReadOptions.Default, path).SourceName);
     }
+
+    [Fact]
+    public void Constrained_options_bound_what_a_phone_or_a_server_holds()
+    {
+        var options = TiffReadOptions.Constrained;
+
+        Assert.Equal(256L << 20, options.MaxPixelBytes);
+        Assert.Equal(64L << 20, options.MaxInputBytes);
+        Assert.Equal(2, options.MaxDegreeOfParallelism);
+        Assert.Equal(TiffReadOptions.Default.MaxTagBytes, options.MaxTagBytes);
+        Assert.False(options.Strict);
+    }
 }
