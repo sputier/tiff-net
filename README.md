@@ -5,10 +5,11 @@ floating point samples, grey or RGB, the metadata astronomy software stores in T
 multi-core encoding and decoding, and bounded resources on hostile files. The sister library of
 [Eleris.FitsNet](https://github.com/sputier/fits-net).
 
-**Status: design.** The library is being written from scratch. The requirements come from the
-[review of the first implementation](docs/review-2026-11-05.md) (in French).
+**Status: 0.1.0.** Written from scratch; the requirements come from the
+[review of the first implementation](docs/review-2026-11-05.md) (in French). See the [changelog](CHANGELOG.md), the
+[guide](docs/getting-started.md) and the [coverage of the standard](docs/standard-coverage.md).
 
-Targets: net10.0 on Windows, Linux and .NET MAUI (Android, iOS), trimming and NativeAOT compatible, no dependency.
+Targets: net10.0 on Windows, Linux, NativeAOT and .NET MAUI (checked on Android), trimming compatible, no dependency.
 
 ## Build, test, documentation
 
