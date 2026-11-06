@@ -33,7 +33,8 @@ The first run gave 77.6 %; 1 055 mutants were tested in the last one (20 minutes
   every branch, a `while (true)` loop), and Stryker dropped the whole methods. The locals are initialised and the loop has no
   condition; both are now mutated.
 - **The bounds of the encoders**: a smaller `MaxEncoded` went unnoticed, because pooled buffers are rounded up. Each encoder
-  now writes incompressible data into a buffer of exactly its bound.
+  now writes incompressible data into a buffer of exactly its bound. Stryker still reports these mutants as surviving (its
+  coverage per test does not see the calls of these static bounds); applied by hand, a smaller bound fails four tests.
 - **The LZW encoder past a full table**: no test filled the 4 093 codes; a megabyte of noise now does, and is decoded back.
   The end of the stream (libtiff's post-encode, where the last string can fill the table or widen the codes) is tested with
   every length of 0 to 9 000 bytes, which ends with the table at every size; that test kills the mutants left there by the
