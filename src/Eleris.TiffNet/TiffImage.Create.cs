@@ -143,6 +143,6 @@ public sealed partial class TiffImage
         return (descriptor, TiffSource.FromMemory(bytes, "image"));
     }
 
-    /// <summary>The sample type of <typeparamref name="T"/> (a constant for each instantiation, without reflection).</summary>
+    /// <summary>The sample type of <typeparamref name="T"/>, from the table of the sample types (found once for each type).</summary>
     private static TiffSampleType SampleTypeOf<T>() where T : unmanaged, INumber<T> => SampleTypes.Of<T>() ?? throw new ArgumentException($"{typeof(T).Name} is not a sample type of TIFF: use byte, sbyte, ushort, short, uint, int, ulong, long, Half, float or double.");
 }
