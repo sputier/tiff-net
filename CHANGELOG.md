@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### Added
+
+- `TiffFile.OpenAsync`, `TiffFile.Open(Stream)` (read on demand, without a copy), `TiffFile.Read(ReadOnlyMemory<byte>)`.
+- `ReadPixels(T[])` and `ReadPixels(Memory<T>)` decode on every core into a buffer of the application; `ReadRegionAsync`,
+  `ReadChannelAsync`, `SaveAsync(path)`; progress (`IProgress<double>`) on the asynchronous reads and saves.
+- `TiffImage.ReadIndices` (palette indices), `TiffImageWriter.SetExtraChannels`, `TiffMetadata.PixelTags` and `CopyFrom`,
+  `TiffReadOptions.Constrained`, `TiffWriteOptions.SkipUnsupportedPages`.
+
+### Changed
+
+- `SaveAsync(Stream, options, progress, cancellationToken)` and `ReadPixelsAsync(scale, order, progress, cancellationToken)`: a
+  progress parameter comes before the token (a token passed by position must now be named).
+- `SetPixels` removes the tags of the ranges of the former values; MinIsWhite, palette and YCbCr images are read without them.
+- Faster: planar and FITS-cube reads, normalised and converted reads, 12 and 14-bit samples, big-endian files, predictors,
+  LZW, files of many small strips, single-strip Deflate images (in bounded memory), JPEG without AVX2.
+
 ## 0.1.0
 
 The first version, written from scratch after the [review of the first implementation](docs/review-2026-11-05.md).

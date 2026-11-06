@@ -404,7 +404,7 @@ public Task SaveAsync(Stream stream, TiffWriteOptions? options = null, IProgress
 
 - `stream` — The stream, left open.
 - `options` — How to write; [`TiffWriteOptions.Default`](Eleris.TiffNet.TiffWriteOptions.md#eleris-tiffnet-tiffwriteoptions-default) when `null`.
-- `progress` — Receives the fraction written, 0 to 1, at most once a percent.
+- `progress` — Receives the fraction written, 0 to 1, at most once a percent and in increasing order, from a thread of the pool; 1 once the file is in place. A [`Progress`](https://learn.microsoft.com/dotnet/api/system.progress-1) posts its reports: its last may run after the task ends.
 - `cancellationToken` — Stops the write between strips or tiles; what is written of the stream is then incomplete.
 
 **Returns**
@@ -428,7 +428,7 @@ public Task SaveAsync(string path, TiffWriteOptions? options = null, IProgress<d
 
 - `path` — The path of the file.
 - `options` — How to write; [`TiffWriteOptions.Default`](Eleris.TiffNet.TiffWriteOptions.md#eleris-tiffnet-tiffwriteoptions-default) when `null`.
-- `progress` — Receives the fraction written, 0 to 1, at most once a percent.
+- `progress` — Receives the fraction written, 0 to 1, at most once a percent and in increasing order, from a thread of the pool; 1 once the file is in place. A [`Progress`](https://learn.microsoft.com/dotnet/api/system.progress-1) posts its reports: its last may run after the task ends.
 - `cancellationToken` — Stops the write between strips or tiles.
 
 **Returns**

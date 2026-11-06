@@ -248,7 +248,7 @@ public Task<T[]> ReadChannelAsync<T>(int channel, TiffPixelScale scale = TiffPix
 
 - `channel` — The channel: 0 for grey or red, 1 for green…, then the extra channels.
 - `scale` — The stored values, or values normalised to \[0, 1\].
-- `progress` — Receives the fraction read, 0 to 1, at most once a percent.
+- `progress` — Receives the fraction read, 0 to 1, at most once a percent and in increasing order; 1 once the array is complete.
 - `cancellationToken` — Stops the read between strips or tiles.
 
 **Returns**
@@ -274,7 +274,7 @@ public ushort[] ReadIndices()
 
 **Returns**
 
-A new array of `Width × Height × samples per pixel` values (1 to 65 535, the depth of the indices).
+A new array of `Width × Height × samples per pixel` values, each below 2^BitsPerSample.
 
 **Exceptions**
 
@@ -410,7 +410,7 @@ public Task<T[]> ReadPixelsAsync<T>(TiffPixelScale scale = TiffPixelScale.Stored
 
 - `scale` — The stored values, or values normalised to \[0, 1\].
 - `order` — Interleaved or planar.
-- `progress` — Receives the fraction read, 0 to 1, at most once a percent (from the threads that decode).
+- `progress` — Receives the fraction read, 0 to 1, at most once a percent and in increasing order, from the threads that decode; 1 once the array is complete. A [`Progress`](https://learn.microsoft.com/dotnet/api/system.progress-1) posts its reports: its last may run after the task ends.
 - `cancellationToken` — Stops the read between strips or tiles.
 
 **Returns**
@@ -538,12 +538,12 @@ public Task<T[]> ReadRegionAsync<T>(int x, int y, int width, int height, TiffPix
 - `height` — The number of rows.
 - `scale` — The stored values, or values normalised to \[0, 1\].
 - `order` — Interleaved or planar.
-- `progress` — Receives the fraction read, 0 to 1, at most once a percent.
+- `progress` — Receives the fraction read, 0 to 1, at most once a percent and in increasing order; 1 once the array is complete.
 - `cancellationToken` — Stops the read between strips or tiles.
 
 **Returns**
 
-A new array of `width × height × Channels` samples; every failure is reported by the task.
+A new array of `width × height × Channels` samples; a region outside the image is thrown, every other failure is reported by the task.
 
 **Exceptions**
 

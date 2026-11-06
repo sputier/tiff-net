@@ -92,7 +92,7 @@ public sealed record TiffWriteOptions
     /// <summary>
     /// Whether a save leaves out the pages the library cannot read (<see cref="TiffImage.UnsupportedReason"/>: a CMYK thumbnail
     /// beside the main image, for example) instead of failing with a <see cref="NotSupportedException"/>; false by default, so that
-    /// no page is lost without the application asking.
+    /// no page is lost without the application asking. It concerns the pages: sub-images are not written in this version.
     /// </summary>
     public bool SkipUnsupportedPages { get; init; }
 
