@@ -41,14 +41,37 @@ internal static class SafeFile
         {
             File.Replace(temporary, target, destinationBackupFileName: null, ignoreMetadataErrors: true);
         }
-        catch (IOException)
+        catch (IOException ex) when (IsSharingViolation(ex))
         {
-            // The target is open (FileShare.Delete): move it aside, put the new file in place, remove the old one.
+            // The target is open (FileShare.Delete): move it aside, put the new file in place, remove the old one. If the new
+            // file cannot be put in place, the old one goes back: the target is never lost.
             string aside = $"{temporary}.old";
             File.Move(target, aside);
-            File.Move(temporary, target);
+            try
+            {
+                File.Move(temporary, target);
+            }
+            catch
+            {
+                File.Move(aside, target);
+                throw;
+            }
+
             TryDelete(aside);
         }
+    }
+
+    /// <summary>A file open elsewhere (Windows ERROR_SHARING_VIOLATION or ERROR_LOCK_VIOLATION), not another failure.</summary>
+    private static bool IsSharingViolation(IOException ex) => (ex.HResult & 0xFFFF) is 32 or 33;
+
+    /// <summary>The file a path designates: the end of its symbolic links, so that a link is written through, not replaced.</summary>
+    internal static string Resolve(string path)
+    {
+        string full = Path.GetFullPath(path);
+        var info = new FileInfo(full);
+        return info.Exists && info.LinkTarget is not null && info.ResolveLinkTarget(returnFinalTarget: true) is { } target
+            ? target.FullName
+            : full;
     }
 
     /// <summary>Writes into a stream: straight when it seeks, otherwise through a temporary file copied in a bounded buffer.</summary>
@@ -66,14 +89,39 @@ internal static class SafeFile
             return;
         }
 
-        string temporary = Path.Combine(Path.GetTempPath(), $"eleris-tiff-{Guid.NewGuid():N}.tmp");
-        using var buffer = new FileStream(temporary, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, 1 << 16,
-            FileOptions.DeleteOnClose);
+        using var buffer = Buffer();
         write(buffer);
         buffer.Position = 0;
         buffer.CopyTo(stream, CopyBuffer);
         stream.Flush();
     }
+
+    /// <summary>As <see cref="ToStream"/>, the copy of a stream that cannot seek done asynchronously (a response body of a web server).</summary>
+    public static async Task ToStreamAsync(Stream stream, Action<Stream> write, CancellationToken cancellationToken)
+    {
+        if (!stream.CanWrite)
+        {
+            throw new ArgumentException("The stream cannot be written.", nameof(stream));
+        }
+
+        if (stream.CanSeek)
+        {
+            // Encoding is the work; the writes go to a stream that seeks, which does not block for long.
+            await Task.Run(() => write(stream), cancellationToken).ConfigureAwait(false);
+            await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        await using var buffer = Buffer();
+        await Task.Run(() => write(buffer), cancellationToken).ConfigureAwait(false);
+        buffer.Position = 0;
+        await buffer.CopyToAsync(stream, CopyBuffer, cancellationToken).ConfigureAwait(false);
+        await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>The temporary file of a stream that cannot seek, removed when it is closed.</summary>
+    private static FileStream Buffer() => new(Path.Combine(Path.GetTempPath(), $"eleris-tiff-{Guid.NewGuid():N}.tmp"),
+        FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, 1 << 16, FileOptions.DeleteOnClose);
 
     internal static void TryDelete(string path)
     {
@@ -100,9 +148,9 @@ internal sealed class TemporaryFile : IDisposable
 
     private TemporaryFile(string target)
     {
-        _target = Path.GetFullPath(target);
+        _target = SafeFile.Resolve(target);
         string folder = Path.GetDirectoryName(_target) ?? ".";
-        _path = Path.Combine(folder, $".{Path.GetFileName(_target)}.{Guid.NewGuid():N}.tmp");
+        _path = Path.Combine(folder, $".tiff-{Guid.NewGuid():N}.tmp");   // short: the name of the target may be long
         Stream = new FileStream(_path, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, 1 << 16);
     }
 
