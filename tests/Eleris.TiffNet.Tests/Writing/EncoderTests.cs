@@ -71,4 +71,30 @@ public class EncoderTests
         Assert.True(DeflateEncoder.Encode(data, TiffCompressionLevel.SmallestSize).Length
             <= DeflateEncoder.Encode(data, TiffCompressionLevel.Fastest).Length);
     }
+
+    [Theory]
+    [InlineData(TiffCompressionLevel.Fastest, TiffPredictor.FloatingPoint, true)]
+    [InlineData(TiffCompressionLevel.Fastest, TiffPredictor.Horizontal, false)]
+    [InlineData(TiffCompressionLevel.Optimal, TiffPredictor.FloatingPoint, false)]
+    public void The_run_length_strategy_compresses_floating_point_data_at_the_level_Fastest(TiffCompressionLevel level, TiffPredictor predictor, bool runLength)
+    {
+        // The stream is the one zlib writes with that strategy (deterministic), plain Deflate, decoded back.
+        byte[] data = LzwTests.Sample("long");
+        byte[] encoded = DeflateEncoder.Encode(data, level, predictor);
+        using var expected = new MemoryStream();
+        var options = new System.IO.Compression.ZLibCompressionOptions
+        {
+            CompressionLevel = level == TiffCompressionLevel.Fastest ? 1 : 6,
+            CompressionStrategy = runLength ? System.IO.Compression.ZLibCompressionStrategy.RunLengthEncoding : System.IO.Compression.ZLibCompressionStrategy.Default,
+        };
+        using (var zlib = new System.IO.Compression.ZLibStream(expected, options, leaveOpen: true))
+        {
+            zlib.Write(data);
+        }
+
+        Assert.Equal(expected.ToArray(), encoded);
+        byte[] decoded = new byte[data.Length];
+        Assert.Equal(data.Length, Deflate.Decode(encoded, encoded.Length, decoded, true, out _));
+        Assert.Equal(data, decoded);
+    }
 }
