@@ -181,7 +181,14 @@ internal sealed class TemporaryFile : IDisposable
         var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.ReadWrite, Share = FileShare.None, BufferSize = 1 << 16 };
         if (!OperatingSystem.IsWindows() && File.Exists(_target))
         {
-            options.UnixCreateMode = File.GetUnixFileMode(_target);
+            try
+            {
+                options.UnixCreateMode = File.GetUnixFileMode(_target);
+            }
+            catch (IOException)
+            {
+                // Removed meanwhile: a new file, with the default permissions.
+            }
         }
 
         Stream = new FileStream(_path, options);

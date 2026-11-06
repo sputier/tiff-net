@@ -212,7 +212,14 @@ public sealed partial class TiffImage
         int size = SampleConversion.SizeOf(SampleType);
         var budget = Budget(CancellationToken.None);
         Int128 bytes = (Int128)Width * Height * Channels * size;
-        budget.ReservePixels(bytes > long.MaxValue ? long.MaxValue : (long)bytes, "saving the image (its pixels are decoded)");
+        try
+        {
+            budget.ReservePixels(bytes > long.MaxValue ? long.MaxValue : (long)bytes, "saving the image (its pixels are decoded)");
+        }
+        catch (TiffException ex) when (ex.Limit is { } limit)
+        {
+            throw new TiffException($"{ex.Message} Open the file with a larger MaxPixelBytes to save it, or copy it by region into a TiffImageWriter.", limit);
+        }
         var request = new PixelRequest(0, 0, Width, Height, null, TiffPixelOrder.Interleaved, TiffPixelScale.Stored);
         _ = PixelPlan.Create(Descriptor, budget, request, size, parallel: false);
     }

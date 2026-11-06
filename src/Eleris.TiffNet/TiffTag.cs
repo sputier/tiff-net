@@ -150,10 +150,11 @@ public sealed class TiffTag : IEquatable<TiffTag>
     public T[] AsNumbers<T>() where T : unmanaged, System.Numerics.INumber<T>
     {
         EnsureNumbers();
+        int size = TagTypes.Size(Type);
         var result = new T[Count];
         for (int i = 0; i < result.Length; i++)
         {
-            result[i] = NumberAt<T>(i);
+            result[i] = NumberAt<T>(i, size);
         }
 
         return result;
@@ -163,7 +164,7 @@ public sealed class TiffTag : IEquatable<TiffTag>
     internal T FirstNumber<T>() where T : unmanaged, System.Numerics.INumber<T>
     {
         EnsureNumbers();
-        return NumberAt<T>(0);
+        return NumberAt<T>(0, TagTypes.Size(Type));
     }
 
     private void EnsureNumbers()
@@ -174,9 +175,8 @@ public sealed class TiffTag : IEquatable<TiffTag>
         }
     }
 
-    private T NumberAt<T>(int i) where T : unmanaged, System.Numerics.INumber<T>
+    private T NumberAt<T>(int i, int size) where T : unmanaged, System.Numerics.INumber<T>
     {
-        int size = TagTypes.Size(Type);
         ReadOnlySpan<byte> v = _values.AsSpan(i * size, size);
         try
         {
