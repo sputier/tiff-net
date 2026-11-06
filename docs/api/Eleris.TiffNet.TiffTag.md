@@ -99,6 +99,10 @@ The values.
 
 - [`InvalidOperationException`](https://learn.microsoft.com/dotnet/api/system.invalidoperationexception) — A value cannot be represented as `T`, or the tag holds text.
 
+**Remarks**
+
+An array of [`TiffTag.Count`](#eleris-tiffnet-tifftag-count) values: check it first for a tag of a file from anywhere, which can hold millions.
+
 <a id="eleris-tiffnet-tifftag-asstring"></a>
 ### `AsString()`
 
@@ -124,6 +128,10 @@ public IReadOnlyList<string> AsStrings()
 **Exceptions**
 
 - [`InvalidOperationException`](https://learn.microsoft.com/dotnet/api/system.invalidoperationexception) — The tag holds numbers.
+
+**Remarks**
+
+A string per text: a tag of a file from anywhere can hold millions (up to [`TiffReadOptions.MaxTagBytes`](Eleris.TiffNet.TiffReadOptions.md#eleris-tiffnet-tiffreadoptions-maxtagbytes)).
 
 <a id="eleris-tiffnet-tifftag-equals-eleris-tiffnet-tifftag"></a>
 ### `Equals(TiffTag)`

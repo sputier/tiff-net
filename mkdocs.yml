@@ -38,12 +38,13 @@ nav:
     - Coverage of the standard: standard-coverage.md
   - Design:
     - Public API: design/api.md
-    - TIFF coverage: design/coverage.md
+    - TIFF coverage (superseded): design/coverage.md
     - Architecture: design/architecture.md
     - Backlog: design/backlog.md
     - Review of the first implementation: review-2026-11-05.md
     - Review of version 0.1.0: review-2026-11-06.md
     - Fuzzing campaign (November 2026): fuzzing-2026-11.md
+    - Mutation testing (November 2026): mutation-2026-11.md
   # BEGIN API NAVIGATION
   - API reference:
     - Overview: api/index.md

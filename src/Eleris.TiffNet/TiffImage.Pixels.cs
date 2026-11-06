@@ -195,6 +195,35 @@ public sealed partial class TiffImage
         ? new(TiffReadOptions.Default, "image", cancellationToken)
         : new(File!.Options, File.Source.Name, cancellationToken);
 
+    /// <summary>
+    /// Checks, before anything is allocated to write the image, that it can be read whole: an image of a file must hold the pixels
+    /// it declares (a small file declaring a huge image, strips sharing their data, a decompression bomb), and the pixels a save
+    /// decodes count in <see cref="TiffReadOptions.MaxPixelBytes"/> as a read of the whole image does, although they are decoded
+    /// band after band.
+    /// </summary>
+    internal void ValidateForWrite()
+    {
+        ThrowIfUnsupported();
+        if (_pixels is not null)
+        {
+            return;
+        }
+
+        int size = SampleConversion.SizeOf(SampleType);
+        var budget = Budget(CancellationToken.None);
+        Int128 bytes = (Int128)Width * Height * Channels * size;
+        try
+        {
+            budget.ReservePixels(bytes > long.MaxValue ? long.MaxValue : (long)bytes, "saving the image (its pixels are decoded)");
+        }
+        catch (TiffException ex) when (ex.Limit is { } limit)
+        {
+            throw new TiffException($"{ex.Message} Open the file with a larger MaxPixelBytes to save it, or copy it by region into a TiffImageWriter.", limit);
+        }
+        var request = new PixelRequest(0, 0, Width, Height, null, TiffPixelOrder.Interleaved, TiffPixelScale.Stored);
+        _ = PixelPlan.Create(Descriptor, budget, request, size, parallel: false);
+    }
+
     /// <summary>Checks that rows of the image can be read (support, blocks, buffers) before the band that holds them is allocated.</summary>
     internal void ValidateBand(int y, int rows, int degree = 1)
     {

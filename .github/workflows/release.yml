@@ -1,7 +1,10 @@
 name: Release
 
 # Publishes Eleris.TiffNet to nuget.org when a version tag is pushed (git tag v0.1.0 && git push origin v0.1.0).
-# The tag must match <Version> in src/Eleris.TiffNet/Eleris.TiffNet.csproj. See RELEASING.md.
+# The tag must match <Version> in src/Eleris.TiffNet/Eleris.TiffNet.csproj, be on main, and have passed the CI. See RELEASING.md.
+#
+# The package is built in a job that installs nothing but the .NET SDK: the Python packages of the tests (tifffile, Pillow…)
+# run in another job, so that none of them can touch what is published.
 
 on:
   push:
@@ -15,9 +18,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  pack:
+  check:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -30,13 +36,20 @@ jobs:
             echo "::error::The tag ${GITHUB_REF_NAME} is not on main"
             exit 1
           fi
+      - name: The CI passed on the tagged commit
+        run: |
+          conclusion=$(gh run list --workflow ci.yml --commit "$GITHUB_SHA" --status completed --json conclusion --jq 'map(.conclusion) | if any(. == "success") then "success" else "none" end')
+          if [ "$conclusion" != "success" ]; then
+            echo "::error::No successful CI run for ${GITHUB_SHA}: wait for the CI of main, then push the tag again"
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           global-json-file: global.json
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version: "3.12"
-      - name: The tag matches the version of the project
+      - name: The tag matches the version of the project, which has a section in the changelog
         id: version
         run: |
           version=$(dotnet msbuild src/Eleris.TiffNet -getProperty:Version)
@@ -44,28 +57,61 @@ jobs:
             echo "::error::The tag ${GITHUB_REF_NAME} does not match the project version v$version"
             exit 1
           fi
+          if ! grep -qx "## $version" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no section '## $version'"
+            exit 1
+          fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
-      - name: Build
-        run: dotnet build Eleris.TiffNet.slnx -c Release
+
+  test:
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
       - run: pip install -r tools/requirements-interop.txt
       - name: Generate the tifffile corpus
         run: python -I tools/make_fixtures.py
+      - name: Build
+        run: dotnet build Eleris.TiffNet.slnx -c Release
       - name: Test (with the corpus)
         run: dotnet test Eleris.TiffNet.slnx -c Release --no-build
-      - name: Pack
-        run: dotnet pack src/Eleris.TiffNet -c Release --no-build -o artifacts
-      - name: Check the package and use it from a new project
-        run: python tools/verify_package.py artifacts ${{ steps.version.outputs.version }}
+
+  pack:
+    needs: [check, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+      - name: Pack (a build of its own, nothing else installed)
+        run: dotnet pack src/Eleris.TiffNet -c Release -o artifacts
+      - name: Check the package and use it from a new project (the standard library of Python only)
+        run: python3 -I tools/verify_package.py artifacts ${{ needs.check.outputs.version }}
+      - name: The notes of the release, from the changelog
+        run: |
+          awk -v v="## ${{ needs.check.outputs.version }}" '$0 == v { on = 1; next } /^## / && on { exit } on' CHANGELOG.md > release-notes.md
+          test -s release-notes.md
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: nuget-package
-          path: artifacts/
+          path: |
+            artifacts/
+            release-notes.md
           if-no-files-found: error
 
   publish:
-    needs: pack
+    needs: [check, pack]
     runs-on: ubuntu-latest
-    # Add required reviewers to this environment in the repository settings to approve each publication by hand.
+    # The environment `nuget` holds the API key; required reviewers on it approve each publication by hand (see RELEASING.md).
     timeout-minutes: 15
     environment: nuget
     permissions:
@@ -74,16 +120,16 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: nuget-package
-          path: artifacts
+          path: release
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 10.0.x   # only `dotnet nuget push`, which does not depend on the SDK of the build
       - name: Push to nuget.org (the .snupkg symbols follow the .nupkg)
-        run: dotnet nuget push "artifacts/*.nupkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+        run: dotnet nuget push "release/artifacts/*.nupkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
-      - name: GitHub release
-        run: gh release create "$GITHUB_REF_NAME" artifacts/* --title "$GITHUB_REF_NAME" --generate-notes ${{ contains(needs.pack.outputs.version, '-') && '--prerelease' || '' }}
+      - name: GitHub release, with the notes of the changelog
+        run: gh release create "$GITHUB_REF_NAME" release/artifacts/* --title "$GITHUB_REF_NAME" --notes-file release/release-notes.md ${{ contains(needs.check.outputs.version, '-') && '--prerelease' || '' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}

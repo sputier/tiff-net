@@ -125,9 +125,27 @@ internal static class SafeFile
         await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>The temporary file of a stream that cannot seek, removed when it is closed.</summary>
-    private static FileStream Buffer() => new(Path.Combine(Path.GetTempPath(), $"eleris-tiff-{Guid.NewGuid():N}.tmp"),
-        FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, 1 << 16, FileOptions.DeleteOnClose);
+    /// <summary>
+    /// The temporary file of a stream that cannot seek, removed when it is closed; on Unix, readable by its owner only (the
+    /// shared temporary folder is listed by every user).
+    /// </summary>
+    internal static FileStream Buffer()
+    {
+        var options = new FileStreamOptions
+        {
+            Mode = FileMode.CreateNew,
+            Access = FileAccess.ReadWrite,
+            Share = FileShare.None,
+            BufferSize = 1 << 16,
+            Options = FileOptions.DeleteOnClose,
+        };
+        if (!OperatingSystem.IsWindows())
+        {
+            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        }
+
+        return new FileStream(Path.Combine(Path.GetTempPath(), $"eleris-tiff-{Guid.NewGuid():N}.tmp"), options);
+    }
 
     internal static void TryDelete(string path)
     {
@@ -157,8 +175,27 @@ internal sealed class TemporaryFile : IDisposable
         _target = SafeFile.Resolve(target);
         string folder = Path.GetDirectoryName(_target) ?? ".";
         _path = Path.Combine(folder, $".tiff-{Guid.NewGuid():N}.tmp");   // short: the name of the target may be long
-        Stream = new FileStream(_path, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, 1 << 16);
+
+        // On Unix, the file is created with the permissions of the target it replaces: a private file is never readable by
+        // others while its new content is written (a new target gets the default permissions, as it will keep).
+        var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.ReadWrite, Share = FileShare.None, BufferSize = 1 << 16 };
+        if (!OperatingSystem.IsWindows() && File.Exists(_target))
+        {
+            try
+            {
+                options.UnixCreateMode = File.GetUnixFileMode(_target);
+            }
+            catch (IOException)
+            {
+                // Removed meanwhile: a new file, with the default permissions.
+            }
+        }
+
+        Stream = new FileStream(_path, options);
     }
+
+    /// <summary>The path of the temporary file.</summary>
+    internal string TemporaryPath => _path;
 
     public FileStream Stream { get; }
 

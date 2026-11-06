@@ -1,0 +1,27 @@
+{
+  "stryker-config": {
+    "solution": "Eleris.TiffNet.slnx",
+    "project": "Eleris.TiffNet.csproj",
+    "test-projects": [
+      "tests/Eleris.TiffNet.Tests/Eleris.TiffNet.Tests.csproj"
+    ],
+    "mutate": [
+      "**/Internal/Structure/**/*.cs",
+      "**/Internal/Codecs/**/*.cs"
+    ],
+    "coverage-analysis": "perTest",
+    "reporters": [
+      "html",
+      "json",
+      "progress",
+      "cleartext"
+    ],
+    "concurrency": 3,
+    "thresholds": {
+      "high": 85,
+      "low": 70,
+      "break": 0
+    },
+    "test-case-filter": "FullyQualifiedName!~MemoryPeak&FullyQualifiedName!~HugeFile&FullyQualifiedName!~FuzzHarness&FullyQualifiedName!~Interop&FullyQualifiedName!~DocumentationExamples&FullyQualifiedName!~WrittenCorpus&FullyQualifiedName!~ParallelEncoding&FullyQualifiedName!~BandWriting"
+  }
+}

@@ -1,6 +1,7 @@
 # Public API 1.0 — design
 
-Status: **validated on 2026-11-05**. This page fixes the public surface before any code is written, because most of these
+Status: **validated on 2026-11-05**, signatures updated to the code of version 0.1.0 (the generated
+[API reference](../api/index.md) is the reference). This page fixed the public surface before any code was written, because most of these
 choices cannot change after 1.0 without breaking callers (review, decision D2). It follows the conventions of Eleris.FitsNet so
 that an application using both libraries reads the same way.
 
@@ -53,7 +54,7 @@ public enum TiffTagType        { Byte = 1, Ascii = 2, Short = 3, Long = 4, Ratio
 ```
 
 Enum values are explicit and never renumbered. `TiffCompression` uses the TIFF codes so that a value read from a file maps
-directly; `Jpeg` is readable but not writable (see [coverage](coverage.md)).
+directly; `Jpeg` is readable but not writable (see [coverage](../standard-coverage.md)).
 
 ## `TiffFile`
 
@@ -77,8 +78,8 @@ public sealed class TiffFile : IReadOnlyList<TiffImage>, IDisposable
     public bool Remove(TiffImage image);
 
     // Writing
-    public void Save(string path, TiffWriteOptions? options = null);
-    public void Save(Stream stream, TiffWriteOptions? options = null);
+    public void Save(string path, TiffWriteOptions? options = null, CancellationToken cancellationToken = default);
+    public void Save(Stream stream, TiffWriteOptions? options = null, CancellationToken cancellationToken = default);
     public Task SaveAsync(Stream stream, TiffWriteOptions? options = null, CancellationToken cancellationToken = default);
 
     public void Dispose();
@@ -131,13 +132,13 @@ public sealed class TiffImage
         TiffColorModel? colorModel = null, TiffPixelOrder order = TiffPixelOrder.Interleaved) where T : unmanaged, INumber<T>;
 
     // Reading pixels
-    public T[] ReadRawPixels<T>(TiffPixelOrder order = TiffPixelOrder.Interleaved) where T : unmanaged;
-    public T[] ReadPixels<T>(TiffPixelScale scale = TiffPixelScale.Stored, TiffPixelOrder order = TiffPixelOrder.Interleaved) where T : unmanaged;
-    public void ReadPixels<T>(Span<T> destination, TiffPixelScale scale = TiffPixelScale.Stored, TiffPixelOrder order = TiffPixelOrder.Interleaved) where T : unmanaged;
-    public T[] ReadRegion<T>(int x, int y, int width, int height, TiffPixelScale scale = TiffPixelScale.Stored, TiffPixelOrder order = TiffPixelOrder.Interleaved) where T : unmanaged;
-    public T[] ReadRawRegion<T>(int x, int y, int width, int height, TiffPixelOrder order = TiffPixelOrder.Interleaved) where T : unmanaged;
-    public T[] ReadChannel<T>(int channel, TiffPixelScale scale = TiffPixelScale.Stored) where T : unmanaged;
-    public Task<T[]> ReadPixelsAsync<T>(TiffPixelScale scale = TiffPixelScale.Stored, TiffPixelOrder order = TiffPixelOrder.Interleaved, CancellationToken cancellationToken = default) where T : unmanaged;
+    public T[] ReadRawPixels<T>(TiffPixelOrder order = TiffPixelOrder.Interleaved) where T : unmanaged, INumber<T>;
+    public T[] ReadPixels<T>(TiffPixelScale scale = TiffPixelScale.Stored, TiffPixelOrder order = TiffPixelOrder.Interleaved) where T : unmanaged, INumber<T>;
+    public void ReadPixels<T>(Span<T> destination, TiffPixelScale scale = TiffPixelScale.Stored, TiffPixelOrder order = TiffPixelOrder.Interleaved) where T : unmanaged, INumber<T>;
+    public T[] ReadRegion<T>(int x, int y, int width, int height, TiffPixelScale scale = TiffPixelScale.Stored, TiffPixelOrder order = TiffPixelOrder.Interleaved) where T : unmanaged, INumber<T>;
+    public T[] ReadRawRegion<T>(int x, int y, int width, int height, TiffPixelOrder order = TiffPixelOrder.Interleaved) where T : unmanaged, INumber<T>;
+    public T[] ReadChannel<T>(int channel, TiffPixelScale scale = TiffPixelScale.Stored) where T : unmanaged, INumber<T>;
+    public Task<T[]> ReadPixelsAsync<T>(TiffPixelScale scale = TiffPixelScale.Stored, TiffPixelOrder order = TiffPixelOrder.Interleaved, CancellationToken cancellationToken = default) where T : unmanaged, INumber<T>;
 }
 ```
 
@@ -230,7 +231,7 @@ public sealed class TiffTag : IEquatable<TiffTag>     // equal when code, type a
     public static TiffTag FromBytes(int code, ReadOnlySpan<byte> value, TiffTagType type = TiffTagType.Undefined);
     public static TiffTag FromNumbers<T>(int code, ReadOnlySpan<T> values) where T : unmanaged;
     public string AsString();
-    public T[] AsNumbers<T>() where T : unmanaged;
+    public T[] AsNumbers<T>() where T : unmanaged, INumber<T>;
     public ReadOnlyMemory<byte> AsBytes();
 }
 ```
@@ -283,14 +284,14 @@ public sealed class TiffImageWriter : IDisposable
 
     public long Width { get; }
     public long Height { get; }
-    public void WriteRows<T>(ReadOnlySpan<T> pixels, int rowCount) where T : unmanaged;          // strips: rows in order, top to bottom
-    public void WriteTile<T>(long tileX, long tileY, ReadOnlySpan<T> pixels) where T : unmanaged; // tiles: any order, each once
+    public void WriteRows<T>(ReadOnlySpan<T> pixels, int rowCount) where T : unmanaged, INumber<T>;          // strips: rows in order, top to bottom
+    public void WriteTile<T>(long tileX, long tileY, ReadOnlySpan<T> pixels) where T : unmanaged, INumber<T>; // tiles: any order, each once
     public void Complete();                                                                       // writes the directory
     public void Dispose();                                                                        // without Complete: output abandoned
 }
 ```
 
-- Width and height go up to the TIFF limit (2³² − 1); the file is BigTIFF when its size requires it (`TiffBigTiff.Auto`
+- Width and height go up to 2³¹ − 1, what the library reads back (TIFF allows 2³² − 1); the file is BigTIFF when its size requires it (`TiffBigTiff.Auto`
   decides from the declared geometry, before the first byte is written).
 - `Layout = Strips` takes `WriteRows`; `Layout = Tiles` takes `WriteTile`, in any order, so that a mosaic can be written as its
   panels are computed. `Complete` refuses missing rows or tiles.
@@ -331,7 +332,7 @@ public sealed record TiffWriteOptions
 
 - The output does not depend on `MaxDegreeOfParallelism`: same bytes on one thread or many, as in FitsNet.
 - `Compression = Jpeg` on writing is refused with `NotSupportedException` (lossy compression has no place in a science
-  pipeline; see [coverage](coverage.md)).
+  pipeline; see [coverage](../standard-coverage.md)).
 
 ## Exceptions
 

@@ -155,7 +155,7 @@ internal sealed record ImageDescriptor
 
         // The layout and the tables of strips or tiles, coherent with the geometry and within the file.
         bool tiled = directory.TryGet(TileOffsetsTag, out _) || directory.TryGet(TileWidthTag, out _);
-        long blockWidth, blockHeight, across, down;
+        long blockWidth = 0, blockHeight = 0, across = 0, down = 0;
         if (tiled)
         {
             blockWidth = Required(reader, directory, TileWidthTag, "TileWidth");
@@ -183,7 +183,7 @@ internal sealed record ImageDescriptor
         }
 
         int planes = planar ? samples : 1;
-        long blocks;
+        long blocks = 0;
         try
         {
             blocks = checked(across * down * planes);
@@ -197,7 +197,7 @@ internal sealed record ImageDescriptor
         ushort countsTag = tiled ? TileByteCountsTag : StripByteCountsTag;
         string unit = tiled ? "tile" : "strip";
         long[] offsets = Table(reader, directory, offsetsTag, blocks, unit, "offsets");
-        long[] counts;
+        long[] counts = [];
         if (directory.TryGet(countsTag, out _))
         {
             counts = Table(reader, directory, countsTag, blocks, unit, "byte counts");
