@@ -6,8 +6,10 @@ Every public type of the library, by namespace. The pages are generated from the
 
 | Type | Kind | Description |
 | --- | --- | --- |
+| [`TiffBigTiff`](Eleris.TiffNet.TiffBigTiff.md) | enum | Whether a file is written as BigTIFF (64-bit offsets, files beyond 4 GB) or as classic TIFF. |
 | [`TiffColorModel`](Eleris.TiffNet.TiffColorModel.md) | enum | What the colour channels of an image are. |
 | [`TiffCompression`](Eleris.TiffNet.TiffCompression.md) | enum | How samples are compressed in a file. |
+| [`TiffCompressionLevel`](Eleris.TiffNet.TiffCompressionLevel.md) | enum | How hard the compressor of a write works (Deflate): faster, or smaller files. |
 | [`TiffException`](Eleris.TiffNet.TiffException.md) | class | Data that is not valid TIFF: a bad structure, truncated or damaged data, or a limit of the reading options exceeded. |
 | [`TiffExtraChannel`](Eleris.TiffNet.TiffExtraChannel.md) | record | An extra channel of an image, after its colour channels. |
 | [`TiffExtraChannelKind`](Eleris.TiffNet.TiffExtraChannelKind.md) | enum | What an extra channel (after the colour channels) holds. |
@@ -26,3 +28,4 @@ Every public type of the library, by namespace. The pages are generated from the
 | [`TiffStorage`](Eleris.TiffNet.TiffStorage.md) | record | How an image is stored in the file it was read from: compression, layout, byte order… The pixels an image delivers do not depend on it (they are always top-down, in the byte order of the machine); it tells what the file holds, and lets an application write a file the same way. |
 | [`TiffTag`](Eleris.TiffNet.TiffTag.md) | class | One tag of a TIFF directory: its code, the type of its values and the values, independent of the byte order of the file. |
 | [`TiffTagType`](Eleris.TiffNet.TiffTagType.md) | enum | The field types of TIFF 6.0 and BigTIFF: how the values of a tag are stored. |
+| [`TiffWriteOptions`](Eleris.TiffNet.TiffWriteOptions.md) | record | How a TIFF file is written: compression, prediction, layout, BigTIFF, threads. |
