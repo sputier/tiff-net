@@ -33,6 +33,8 @@ internal static partial class PixelReader
         private readonly bool _direct;
         private readonly bool _directSwap;
         private readonly bool _uniformMaxima;
+        private readonly bool _inPlace;
+        private readonly bool _inPlaceSwap;
 
         public Context(PixelPlan plan, TiffSource source, ResourceBudget budget, int channels, bool littleEndian)
         {
@@ -48,13 +50,20 @@ internal static partial class PixelReader
             _little = littleEndian;
             _orientation = _d.Orientation;
             _rowBytes = plan.RowBytes;
-            _identity = typeof(TD) == typeof(TOut) && _request.Scale == TiffPixelScale.Stored;
+            // A floating-point image normalised to its own type is delivered as it is: every maximum is 1.
+            _identity = typeof(TD) == typeof(TOut)
+                && (_request.Scale == TiffPixelScale.Stored || (_d.SampleFormat == 3 && _d.Photometric != TiffPhotometric.Palette));
             // Unpacking is a plain copy: uncompressed, whole bytes of the delivered type, in the byte order of the machine, nothing
             // to invert, expand or reverse.
             // Big-endian samples too: read in place, then their bytes swapped.
             _direct = !_compressed && _identity && _d.BitsPerSample == Unsafe.SizeOf<TD>() * 8
                 && !_d.ReversedBits && _d.Photometric is not (TiffPhotometric.MinIsWhite or TiffPhotometric.Palette);
             _directSwap = _direct && _d.BitsPerSample > 8 && littleEndian != BitConverter.IsLittleEndian;
+            // The stored samples are the unpacked ones (whole bytes of the type, nothing to invert, expand or reverse): a row to
+            // convert is read where it was decoded, its bytes swapped there for a big-endian file.
+            _inPlace = _d.BitsPerSample == Unsafe.SizeOf<TD>() * 8 && !_d.ReversedBits
+                && _d.Photometric is not (TiffPhotometric.MinIsWhite or TiffPhotometric.Palette);
+            _inPlaceSwap = _inPlace && _d.BitsPerSample > 8 && littleEndian != BitConverter.IsLittleEndian;
             _maxima = _request.Scale == TiffPixelScale.Normalized ? Maxima(_d, channels) : null;
             _uniformMaxima = _maxima is null || Array.TrueForAll(_maxima, m => m == _maxima[0]);
         }
@@ -115,8 +124,23 @@ internal static partial class PixelReader
                 return;
             }
 
-            Span<TD> row = scratch.Row.AsSpan(0, rowSamples);
-            SampleUnpacker.Unpack<TD>(_d, unit.Plane, stored, (int)_d.BlockWidth, row, _little);
+            Span<TD> row;
+            if (_inPlace)
+            {
+                Span<byte> bytes = stored[..(rowSamples * Unsafe.SizeOf<TD>())];
+                if (_inPlaceSwap)
+                {
+                    SampleUnpacker.Swap(bytes, Unsafe.SizeOf<TD>());
+                }
+
+                row = MemoryMarshal.Cast<byte, TD>(bytes);
+            }
+            else
+            {
+                row = scratch.Row.AsSpan(0, rowSamples);
+                SampleUnpacker.Unpack<TD>(_d, unit.Plane, stored, (int)_d.BlockWidth, row, _little);
+            }
+
             Place(unit, unit.Y0 + r, row, deliveredPerPixel, destination);
         }
 
