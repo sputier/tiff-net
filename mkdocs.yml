@@ -42,6 +42,7 @@ nav:
     - Architecture: design/architecture.md
     - Backlog: design/backlog.md
     - Review of the first implementation: review-2026-11-05.md
+    - Review of version 0.1.0: review-2026-11-06.md
     - Fuzzing campaign (November 2026): fuzzing-2026-11.md
   # BEGIN API NAVIGATION
   - API reference:
