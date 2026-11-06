@@ -21,10 +21,31 @@ internal static class JpegIdct
     /// <param name="quantization">64 quantization steps, in natural order.</param>
     /// <param name="output">The first sample of the block in its plane.</param>
     /// <param name="stride">The bytes from one row of the plane to the next.</param>
+    /// <summary>The scalar transform, whatever the machine (the reference of the vectorised one).</summary>
+    internal static void TransformScalar(ReadOnlySpan<short> coefficients, ReadOnlySpan<ushort> quantization, Span<byte> output, int stride) =>
+        Scalar(coefficients, quantization, output, stride);
+
     [SkipLocalsInit]
     public static void Transform(ReadOnlySpan<short> coefficients, ReadOnlySpan<ushort> quantization, Span<byte> output, int stride)
     {
         // The bounds are checked once here; the loops then go through references (the IDCT runs for every block).
+        if (coefficients.Length < 64 || quantization.Length < 64 || output.Length < 7 * stride + 8)
+        {
+            throw new ArgumentException("A block needs 64 coefficients, 64 quantization steps and 8 rows of output.");
+        }
+
+        if (JpegIdctAvx2.IsSupported)
+        {
+            JpegIdctAvx2.Transform(coefficients, quantization, output, stride);
+            return;
+        }
+
+        Scalar(coefficients, quantization, output, stride);
+    }
+
+    [SkipLocalsInit]
+    private static void Scalar(ReadOnlySpan<short> coefficients, ReadOnlySpan<ushort> quantization, Span<byte> output, int stride)
+    {
         if (coefficients.Length < 64 || quantization.Length < 64 || output.Length < 7 * stride + 8)
         {
             throw new ArgumentException("A block needs 64 coefficients, 64 quantization steps and 8 rows of output.");
