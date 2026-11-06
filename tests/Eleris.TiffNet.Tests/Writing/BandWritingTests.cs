@@ -44,7 +44,7 @@ public class BandWritingTests
     public void Bands_end_on_the_compressed_strips_of_the_source(TiffLayout layout)
     {
         // Strips of 262 rows in the source (256 KB of 1000 bytes).
-        string path = Path.Combine(Path.GetTempPath(), $"tiffnet-band-{Guid.NewGuid():N}.tif");
+        string path = TemporaryPath();
         try
         {
             new TiffFile().Add(Gradient(1000, 3000, 1)).Save(path);
@@ -69,14 +69,14 @@ public class BandWritingTests
         }
         finally
         {
-            File.Delete(path);
+            Directory.Delete(Path.GetDirectoryName(path)!, recursive: true);
         }
     }
 
     [Fact]
     public void Writing_from_a_file_gives_its_pixels_whatever_the_bands()
     {
-        string path = Path.Combine(Path.GetTempPath(), $"tiffnet-band-{Guid.NewGuid():N}.tif");
+        string path = TemporaryPath();
         try
         {
             var image = Gradient(1000, 3000, 1);
@@ -94,7 +94,7 @@ public class BandWritingTests
         }
         finally
         {
-            File.Delete(path);
+            Directory.Delete(Path.GetDirectoryName(path)!, recursive: true);
         }
     }
 
@@ -175,6 +175,14 @@ public class BandWritingTests
         Task? task = null;
         Assert.Throws<ArgumentException>(() => { task = file.SaveAsync(stream); });
         Assert.Null(task);
+    }
+
+    /// <summary>A path in a folder of its own: other tests check that no temporary file is left in the shared one.</summary>
+    private static string TemporaryPath()
+    {
+        string folder = Path.Combine(Path.GetTempPath(), $"tiffnet-band-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(folder);
+        return Path.Combine(folder, "source.tif");
     }
 
     internal static TiffImage Gradient(int width, int height, int channels)

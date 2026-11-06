@@ -104,7 +104,7 @@ public class ImageWriterTests
     [Fact]
     public void A_path_is_replaced_on_completion_and_left_as_it_was_when_abandoned()
     {
-        string path = Path.Combine(Path.GetTempPath(), $"tiffnet-{Guid.NewGuid():N}.tif");
+        string path = SaveTests.Temporary();
         File.WriteAllBytes(path, [1, 2, 3]);
         try
         {
@@ -114,7 +114,7 @@ public class ImageWriterTests
             }
 
             Assert.Equal(new byte[] { 1, 2, 3 }, File.ReadAllBytes(path));
-            Assert.Empty(Directory.GetFiles(Path.GetTempPath(), ".tiff-*.tmp*"));
+            Assert.Empty(Directory.GetFiles(Path.GetDirectoryName(path)!, ".tiff-*.tmp*"));
 
             using (var writer = TiffImageWriter.Create(path, 4, 4, TiffSampleType.UInt8))
             {
@@ -127,7 +127,7 @@ public class ImageWriterTests
         }
         finally
         {
-            File.Delete(path);
+            SaveTests.Delete(path);
         }
     }
 
