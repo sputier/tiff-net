@@ -10,7 +10,11 @@ namespace Eleris.TiffNet.Examples;
 /// </remarks>
 public static class ExampleRunner
 {
-    private static readonly Type[] Pages = [typeof(ReliabilityExamples)];
+    private static readonly Type[] Pages =
+    [
+        typeof(GettingStartedExamples), typeof(FilesExamples), typeof(PixelExamples), typeof(MetadataExamples), typeof(WritingExamples),
+        typeof(LargeImageExamples), typeof(ThreadExamples), typeof(ReliabilityExamples),
+    ];
 
     /// <summary>The names of all the examples, as <c>Class.Method</c>.</summary>
     public static IEnumerable<string> Names => Pages.SelectMany(t => Methods(t).Select(m => $"{t.Name}.{m.Name}"));
@@ -29,7 +33,10 @@ public static class ExampleRunner
                 starting?.Invoke($"{page.Name}.{method.Name}");
                 try
                 {
-                    method.Invoke(null, null);
+                    if (method.Invoke(null, null) is Task task)
+                    {
+                        task.GetAwaiter().GetResult();
+                    }
                 }
                 catch (TargetInvocationException e) when (e.InnerException is not null)
                 {
