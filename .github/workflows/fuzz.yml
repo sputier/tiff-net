@@ -51,6 +51,8 @@ jobs:
             mode: mixed
           - target: read
             mode: mixed
+          - target: save
+            mode: mixed
           - target: jpeg
             mode: havoc
     steps:

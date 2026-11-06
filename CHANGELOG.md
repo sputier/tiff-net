@@ -28,6 +28,8 @@ The first version, written from scratch after the [review of the first implement
   none,
   PackBits, LZW and Deflate with the predictor that suits the samples, strips or tiles, interleaved or planar, BigTIFF when
   needed; encoded on every core, the file identical whatever the number of threads.
+- Saving an image opened from a file costs what reading it would: its pixels count in `MaxPixelBytes`, and a file that does
+  not hold the pixels it declares is refused before anything is allocated; `Save` can be cancelled.
 - `TiffImageWriter` writes images larger than an array, rows in order or tiles in any order, with bounded memory.
 - Metadata: the common tags as properties, any other tag by its code, Astro-TIFF headers kept byte for byte.
 - Every written combination is read back with the same samples by tifffile, and by Pillow for the types it supports.

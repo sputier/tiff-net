@@ -18,7 +18,7 @@ namespace Eleris.TiffNet;
 /// the cores as they come, at most 2 × <see cref="TiffWriteOptions.MaxDegreeOfParallelism"/> at once, which bounds the memory.
 /// </para>
 /// <para>
-/// The path overload writes a temporary file that replaces the target on <see cref="Complete"/>, as <see cref="TiffFile.Save(string, TiffWriteOptions?)"/>
+/// The path overload writes a temporary file that replaces the target on <see cref="Complete"/>, as <see cref="TiffFile.Save(string, TiffWriteOptions?, CancellationToken)"/>
 /// does; <see cref="Dispose"/> without <see cref="Complete"/> abandons it. A writer is used from one thread.
 /// </para>
 /// </remarks>
