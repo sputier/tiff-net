@@ -36,7 +36,7 @@ internal sealed class ImageEncoder
         else
         {
             BlockWidth = Width;
-            BlockHeight = (int)Math.Clamp(StripBytes / Math.Max(1, rowBytes), 1, Height);
+            BlockHeight = StripRows((int)Math.Clamp(StripBytes / Math.Max(1, rowBytes), 1, Height), SourceRows(image), Height);
         }
 
         Across = (Width + BlockWidth - 1) / BlockWidth;
@@ -117,25 +117,67 @@ internal sealed class ImageEncoder
     }
 
     /// <summary>
-    /// The rows of the image read at once, a multiple of the block height. Each block of the source is decoded once: a band covers
-    /// whole source strips or tiles (an image stored on its side, Orientation 5 to 8, is read whole, since each of its rows crosses
-    /// every source block); a source in memory or uncompressed needs only enough blocks to keep the threads busy.
+    /// The rows of the source decoded together: a compressed strip or a tile row (decoding a part costs the whole); the whole
+    /// image when it is stored on its side (Orientation 5 to 8: each of its rows crosses every source block); one row otherwise
+    /// (pixels in memory, or stored uncompressed).
     /// </summary>
-    private int BandRows(int degree)
+    private static long SourceRows(TiffImage image)
     {
-        long sourceRows = 1;
-        if (_image.File is not null && _image.Storage is { } storage && storage.Compression != TiffCompression.None)
+        var d = image.Descriptor;
+        if (image.InMemory)
         {
-            var d = _image.Descriptor;
-            sourceRows = d.Orientation >= 5 ? Height : d.BlockHeight;
-        }
-        else if (_image.File is not null && _image.Descriptor.Orientation >= 5)
-        {
-            sourceRows = Height;
+            return 1;
         }
 
-        long wanted = Math.Max(sourceRows, (long)BlockHeight * (Tiled ? 1 : 2 * Math.Max(1, degree)));
-        long rows = (wanted + BlockHeight - 1) / BlockHeight * BlockHeight;
+        if (d.Orientation >= 5)
+        {
+            return image.Height;
+        }
+
+        return d.Compression == TiffCompression.None ? 1 : d.BlockHeight;
+    }
+
+    /// <summary>
+    /// The rows of an output strip: about <paramref name="target"/>, aligned on the source when it can be (a multiple of a short
+    /// source strip, or a divisor of a long one), so that bands end where source blocks end.
+    /// </summary>
+    internal static int StripRows(int target, long source, int height)
+    {
+        if (source <= 1 || source >= height)
+        {
+            return target;
+        }
+
+        if (source <= target)
+        {
+            return (int)(source * (target / source));
+        }
+
+        for (int rows = target; rows >= Math.Max(1, target / 2); rows--)
+        {
+            if (source % rows == 0)
+            {
+                return rows;
+            }
+        }
+
+        return target;
+    }
+
+    /// <summary>
+    /// The rows of the image read at once: a multiple of the output block height that ends on source blocks (their least common
+    /// multiple, when it is not too large; otherwise at least 8 source blocks), and at least 16 output blocks, so that the threads have work. It does not depend on
+    /// the number of threads, so that the order of the blocks in the file does not either.
+    /// </summary>
+    internal int BandRows()
+    {
+        long source = Math.Min(SourceRows(_image), Height);
+        long common = source * BlockHeight / (long)System.Numerics.BigInteger.GreatestCommonDivisor(source, BlockHeight);
+        // Without a common multiple of a fair size (tiles of 128 rows over strips of 262), a band covers at least 8 source blocks:
+        // the source block it ends in is decoded twice, at most 1/8 more work.
+        long aligned = common <= Math.Max(source, BlockHeight) * 16L ? common : (source * 8 + BlockHeight - 1) / BlockHeight * BlockHeight;
+        long wanted = Math.Max(aligned, (long)BlockHeight * (Tiled ? 1 : 16));
+        long rows = (wanted + aligned - 1) / aligned * aligned;
         return (int)Math.Min(rows, (Height + BlockHeight - 1L) / BlockHeight * BlockHeight);
     }
 
@@ -145,9 +187,9 @@ internal sealed class ImageEncoder
     /// </summary>
     public void Write(FileWriter writer, long[] offsets, long[] counts, int degree, CancellationToken cancellationToken)
     {
-        int bandRows = BandRows(degree);
+        int bandRows = BandRows();
         int pixelBytes = Channels * BytesPerSample;
-        long bandBytes = (long)bandRows * Width * pixelBytes;
+        long bandBytes = (long)Math.Min(bandRows, Height) * Width * pixelBytes;
         if (bandBytes > Array.MaxLength)
         {
             throw new NotSupportedException(
@@ -155,14 +197,19 @@ internal sealed class ImageEncoder
         }
 
         int blockRowsPerBand = bandRows / BlockHeight;
+
+        // A large band (a whole single-strip source) is allocated for the write, not rented: the pool would round it up and keep it.
+        bool pooled = bandBytes <= 16 << 20;
+        var scratch = new Pixels.ScratchCache();
         for (int bandY = 0; bandY < Height; bandY += bandRows)
         {
             int rows = Math.Min(bandRows, Height - bandY);
             _image.ValidateBand(bandY, rows);
-            byte[] band = System.Buffers.ArrayPool<byte>.Shared.Rent(rows * Width * pixelBytes);
+            int bytes = rows * Width * pixelBytes;
+            byte[] band = pooled ? System.Buffers.ArrayPool<byte>.Shared.Rent(bytes) : GC.AllocateUninitializedArray<byte>(bytes);
             try
             {
-                _image.ReadBand(bandY, rows, band.AsMemory(0, rows * Width * pixelBytes), degree, cancellationToken);
+                _image.ReadBand(bandY, rows, band.AsMemory(0, bytes), degree, scratch, cancellationToken);
                 int firstRow = bandY / BlockHeight;
                 int blockRows = Math.Min(blockRowsPerBand, Down - firstRow);
                 int perPlane = blockRows * Across;
@@ -180,7 +227,10 @@ internal sealed class ImageEncoder
             }
             finally
             {
-                System.Buffers.ArrayPool<byte>.Shared.Return(band);
+                if (pooled)
+                {
+                    System.Buffers.ArrayPool<byte>.Shared.Return(band);
+                }
             }
         }
     }
