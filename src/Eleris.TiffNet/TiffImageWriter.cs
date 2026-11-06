@@ -13,7 +13,7 @@ namespace Eleris.TiffNet;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The image is up to 4 294 967 295 pixels wide and high; the file is BigTIFF when its size could exceed 4 GB
+/// The image is up to 2 147 483 647 pixels wide and high (what the library reads back); the file is BigTIFF when its size could exceed 4 GB
 /// (<see cref="TiffBigTiff.Auto"/> decides from the geometry, before the first byte is written). Strips or tiles are encoded on
 /// the cores as they come, at most 2 × <see cref="TiffWriteOptions.MaxDegreeOfParallelism"/> at once, which bounds the memory.
 /// </para>
@@ -62,8 +62,8 @@ public sealed class TiffImageWriter : IDisposable
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(width, uint.MaxValue);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(height, uint.MaxValue);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(width, int.MaxValue);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(height, int.MaxValue);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(channels);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(channels, ushort.MaxValue);
         if (!Enum.IsDefined(sampleType))
@@ -147,8 +147,8 @@ public sealed class TiffImageWriter : IDisposable
 
     /// <summary>Starts writing an image into a file, through a temporary file that replaces it on <see cref="Complete"/>.</summary>
     /// <param name="path">The path of the file.</param>
-    /// <param name="width">The width, in pixels (up to 4 294 967 295).</param>
-    /// <param name="height">The height, in pixels (up to 4 294 967 295).</param>
+    /// <param name="width">The width, in pixels (up to 2 147 483 647).</param>
+    /// <param name="height">The height, in pixels (up to 2 147 483 647).</param>
     /// <param name="sampleType">The type of the samples given to <see cref="WriteRows{T}"/> or <see cref="WriteTile{T}"/>.</param>
     /// <param name="channels">The channels per pixel: the colour channels (1 for grey, 3 for RGB), then extra channels (of kind Data).</param>
     /// <param name="colorModel">What the colour channels are; required with 3 channels or more.</param>
@@ -176,8 +176,8 @@ public sealed class TiffImageWriter : IDisposable
 
     /// <summary>Starts writing an image into a stream, from its current position; the stream must seek and is left open.</summary>
     /// <param name="stream">The stream.</param>
-    /// <param name="width">The width, in pixels (up to 4 294 967 295).</param>
-    /// <param name="height">The height, in pixels (up to 4 294 967 295).</param>
+    /// <param name="width">The width, in pixels (up to 2 147 483 647).</param>
+    /// <param name="height">The height, in pixels (up to 2 147 483 647).</param>
     /// <param name="sampleType">The type of the samples.</param>
     /// <param name="channels">The channels per pixel.</param>
     /// <param name="colorModel">What the colour channels are; required with 3 channels or more.</param>
