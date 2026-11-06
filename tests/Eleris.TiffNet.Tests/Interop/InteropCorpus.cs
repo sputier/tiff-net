@@ -49,6 +49,22 @@ internal static partial class InteropCorpus
 
     public static bool Skipped => Environment.GetEnvironmentVariable(SkipVariable) == "1";
 
+    /// <summary>
+    /// Requires the corpus: a test that needs it is skipped (reported as such) when TIFFNET_SKIP_INTEROP=1, and fails when the
+    /// corpus is missing without it, so that a job that should have generated it does not pass without reading it.
+    /// </summary>
+    public static void RequireGenerated()
+    {
+        if (Directory.Exists(Folder))
+        {
+            return;
+        }
+
+        Skip.If(Skipped, $"The interop corpus is not generated ({SkipVariable}=1).");
+        Assert.Fail($"The interop corpus is not generated in {Folder}: run python -I tools/make_fixtures.py "
+            + $"(pip install -r tools/requirements-interop.txt), or set {SkipVariable}=1 to skip.");
+    }
+
     /// <summary>The folder of the generated files: <c>TIFFNET_INTEROP_DIR</c>, or the default of the script in the repository.</summary>
     public static string Folder => Environment.GetEnvironmentVariable("TIFFNET_INTEROP_DIR") is { Length: > 0 } dir
         ? dir

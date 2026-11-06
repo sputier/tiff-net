@@ -17,14 +17,11 @@ public class WrittenCorpusTests
 
     private static readonly TiffCompression[] Compressions = [TiffCompression.None, TiffCompression.PackBits, TiffCompression.Lzw, TiffCompression.Deflate];
 
-    [Fact]
+    [SkippableFact]
     public void The_written_corpus_is_written_with_its_expectations()
     {
         string? folder = Environment.GetEnvironmentVariable(FolderVariable);
-        if (string.IsNullOrEmpty(folder))
-        {
-            return;   // only when the interop job asks for it
-        }
+        Skip.If(string.IsNullOrEmpty(folder), $"Only with {FolderVariable} set (the interop job).");
 
         Directory.CreateDirectory(folder);
         var expected = new SortedDictionary<string, string>(StringComparer.Ordinal);
@@ -116,8 +113,12 @@ public class WrittenCorpusTests
                             {
                                 var options = TiffWriteOptions.Default with
                                 {
-                                    Compression = compression, Predictor = predictor, Layout = layout, PlanarConfiguration = order,
-                                    BigTiff = bigTiff, TileSize = 16,
+                                    Compression = compression,
+                                    Predictor = predictor,
+                                    Layout = layout,
+                                    PlanarConfiguration = order,
+                                    BigTiff = bigTiff,
+                                    TileSize = 16,
                                 };
                                 string name = $"{type}-c{channels}-{compression.ToString().ToLowerInvariant()}-p{(predictor == TiffPredictor.Auto ? 1 : 0)}"
                                     + $"-t{(layout == TiffLayout.Tiles ? 1 : 0)}-pl{(order == TiffPixelOrder.Planar ? 1 : 0)}-b{(bigTiff == TiffBigTiff.Always ? 1 : 0)}.tif";

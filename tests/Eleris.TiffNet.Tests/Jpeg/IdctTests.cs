@@ -5,7 +5,7 @@ namespace Eleris.TiffNet.Tests.Jpeg;
 /// <summary>The scalar and vectorised (AVX2, 128-bit) inverse DCTs give the same samples, so that the pixels of a JPEG do not depend on the machine.</summary>
 public class IdctTests
 {
-    [Theory]
+    [SkippableTheory]
     [InlineData(8)]
     [InlineData(11)]
     [InlineData(256)]
@@ -21,7 +21,7 @@ public class IdctTests
         });
     }
 
-    [Fact]
+    [SkippableFact]
     public void Both_transforms_wrap_alike_on_hostile_blocks()
     {
         // Any coefficient with any 16-bit quantization step: the 32-bit sums overflow, identically.
@@ -52,10 +52,7 @@ public class IdctTests
 
     private static void Compare(int stride, int blocks, Func<Random, int, int, (short Coefficient, ushort Step)> make)
     {
-        if (!JpegIdctAvx2.IsSupported && !JpegIdctVector128.IsSupported)
-        {
-            return;   // only the scalar transform runs on this machine
-        }
+        Skip.If(!JpegIdctAvx2.IsSupported && !JpegIdctVector128.IsSupported, "Only the scalar transform runs on this machine.");
 
         var random = new Random(48 + stride);
         short[] block = new short[64];

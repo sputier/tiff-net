@@ -9,10 +9,22 @@ internal static class Signatures
 {
     private static readonly Dictionary<Type, string> Keywords = new()
     {
-        [typeof(void)] = "void", [typeof(bool)] = "bool", [typeof(byte)] = "byte", [typeof(sbyte)] = "sbyte", [typeof(short)] = "short",
-        [typeof(ushort)] = "ushort", [typeof(int)] = "int", [typeof(uint)] = "uint", [typeof(long)] = "long", [typeof(ulong)] = "ulong",
-        [typeof(float)] = "float", [typeof(double)] = "double", [typeof(decimal)] = "decimal", [typeof(char)] = "char",
-        [typeof(string)] = "string", [typeof(object)] = "object",
+        [typeof(void)] = "void",
+        [typeof(bool)] = "bool",
+        [typeof(byte)] = "byte",
+        [typeof(sbyte)] = "sbyte",
+        [typeof(short)] = "short",
+        [typeof(ushort)] = "ushort",
+        [typeof(int)] = "int",
+        [typeof(uint)] = "uint",
+        [typeof(long)] = "long",
+        [typeof(ulong)] = "ulong",
+        [typeof(float)] = "float",
+        [typeof(double)] = "double",
+        [typeof(decimal)] = "decimal",
+        [typeof(char)] = "char",
+        [typeof(string)] = "string",
+        [typeof(object)] = "object",
     };
 
     private static readonly NullabilityInfoContext Nullability = new();
@@ -179,9 +191,21 @@ internal static class Signatures
 
     private static string OperatorSymbol(string name) => name switch
     {
-        "op_Equality" => "==", "op_Inequality" => "!=", "op_LessThan" => "<", "op_GreaterThan" => ">", "op_LessThanOrEqual" => "<=",
-        "op_GreaterThanOrEqual" => ">=", "op_Addition" => "+", "op_Subtraction" => "-", "op_Multiply" => "*", "op_Division" => "/",
-        "op_UnaryNegation" => "-", "op_UnaryPlus" => "+", "op_LogicalNot" => "!", "op_True" => "true", "op_False" => "false",
+        "op_Equality" => "==",
+        "op_Inequality" => "!=",
+        "op_LessThan" => "<",
+        "op_GreaterThan" => ">",
+        "op_LessThanOrEqual" => "<=",
+        "op_GreaterThanOrEqual" => ">=",
+        "op_Addition" => "+",
+        "op_Subtraction" => "-",
+        "op_Multiply" => "*",
+        "op_Division" => "/",
+        "op_UnaryNegation" => "-",
+        "op_UnaryPlus" => "+",
+        "op_LogicalNot" => "!",
+        "op_True" => "true",
+        "op_False" => "false",
         _ => name[3..],
     };
 

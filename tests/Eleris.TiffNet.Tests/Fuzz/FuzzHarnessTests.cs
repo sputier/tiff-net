@@ -5,6 +5,7 @@ namespace Eleris.TiffNet.Tests.Fuzz;
 
 // The fuzzer must be trustworthy before it finds anything: an input it reports must be reproducible from its seed and iteration,
 // its mutations must never stop a campaign, and what it calls a crash must be a crash.
+[Trait("Category", "Slow")]
 public class FuzzHarnessTests
 {
     private static readonly string[] Seeds = Directory.GetFiles(DomainFixtures.Folder, "*.tif").Order(StringComparer.Ordinal).ToArray();

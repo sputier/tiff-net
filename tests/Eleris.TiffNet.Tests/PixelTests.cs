@@ -65,14 +65,11 @@ public class PixelTests
     /// <summary>The compressions of the corpus the library refuses by design (coverage.md): their files must say so.</summary>
     private static readonly string[] RefusedByDesign = ["lzma", "zstd"];
 
-    [Fact]
+    [SkippableFact]
+    [Trait("Category", "Interop")]
     public void Every_file_of_the_interop_corpus_gives_the_samples_of_tifffile_or_is_refused_by_design()
     {
-        if (!Directory.Exists(InteropCorpus.Folder))
-        {
-            Assert.True(InteropCorpus.Skipped, $"The interop corpus is not generated; set {InteropCorpus.SkipVariable}=1 to skip.");
-            return;
-        }
+        InteropCorpus.RequireGenerated();
 
         var counts = new Dictionary<TiffCompression, int>();
         var predicted = new Dictionary<TiffPredictor, int>();

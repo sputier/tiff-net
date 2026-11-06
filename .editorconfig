@@ -19,3 +19,11 @@ trim_trailing_whitespace = false
 # Tests are named as sentences (A_damaged_file_fails_with_a_TiffException).
 [tests/**.cs]
 dotnet_diagnostic.CA1707.severity = none
+
+# C# style, checked by `dotnet format --verify-no-changes` in CI.
+[*.cs]
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_using_directive_placement = outside_namespace:warning
+dotnet_sort_system_directives_first = true
+csharp_indent_case_contents_when_block = false
+csharp_new_line_before_open_brace = all
