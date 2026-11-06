@@ -2,6 +2,7 @@
 
   <!-- Structure-aware fuzzer of the readers. See Program.cs for the commands. -->
   <PropertyGroup>
+    <AssemblyName>Eleris.TiffNet.Fuzz</AssemblyName>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
