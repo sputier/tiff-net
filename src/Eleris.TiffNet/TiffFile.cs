@@ -10,8 +10,8 @@ namespace Eleris.TiffNet;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <see cref="Open"/> reads the directories of a file, not its pixels, and keeps the file open until <see cref="Dispose"/>: the
-/// pixels are read when they are asked for. <see cref="Read"/> holds a whole stream in memory.
+/// <see cref="Open(string, TiffReadOptions?)"/> (or <see cref="Open(Stream, TiffReadOptions?, bool)"/>) reads the directories of a file, not its pixels, and keeps the file open until <see cref="Dispose"/>: the
+/// pixels are read when they are asked for. <see cref="Read(Stream, TiffReadOptions?)"/> holds a whole stream in memory.
 /// </para>
 /// <para>A damaged or hostile file fails with a <see cref="TiffException"/>, within the limits of <see cref="TiffReadOptions"/>.</para>
 /// </remarks>
@@ -70,6 +70,45 @@ public sealed partial class TiffFile : IReadOnlyList<TiffImage>, IDisposable
     }
 
     /// <summary>
+    /// Opens a TIFF stream that seeks, from its current position, and reads its directories; the pixels are read from the stream
+    /// on demand, until the file is disposed, without copying the stream into memory (a <see cref="FileStream"/> is read through
+    /// its handle, from several threads at once).
+    /// </summary>
+    /// <param name="stream">The stream; it must seek and be read, and must not be used by the application while the file is open.</param>
+    /// <param name="options">The tolerance and the limits of the read; <see cref="TiffReadOptions.Default"/> when <see langword="null"/>.</param>
+    /// <param name="leaveOpen">Whether the stream stays open when the file is disposed.</param>
+    /// <returns>The file, to dispose when its pixels are no longer needed.</returns>
+    /// <exception cref="ArgumentException">The stream cannot seek or be read.</exception>
+    /// <exception cref="TiffException">The data is not TIFF, is damaged, or exceeds a limit of <paramref name="options"/>.</exception>
+    /// <exception cref="IOException">The stream cannot be read.</exception>
+    public static TiffFile Open(Stream stream, TiffReadOptions? options = null, bool leaveOpen = false)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        Platform.EnsureSupported();
+        if (!stream.CanSeek || !stream.CanRead)
+        {
+            throw new ArgumentException("The stream must seek and be read: use TiffFile.Read for a stream that cannot seek.", nameof(stream));
+        }
+
+        options ??= TiffReadOptions.Default;
+        return Load(TiffSource.FromOpenStream(stream, leaveOpen, NameOf(stream)), options);
+    }
+
+    /// <summary>
+    /// Reads TIFF data the application holds in memory, without copying it: the memory must not change while the file is used.
+    /// </summary>
+    /// <param name="data">The bytes of the TIFF data.</param>
+    /// <param name="options">The tolerance and the limits of the read; <see cref="TiffReadOptions.Default"/> when <see langword="null"/>.</param>
+    /// <returns>The file.</returns>
+    /// <exception cref="TiffException">The data is not TIFF, is damaged, or exceeds a limit of <paramref name="options"/>.</exception>
+    public static TiffFile Read(ReadOnlyMemory<byte> data, TiffReadOptions? options = null)
+    {
+        Platform.EnsureSupported();
+        options ??= TiffReadOptions.Default;
+        return Load(TiffSource.FromMemory(data), options);
+    }
+
+    /// <summary>
     /// Reads a TIFF stream into memory, from its current position: the stream can be closed afterwards, and need not be able to
     /// seek.
     /// </summary>
@@ -105,7 +144,7 @@ public sealed partial class TiffFile : IReadOnlyList<TiffImage>, IDisposable
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    /// <summary>Closes the file opened by <see cref="Open"/>; its pixels can no longer be read. The metadata stays available.</summary>
+    /// <summary>Closes the file opened by <see cref="Open(string, TiffReadOptions?)"/>; its pixels can no longer be read. The metadata stays available.</summary>
     public void Dispose() => _source?.Dispose();
 
     private static string NameOf(Stream stream) => stream is FileStream file ? file.Name : "stream";

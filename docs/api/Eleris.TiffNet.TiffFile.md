@@ -12,7 +12,7 @@ public sealed class TiffFile : IDisposable, IReadOnlyList<TiffImage>
 
 **Remarks**
 
-[`TiffFile.Open`](#eleris-tiffnet-tifffile-open-system-string-eleris-tiffnet-tiffreadoptions) reads the directories of a file, not its pixels, and keeps the file open until [`TiffFile.Dispose`](#eleris-tiffnet-tifffile-dispose): the pixels are read when they are asked for. [`TiffFile.Read`](#eleris-tiffnet-tifffile-read-system-io-stream-eleris-tiffnet-tiffreadoptions) holds a whole stream in memory.
+[`TiffFile.Open`](#eleris-tiffnet-tifffile-open-system-string-eleris-tiffnet-tiffreadoptions) (or [`TiffFile.Open`](#eleris-tiffnet-tifffile-open-system-io-stream-eleris-tiffnet-tiffreadoptions-system-boolean)) reads the directories of a file, not its pixels, and keeps the file open until [`TiffFile.Dispose`](#eleris-tiffnet-tifffile-dispose): the pixels are read when they are asked for. [`TiffFile.Read`](#eleris-tiffnet-tifffile-read-system-io-stream-eleris-tiffnet-tiffreadoptions) holds a whole stream in memory.
 
 A damaged or hostile file fails with a [`TiffException`](Eleris.TiffNet.TiffException.md), within the limits of [`TiffReadOptions`](Eleris.TiffNet.TiffReadOptions.md).
 
@@ -40,6 +40,8 @@ A damaged or hostile file fails with a [`TiffException`](Eleris.TiffNet.TiffExce
 | [`GetEnumerator()`](#eleris-tiffnet-tifffile-getenumerator) | Returns an enumerator over the pages. |
 | [`Insert(int, TiffImage)`](#eleris-tiffnet-tifffile-insert-system-int32-eleris-tiffnet-tiffimage) | Inserts a page. |
 | [`Open(string, TiffReadOptions)`](#eleris-tiffnet-tifffile-open-system-string-eleris-tiffnet-tiffreadoptions) | Opens a file and reads its directories; the pixels are read on demand, until the file is disposed. |
+| [`Open(Stream, TiffReadOptions, bool)`](#eleris-tiffnet-tifffile-open-system-io-stream-eleris-tiffnet-tiffreadoptions-system-boolean) | Opens a TIFF stream that seeks, from its current position, and reads its directories; the pixels are read from the stream on demand, until the file is disposed, without copying the stream into memory (a [`FileStream`](https://learn.microsoft.com/dotnet/api/system.io.filestream) is read through its handle, from several threads at once). |
+| [`Read(ReadOnlyMemory<byte>, TiffReadOptions)`](#eleris-tiffnet-tifffile-read-system-readonlymemory-system-byte-eleris-tiffnet-tiffreadoptions) | Reads TIFF data the application holds in memory, without copying it: the memory must not change while the file is used. |
 | [`Read(Stream, TiffReadOptions)`](#eleris-tiffnet-tifffile-read-system-io-stream-eleris-tiffnet-tiffreadoptions) | Reads a TIFF stream into memory, from its current position: the stream can be closed afterwards, and need not be able to seek. |
 | [`ReadAsync(Stream, TiffReadOptions, CancellationToken)`](#eleris-tiffnet-tifffile-readasync-system-io-stream-eleris-tiffnet-tiffreadoptions-system-threading-cancellationtoken) | Reads a TIFF stream into memory asynchronously, from its current position. |
 | [`Remove(TiffImage)`](#eleris-tiffnet-tifffile-remove-eleris-tiffnet-tiffimage) | Removes a page. |
@@ -191,6 +193,53 @@ The file, to dispose when its pixels are no longer needed.
 
 - [`TiffException`](Eleris.TiffNet.TiffException.md) — The file is not TIFF, is damaged, or exceeds a limit of `options`.
 - [`IOException`](https://learn.microsoft.com/dotnet/api/system.io.ioexception) — The file cannot be read.
+
+<a id="eleris-tiffnet-tifffile-open-system-io-stream-eleris-tiffnet-tiffreadoptions-system-boolean"></a>
+### `Open(Stream, TiffReadOptions, bool)`
+
+Opens a TIFF stream that seeks, from its current position, and reads its directories; the pixels are read from the stream on demand, until the file is disposed, without copying the stream into memory (a [`FileStream`](https://learn.microsoft.com/dotnet/api/system.io.filestream) is read through its handle, from several threads at once).
+
+```csharp
+public static TiffFile Open(Stream stream, TiffReadOptions? options = null, bool leaveOpen = false)
+```
+
+**Parameters**
+
+- `stream` — The stream; it must seek and be read, and must not be used by the application while the file is open.
+- `options` — The tolerance and the limits of the read; [`TiffReadOptions.Default`](Eleris.TiffNet.TiffReadOptions.md#eleris-tiffnet-tiffreadoptions-default) when `null`.
+- `leaveOpen` — Whether the stream stays open when the file is disposed.
+
+**Returns**
+
+The file, to dispose when its pixels are no longer needed.
+
+**Exceptions**
+
+- [`ArgumentException`](https://learn.microsoft.com/dotnet/api/system.argumentexception) — The stream cannot seek or be read.
+- [`TiffException`](Eleris.TiffNet.TiffException.md) — The data is not TIFF, is damaged, or exceeds a limit of `options`.
+- [`IOException`](https://learn.microsoft.com/dotnet/api/system.io.ioexception) — The stream cannot be read.
+
+<a id="eleris-tiffnet-tifffile-read-system-readonlymemory-system-byte-eleris-tiffnet-tiffreadoptions"></a>
+### `Read(ReadOnlyMemory<byte>, TiffReadOptions)`
+
+Reads TIFF data the application holds in memory, without copying it: the memory must not change while the file is used.
+
+```csharp
+public static TiffFile Read(ReadOnlyMemory<byte> data, TiffReadOptions? options = null)
+```
+
+**Parameters**
+
+- `data` — The bytes of the TIFF data.
+- `options` — The tolerance and the limits of the read; [`TiffReadOptions.Default`](Eleris.TiffNet.TiffReadOptions.md#eleris-tiffnet-tiffreadoptions-default) when `null`.
+
+**Returns**
+
+The file.
+
+**Exceptions**
+
+- [`TiffException`](Eleris.TiffNet.TiffException.md) — The data is not TIFF, is damaged, or exceeds a limit of `options`.
 
 <a id="eleris-tiffnet-tifffile-read-system-io-stream-eleris-tiffnet-tiffreadoptions"></a>
 ### `Read(Stream, TiffReadOptions)`
