@@ -24,6 +24,10 @@ Console.WriteLine($"{read.Software}, {read.Resolution!.X} dpi, {read[65000]!.AsS
 - **Astro-TIFF**: the FITS header that Siril and other tools write is the text of `ImageDescription` (`Description`), kept
   byte for byte when a file is read and saved again. Converting it to FITS cards, and flipping rows (FITS counts them from the
   bottom), is the job of the bridge with Eleris.FitsNet.
+- **Pixels that change** (`SetPixels`) drop the tags that describe their values (`TiffMetadata.PixelTags`: minimum and
+  maximum sample values); images whose values the library inverts (MinIsWhite) are read without them. A FITS header in the
+  description still describes the pixels it came with: update it with the pixels. `CopyFrom` copies the metadata of another
+  image, with exclusions.
 - **Saving again** keeps every tag except those that hold offsets into the file (EXIF, GPS and Interoperability
   sub-directories, `SubIFDs`, `FreeOffsets`, and any tag of type `IFD`): they would point nowhere in a new file. The EXIF and GPS
   tags are readable (`Exif`, `Gps`) but not written in this version.

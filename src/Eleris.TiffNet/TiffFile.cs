@@ -270,6 +270,16 @@ public sealed partial class TiffFile : IReadOnlyList<TiffImage>, IDisposable
             Photometric = descriptor.Photometric,
             BitsPerSample = descriptor.BitsPerSample,
         };
-        return new TiffImage(descriptor, MetadataReader.Read(reader, directory), storage);
+        var metadata = MetadataReader.Read(reader, directory);
+        if (descriptor.Photometric == TiffPhotometric.MinIsWhite)
+        {
+            // The values are delivered inverted (as MinIsBlack): the ranges of the file describe the values it stores.
+            foreach (int code in TiffMetadata.PixelTags)
+            {
+                metadata.Remove(code);
+            }
+        }
+
+        return new TiffImage(descriptor, metadata, storage);
     }
 }

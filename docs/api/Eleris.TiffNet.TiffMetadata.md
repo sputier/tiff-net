@@ -40,6 +40,7 @@ Reading the properties of metadata from several threads is safe; changing it whi
 | [`IccProfile`](#eleris-tiffnet-tiffmetadata-iccprofile) | The ICC colour profile of the image (34675), as it is. |
 | [`Iptc`](#eleris-tiffnet-tiffmetadata-iptc) | The IPTC metadata of the image (33723), as it is. |
 | [`PageName`](#eleris-tiffnet-tiffmetadata-pagename) | The name of the page (`PageName`, 285). |
+| [`PixelTags`](#eleris-tiffnet-tiffmetadata-pixeltags) | The tags that describe the values of the pixels (`MinSampleValue`, `MaxSampleValue`, `SMinSampleValue`, `SMaxSampleValue`; 280, 281, 340, 341): removed when the pixels change, and from images whose values the library inverts (MinIsWhite), since they would describe other values. |
 | [`Resolution`](#eleris-tiffnet-tiffmetadata-resolution) | The resolution (`XResolution`, `YResolution`, `ResolutionUnit`; 282, 283, 296); the unit is inches when the file does not say, as TIFF specifies. |
 | [`SampleRange`](#eleris-tiffnet-tiffmetadata-samplerange) | The smallest and largest sample values the image holds (`SMinSampleValue`, `SMaxSampleValue`; 340, 341), when the writer recorded them: for example 0 and 1 for normalised floating point data. |
 | [`Software`](#eleris-tiffnet-tiffmetadata-software) | The software that wrote the image (`Software`, 305). |
@@ -50,6 +51,7 @@ Reading the properties of metadata from several threads is safe; changing it whi
 
 | Member | Description |
 | --- | --- |
+| [`CopyFrom(TiffMetadata, IEnumerable<int>)`](#eleris-tiffnet-tiffmetadata-copyfrom-eleris-tiffnet-tiffmetadata-system-collections-generic-ienumerable-system-int32) | Replaces the tags of these metadata by those of `other` (the metadata of another image), except the codes of `excluded`; the EXIF and GPS tags, read only, are not copied. |
 | [`GetEnumerator()`](#eleris-tiffnet-tiffmetadata-getenumerator) | The tags, by code. |
 | [`Remove(int)`](#eleris-tiffnet-tiffmetadata-remove-system-int32) | Removes a tag. |
 | [`Set(TiffTag)`](#eleris-tiffnet-tiffmetadata-set-eleris-tiffnet-tifftag) | Adds a tag, or replaces the tag of the same code. |
@@ -175,6 +177,15 @@ The name of the page (`PageName`, 285).
 public string? PageName { get; set; }
 ```
 
+<a id="eleris-tiffnet-tiffmetadata-pixeltags"></a>
+### `PixelTags`
+
+The tags that describe the values of the pixels (`MinSampleValue`, `MaxSampleValue`, `SMinSampleValue`, `SMaxSampleValue`; 280, 281, 340, 341): removed when the pixels change, and from images whose values the library inverts (MinIsWhite), since they would describe other values.
+
+```csharp
+public static IReadOnlyList<int> PixelTags { get; }
+```
+
 <a id="eleris-tiffnet-tiffmetadata-resolution"></a>
 ### `Resolution`
 
@@ -225,6 +236,24 @@ public TiffTag? this[int code] { get; }
 - `code` — The code of the tag.
 
 ## Method details
+
+<a id="eleris-tiffnet-tiffmetadata-copyfrom-eleris-tiffnet-tiffmetadata-system-collections-generic-ienumerable-system-int32"></a>
+### `CopyFrom(TiffMetadata, IEnumerable<int>)`
+
+Replaces the tags of these metadata by those of `other` (the metadata of another image), except the codes of `excluded`; the EXIF and GPS tags, read only, are not copied.
+
+```csharp
+public void CopyFrom(TiffMetadata other, IEnumerable<int> excluded)
+```
+
+**Parameters**
+
+- `other` — The metadata to copy.
+- `excluded` — The codes of the tags not to copy (for example [`TiffMetadata.PixelTags`](#eleris-tiffnet-tiffmetadata-pixeltags) when the pixels differ).
+
+**Exceptions**
+
+- [`ArgumentNullException`](https://learn.microsoft.com/dotnet/api/system.argumentnullexception) — `other` or `excluded` is null.
 
 <a id="eleris-tiffnet-tiffmetadata-getenumerator"></a>
 ### `GetEnumerator()`

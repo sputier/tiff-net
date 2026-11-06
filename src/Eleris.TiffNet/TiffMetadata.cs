@@ -217,6 +217,33 @@ public sealed class TiffMetadata : IEnumerable<TiffTag>
     /// <returns>Whether there was such a tag.</returns>
     public bool Remove(int code) => _tags.Remove(code);
 
+    /// <summary>
+    /// The tags that describe the values of the pixels (<c>MinSampleValue</c>, <c>MaxSampleValue</c>, <c>SMinSampleValue</c>,
+    /// <c>SMaxSampleValue</c>; 280, 281, 340, 341): removed when the pixels change, and from images whose values the library
+    /// inverts (MinIsWhite), since they would describe other values.
+    /// </summary>
+    public static IReadOnlyList<int> PixelTags { get; } = [280, 281, MinSampleValueTag, MaxSampleValueTag];
+
+    /// <summary>
+    /// Replaces the tags of these metadata by those of <paramref name="other"/> (the metadata of another image), except the codes
+    /// of <paramref name="excluded"/>; the EXIF and GPS tags, read only, are not copied.
+    /// </summary>
+    /// <param name="other">The metadata to copy.</param>
+    /// <param name="excluded">The codes of the tags not to copy (for example <see cref="PixelTags"/> when the pixels differ).</param>
+    /// <exception cref="ArgumentNullException"><paramref name="other"/> or <paramref name="excluded"/> is null.</exception>
+    public void CopyFrom(TiffMetadata other, params IEnumerable<int> excluded)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        ArgumentNullException.ThrowIfNull(excluded);
+        var skip = excluded.ToHashSet();
+        var tags = other._tags.Values.Where(t => !skip.Contains(t.Code)).ToList();
+        _tags.Clear();
+        foreach (var tag in tags)
+        {
+            _tags[tag.Code] = tag;
+        }
+    }
+
     /// <summary>The tags, by code.</summary>
     public IEnumerator<TiffTag> GetEnumerator() => _tags.Values.GetEnumerator();
 
