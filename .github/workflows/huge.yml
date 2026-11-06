@@ -1,0 +1,46 @@
+name: Huge files
+
+# Writes a file beyond 4 GB (BigTIFF, 64-bit offsets) with TiffImageWriter and reads it back by region, checking the samples.
+# It takes a few minutes and 4.3 GB of disk: it runs when the writer or the structure changes, weekly, and on demand.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/Eleris.TiffNet/Internal/Writing/**"
+      - "src/Eleris.TiffNet/Internal/Structure/**"
+      - "src/Eleris.TiffNet/TiffImageWriter.cs"
+      - ".github/workflows/huge.yml"
+  pull_request:
+    paths:
+      - "src/Eleris.TiffNet/Internal/Writing/**"
+      - "src/Eleris.TiffNet/Internal/Structure/**"
+      - "src/Eleris.TiffNet/TiffImageWriter.cs"
+      - ".github/workflows/huge.yml"
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: huge-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  beyond-4-gb:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+      - name: Free disk space (the file is 4.3 GB)
+        run: df -h /tmp
+      - name: Build
+        run: dotnet build tests/Eleris.TiffNet.Tests -c Release
+      - name: Write and read back a file beyond 4 GB
+        run: dotnet test tests/Eleris.TiffNet.Tests -c Release --no-build --filter "FullyQualifiedName~HugeFileTests" --logger "console;verbosity=detailed"
+        env:
+          TIFFNET_HUGE: "1"
