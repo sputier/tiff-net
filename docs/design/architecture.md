@@ -9,7 +9,7 @@ coverage in [standard-coverage.md](../standard-coverage.md). The library as buil
 
 - net10.0 only; Windows, Linux, .NET MAUI (Android, iOS): no reflection that trimming cannot see, no native code, no
   `unsafe` blocks (Span, `MemoryMarshal`, `BinaryPrimitives` and `System.Numerics.Vector` instead; as built, `Unsafe.Add`
-  and `Unsafe.WriteUnaligned` go through references in four hot loops, each after a bounds check, see [As built](#as-built)), `IsTrimmable` and
+  and `Unsafe.WriteUnaligned` go through references in five hot loops, each after a bounds check, see [As built](#as-built)), `IsTrimmable` and
   `IsAotCompatible` with zero warnings, little and big endian *files* on little endian *machines* (a check refuses big endian
   machines at start-up rather than giving wrong pixels).
 - No dependency. Deflate through `System.IO.Compression` (zlib-ng in .NET 10); everything else written here.
@@ -199,13 +199,15 @@ The layers of this page, with the names of the code of version 0.1.0:
 | — | `ResourceBudget` (every limit of the read options), `Writing/SafeFile` (temporary files, replacement) |
 
 **References instead of `unsafe` blocks.** No `unsafe` block exists (`AllowUnsafeBlocks` is set for `[SkipLocalsInit]` only).
-Four hot loops go through references with `System.Runtime.CompilerServices.Unsafe`, each after the check that keeps it in
+Five hot loops go through references with `System.Runtime.CompilerServices.Unsafe`, each after the check that keeps it in
 bounds (elsewhere, `Unsafe.SizeOf` gives the size of a sample type, and `Unsafe.As` in the context of a read, `Pixels/PixelReader.Context.cs`,
 reinterprets a sample as itself when the stored and delivered types are the same):
 
 - `Codecs/Lzw.Decode`: every write is preceded by `written < capacity` (a string is cut to the room left), and a string is
   copied from what is already written (`from + size <= written` + 1 for the string being defined); a string of at most 16
   bytes is copied as one 16-byte vector only when `capacity - written >= 16`.
+- `Codecs/PackBits.Decode`: a run of at most 16 bytes is copied or stored as one 16-byte vector only when 16 bytes are left in
+  the destination (and, for a literal run, in the source).
 - `Codecs/Predictors`: the loops run over the length of the row they are given (`UndoFloatingPoint` copies the row into a
   scratch buffer of at least that length, which throws otherwise).
 - `Jpeg/JpegColour.Convert`: the length of the rows is checked first; the range-limit table covers every index a sample can
