@@ -34,7 +34,7 @@ new TiffFile().Add(image).Save(path, options);
 | Option | Values | Default |
 | --- | --- | --- |
 | `Compression` | `Deflate`, `Lzw`, `PackBits`, `None` | `Deflate` |
-| `Level` | `Fastest` (2 to 2.5 times faster, files 15 to 50 % larger), `Optimal`, `SmallestSize` | `Optimal` |
+| `Level` | `Fastest` (2 to 2.5 times faster, files 15 to 50 % larger), `Optimal`, `SmallestSize` (much slower, rarely smaller with the zlib of .NET) | `Optimal` |
 | `Predictor` | `Auto` (horizontal for integers of 8 to 32 bits, floating point for floating point), `None`, `Horizontal`, `FloatingPoint` | `Auto` |
 | `Layout`, `TileSize` | strips, or square tiles of a multiple of 16 | strips |
 | `PlanarConfiguration` | interleaved, or one plane per channel | interleaved |

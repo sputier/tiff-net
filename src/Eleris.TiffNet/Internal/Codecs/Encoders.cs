@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace Eleris.TiffNet.Internal.Codecs;
 
@@ -59,31 +60,28 @@ internal static class LzwEncoder
     public static long MaxEncoded(long length) => length * 3 / 2 + length / 2000 * 2 + 16;
 
     /// <summary>Encodes a strip or tile; returns the bytes written into <paramref name="destination"/> (at least <see cref="MaxEncoded"/>).</summary>
+    /// <exception cref="ArgumentException"><paramref name="destination"/> is shorter than <see cref="MaxEncoded"/>.</exception>
     [SkipLocalsInit]
     public static int Encode(ReadOnlySpan<byte> source, Span<byte> destination)
     {
-        // Open addressing: a key (prefix code << 8 | byte, plus 1 so that 0 is empty) and its code.
-        Span<int> keys = stackalloc int[HashSize];
-        Span<short> codes = stackalloc short[HashSize];
-        keys.Clear();
+        // The bound is checked once: every code then goes out through a reference, without a check per byte.
+        if (destination.Length < MaxEncoded(source.Length))
+        {
+            throw new ArgumentException($"{source.Length} bytes need {MaxEncoded(source.Length)} bytes of output.", nameof(destination));
+        }
+
+        // Open addressing over one table: an entry is its key (prefix code << 8 | byte, plus 1 so that 0 is empty) in the high
+        // 20 bits and its code in the low 12 bits; 32 KB, one cache line a probe.
+        Span<uint> table = stackalloc uint[HashSize];
+        table.Clear();
+        ref byte output = ref MemoryMarshal.GetReference(destination);
 
         ulong bits = 0;
         int count = 0, written = 0, width = 9, free = FirstFree;
-        void Put(int code, Span<byte> output)
-        {
-            bits = (bits << width) | (uint)code;
-            count += width;
-            while (count >= 8)
-            {
-                count -= 8;
-                output[written++] = (byte)(bits >> count);
-            }
-        }
-
-        Put(Clear, destination);
+        Put(Clear, width, ref bits, ref count, ref output, ref written);
         if (source.IsEmpty)
         {
-            Put(End, destination);
+            Put(End, width, ref bits, ref count, ref output, ref written);
             Flush(ref bits, ref count, ref written, destination);
             return written;
         }
@@ -92,28 +90,28 @@ internal static class LzwEncoder
         for (int i = 1; i < source.Length; i++)
         {
             byte value = source[i];
-            int key = (prefix << 8 | value) + 1;
-            int slot = (int)((uint)(key * -1640531535) >> (32 - HashBits));
-            while (keys[slot] != 0 && keys[slot] != key)
+            uint key = (uint)(prefix << 8 | value) + 1;
+            int slot = (int)((key * 2654435761u) >> (32 - HashBits));
+            uint entry;
+            while ((entry = table[slot]) != 0 && entry >> 12 != key)
             {
                 slot = (slot + 1) & (HashSize - 1);
             }
 
-            if (keys[slot] == key)
+            if (entry != 0)
             {
-                prefix = codes[slot];
+                prefix = (int)(entry & 0xFFF);
                 continue;
             }
 
-            Put(prefix, destination);
-            keys[slot] = key;
-            codes[slot] = (short)free++;
+            Put(prefix, width, ref bits, ref count, ref output, ref written);
+            table[slot] = key << 12 | (uint)free++;
             prefix = value;
             if (free == Full)
             {
                 // The table is full: a clear code, written at the width reached, then 9 bits again.
-                Put(Clear, destination);
-                keys.Clear();
+                Put(Clear, width, ref bits, ref count, ref output, ref written);
+                table.Clear();
                 free = FirstFree;
                 width = 9;
             }
@@ -125,10 +123,10 @@ internal static class LzwEncoder
 
         // The last string, then as libtiff's LZWPostEncode: the decoder adds an entry for it before the end code, so the table
         // may be full (a clear code, back to 9 bits) or the width may grow first.
-        Put(prefix, destination);
+        Put(prefix, width, ref bits, ref count, ref output, ref written);
         if (++free == Full)
         {
-            Put(Clear, destination);
+            Put(Clear, width, ref bits, ref count, ref output, ref written);
             width = 9;
         }
         else if (free > (1 << width) - 1 && width < 12)
@@ -136,9 +134,22 @@ internal static class LzwEncoder
             width++;
         }
 
-        Put(End, destination);
+        Put(End, width, ref bits, ref count, ref output, ref written);
         Flush(ref bits, ref count, ref written, destination);
         return written;
+    }
+
+    /// <summary>A code of <paramref name="width"/> bits, most significant first; whole bytes go out.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void Put(int code, int width, ref ulong bits, ref int count, ref byte output, ref int written)
+    {
+        bits = (bits << width) | (uint)code;
+        count += width;
+        while (count >= 8)
+        {
+            count -= 8;
+            Unsafe.Add(ref output, written++) = (byte)(bits >> count);
+        }
     }
 
     private static void Flush(ref ulong bits, ref int count, ref int written, Span<byte> output)
