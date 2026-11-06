@@ -15,6 +15,7 @@ Every public type of the library, by namespace. The pages are generated from the
 | [`TiffExtraChannelKind`](Eleris.TiffNet.TiffExtraChannelKind.md) | enum | What an extra channel (after the colour channels) holds. |
 | [`TiffFile`](Eleris.TiffNet.TiffFile.md) | class | A TIFF file: its pages, in the order of the file. |
 | [`TiffImage`](Eleris.TiffNet.TiffImage.md) | class | One image of a TIFF file: its geometry, its samples and, on demand, its pixels. |
+| [`TiffImageWriter`](Eleris.TiffNet.TiffImageWriter.md) | class | Writes one image piece by piece, for mosaics and other images that do not fit in one array, without holding the image in memory: rows in order ([`TiffLayout.Strips`](Eleris.TiffNet.TiffLayout.md#eleris-tiffnet-tifflayout-strips)) or tiles in any order ([`TiffLayout.Tiles`](Eleris.TiffNet.TiffLayout.md#eleris-tiffnet-tifflayout-tiles)), then [`TiffImageWriter.Complete`](Eleris.TiffNet.TiffImageWriter.md#eleris-tiffnet-tiffimagewriter-complete). |
 | [`TiffLayout`](Eleris.TiffNet.TiffLayout.md) | enum | How the samples of an image are divided in a file. |
 | [`TiffMetadata`](Eleris.TiffNet.TiffMetadata.md) | class | The tags of an image other than its structure: description, software, date, resolution, ICC profile, XMP, private tags… They are kept as they are when an image is read and saved again. |
 | [`TiffPhotometric`](Eleris.TiffNet.TiffPhotometric.md) | enum | The photometric interpretation of a file: what its samples mean. |

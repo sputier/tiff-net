@@ -32,12 +32,8 @@ internal static class TiffFileWriter
         {
             var encoder = encoders[i];
             long[] offsets = new long[encoder.Blocks], counts = new long[encoder.Blocks];
-            BlockPipeline.Run(encoder.Blocks, options.Degree, encoder.Encode, (block, data) =>
-            {
-                offsets[block] = writer.Append(data);
-                counts[block] = data.Length;
-            }, cancellationToken);
-            writer.WriteDirectory(Entries(images[i], encoder, offsets, counts, bigTiff));
+            encoder.Write(writer, offsets, counts, options.Degree, cancellationToken);
+            writer.WriteDirectory(Entries(encoder.Shape(images[i]), images[i].Metadata, offsets, counts, bigTiff));
         }
     }
 
@@ -55,10 +51,10 @@ internal static class TiffFileWriter
     }
 
     /// <summary>The entries of the directory of an image: its structure, then its metadata (except the tags of offsets).</summary>
-    internal static List<DirectoryEntry> Entries(TiffImage image, ImageEncoder e, long[] offsets, long[] counts, bool bigTiff)
+    internal static List<DirectoryEntry> Entries(ImageShape e, TiffMetadata metadata, long[] offsets, long[] counts, bool bigTiff)
     {
         int samples = e.Channels;
-        int bits = e.BytesPerSample * 8;
+        int bits = Pixels.SampleConversion.SizeOf(e.SampleType) * 8;
         int format = e.SampleType switch
         {
             TiffSampleType.Float16 or TiffSampleType.Float32 or TiffSampleType.Float64 => 3,
@@ -71,7 +67,7 @@ internal static class TiffFileWriter
             DirectoryEntry.Long(ImageLength, e.Height),
             DirectoryEntry.Short(BitsPerSample, [.. Enumerable.Repeat(bits, samples)]),
             DirectoryEntry.Short(CompressionTag, (int)e.Compression),
-            DirectoryEntry.Short(Photometric, image.ColorModel == TiffColorModel.Rgb ? 2 : 1),
+            DirectoryEntry.Short(Photometric, e.ColorModel == TiffColorModel.Rgb ? 2 : 1),
             DirectoryEntry.Short(Orientation, 1),
             DirectoryEntry.Short(SamplesPerPixel, samples),
             DirectoryEntry.Offsets(e.Tiled ? TileOffsets : StripOffsets, offsets, bigTiff),
@@ -98,9 +94,9 @@ internal static class TiffFileWriter
             entries.Add(DirectoryEntry.Short(PredictorTag, (int)e.Predictor));
         }
 
-        if (image.ExtraChannels.Count > 0)
+        if (e.Extras.Count > 0)
         {
-            entries.Add(DirectoryEntry.Short(ExtraSamples, [.. image.ExtraChannels.Select(c => (int)c.Kind)]));
+            entries.Add(DirectoryEntry.Short(ExtraSamples, [.. e.Extras.Select(k => (int)k)]));
         }
 
         if (format != 1)
@@ -109,21 +105,49 @@ internal static class TiffFileWriter
         }
 
         // What the image is (a reduced-resolution version, a mask), as it was read; a page otherwise.
-        int subfile = image.Descriptor.SubfileType & 5;
+        int subfile = e.SubfileType & 5;
         if (subfile != 0)
         {
             entries.Add(DirectoryEntry.Long(NewSubfileType, subfile));
         }
 
-        foreach (var tag in image.Metadata)
+        foreach (var tag in metadata)
         {
-            if (Writable(tag))
+            if (Writable(tag) && Fit(tag, bigTiff) is { } entry)
             {
-                entries.Add(new DirectoryEntry((ushort)tag.Code, tag.Type, tag.Count, tag.AsBytes().ToArray()));
+                entries.Add(entry);
             }
         }
 
         return entries;
+    }
+
+    /// <summary>
+    /// The entry of a tag; in classic TIFF, which has no 64-bit types, LONG8 and SLONG8 values become LONG and SLONG when they fit
+    /// (the tag is dropped otherwise).
+    /// </summary>
+    private static DirectoryEntry? Fit(TiffTag tag, bool bigTiff)
+    {
+        if (bigTiff || tag.Type is not (TiffTagType.Long8 or TiffTagType.SLong8))
+        {
+            return new DirectoryEntry((ushort)tag.Code, tag.Type, tag.Count, tag.AsBytes().ToArray());
+        }
+
+        var values = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, long>(tag.AsBytes().Span);
+        bool signed = tag.Type == TiffTagType.SLong8;
+        byte[] narrow = new byte[values.Length * 4];
+        for (int i = 0; i < values.Length; i++)
+        {
+            long v = values[i];
+            if (signed ? v is < int.MinValue or > int.MaxValue : (ulong)v > uint.MaxValue)
+            {
+                return null;
+            }
+
+            System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(narrow.AsSpan(i * 4), (int)v);
+        }
+
+        return new DirectoryEntry((ushort)tag.Code, signed ? TiffTagType.SLong : TiffTagType.Long, values.Length, narrow);
     }
 
     /// <summary>
@@ -134,3 +158,8 @@ internal static class TiffFileWriter
         !TiffMetadata.Excluded.Contains(tag.Code) && tag.Type is not (TiffTagType.Ifd or TiffTagType.Ifd8)
         && TagTypes.Size(tag.Type) > 0 && tag.Code is > 0 and <= ushort.MaxValue;
 }
+
+/// <summary>What the directory of an image says about its structure.</summary>
+internal readonly record struct ImageShape(long Width, long Height, int Channels, TiffSampleType SampleType, TiffColorModel ColorModel,
+    IReadOnlyList<TiffExtraChannelKind> Extras, int SubfileType, bool Tiled, bool Planar, int BlockWidth, int BlockHeight,
+    TiffCompression Compression, TiffPredictor Predictor);
