@@ -400,6 +400,7 @@ internal static class PixelReader
         private readonly double[]? _maxima;
         private readonly bool _identity;
         private readonly bool _direct;
+        private readonly bool _uniformMaxima;
 
         public Context(PixelPlan plan, TiffSource source, ResourceBudget budget, int channels, bool littleEndian)
         {
@@ -422,6 +423,7 @@ internal static class PixelReader
                 && (_d.BitsPerSample == 8 || littleEndian == BitConverter.IsLittleEndian)
                 && !_d.ReversedBits && _d.Photometric is not (TiffPhotometric.MinIsWhite or TiffPhotometric.Palette);
             _maxima = _request.Scale == TiffPixelScale.Normalized ? Maxima(_d, channels) : null;
+            _uniformMaxima = _maxima is null || Array.TrueForAll(_maxima, m => m == _maxima[0]);
         }
 
         public void Process(PixelUnit unit, Span<TOut> destination, Scratch<TD> scratch)
@@ -598,6 +600,12 @@ internal static class PixelReader
                 return;
             }
 
+            if (_orientation == 1)
+            {
+                PlaceRun(unit, sy, row, perPixel, destination, x0, (int)(x1 - x0));
+                return;
+            }
+
             // Where the first sample of the row goes, and how far the next pixel of the row is in the destination.
             var (vx, vy) = Visual(x0, sy);
             var (dx, dy) = Step();
@@ -632,6 +640,60 @@ internal static class PixelReader
                 }
             }
         }
+
+        /// <summary>
+        /// <see cref="Place"/> for a stored row that is a delivered row (Orientation 1): each channel is a run, contiguous or
+        /// every few samples, converted as a whole instead of sample by sample.
+        /// </summary>
+        private void PlaceRun(PixelUnit unit, long sy, ReadOnlySpan<TD> row, int perPixel, Span<TOut> destination, long x0, int count)
+        {
+            var q = _request;
+            int from = (int)((x0 - unit.X0) * perPixel);
+            long pixel = (sy - q.Y) * q.Width + (x0 - q.X);
+            int firstChannel = _d.Planar ? ChannelOfPlane(unit.Plane) : 0;
+            if (q.Channel is { } wanted)
+            {
+                int c = wanted - firstChannel;
+                if (c >= 0 && c < perPixel)
+                {
+                    RowConversion<TD, TOut>.Strided(row, from + c, perPixel, destination, (int)pixel, 1, count, _identity, Maximum(wanted));
+                }
+
+                return;
+            }
+
+            if (q.Order == TiffPixelOrder.Planar)
+            {
+                // A FITS cube: each channel to its plane, contiguous.
+                long planeSize = (long)q.Width * q.Height;
+                for (int c = 0; c < perPixel; c++)
+                {
+                    int channel = firstChannel + c;
+                    RowConversion<TD, TOut>.Strided(row, from + c, perPixel, destination, (int)(pixel + channel * planeSize), 1, count,
+                        _identity, Maximum(channel));
+                }
+
+                return;
+            }
+
+            long at = pixel * _channels + firstChannel;
+            if (perPixel == _channels && _uniformMaxima)
+            {
+                // Interleaved samples of every channel: one run.
+                RowConversion<TD, TOut>.Run(row.Slice(from, count * perPixel), destination.Slice((int)at, count * perPixel), _identity, Maximum(0));
+                return;
+            }
+
+            // A plane of the file into interleaved pixels, or channels of different maxima (a palette): channel by channel.
+            for (int c = 0; c < perPixel; c++)
+            {
+                RowConversion<TD, TOut>.Strided(row, from + c, perPixel, destination, (int)(at + c), _channels, count, _identity,
+                    Maximum(firstChannel + c));
+            }
+        }
+
+        /// <summary>The divisor of a channel for a normalised read, <see cref="double.NaN"/> for a stored one.</summary>
+        private double Maximum(int channel) => _maxima is null ? double.NaN : _maxima[channel];
 
         private int ChannelOfPlane(int plane) =>
             _d.Photometric == TiffPhotometric.Palette && plane > 0 ? plane + 2 : plane;
