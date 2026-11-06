@@ -41,6 +41,7 @@ An image can be read from several threads at once. Changing it ([`TiffImage.SetP
 | [`ReadPixels<T>(TiffPixelScale, TiffPixelOrder)`](#eleris-tiffnet-tiffimage-readpixels-1-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder) | The samples, converted to `T`, as stored or normalised. |
 | [`ReadPixels<T>(Memory<T>, TiffPixelScale, TiffPixelOrder)`](#eleris-tiffnet-tiffimage-readpixels-1-system-memory-0-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder) | Reads the samples into a buffer of the caller, decoding on every core, without allocating an array for them. |
 | [`ReadPixels<T>(Span<T>, TiffPixelScale, TiffPixelOrder)`](#eleris-tiffnet-tiffimage-readpixels-1-system-span-0-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder) | Reads the samples into a buffer of the caller, on the calling thread, without allocating an array for them; the [`Memory`](https://learn.microsoft.com/dotnet/api/system.memory-1) overload decodes on every core. |
+| [`ReadPixels<T>(T[], TiffPixelScale, TiffPixelOrder)`](#eleris-tiffnet-tiffimage-readpixels-1-0-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder) | Reads the samples into an array of the caller, decoding on every core, without allocating one. |
 | [`ReadPixelsAsync<T>(TiffPixelScale, TiffPixelOrder, CancellationToken)`](#eleris-tiffnet-tiffimage-readpixelsasync-1-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder-system-threading-cancellationtoken) | Reads the samples on a thread of the pool, as [`TiffImage.ReadPixels`](#eleris-tiffnet-tiffimage-readpixels-1-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder). |
 | [`ReadRawPixels<T>(TiffPixelOrder)`](#eleris-tiffnet-tiffimage-readrawpixels-1-eleris-tiffnet-tiffpixelorder) | The samples as stored (orientation applied, palette expanded, MinIsWhite inverted), of exactly their type. |
 | [`ReadRawRegion<T>(int, int, int, int, TiffPixelOrder)`](#eleris-tiffnet-tiffimage-readrawregion-1-system-int32-system-int32-system-int32-system-int32-eleris-tiffnet-tiffpixelorder) | The samples of a region of the image, of exactly their stored type. |
@@ -303,6 +304,34 @@ public void ReadPixels<T>(Span<T> destination, TiffPixelScale scale = TiffPixelS
 
 **Exceptions**
 
+- [`ArgumentException`](https://learn.microsoft.com/dotnet/api/system.argumentexception) — `destination` is not of the size of the image.
+- [`InvalidOperationException`](https://learn.microsoft.com/dotnet/api/system.invalidoperationexception) — The conversion could lose values.
+- [`NotSupportedException`](https://learn.microsoft.com/dotnet/api/system.notsupportedexception) — The library does not handle the format of the image.
+- [`TiffException`](Eleris.TiffNet.TiffException.md) — The pixel data is damaged, or the decoding buffers exceed [`TiffReadOptions.MaxPixelBytes`](Eleris.TiffNet.TiffReadOptions.md#eleris-tiffnet-tiffreadoptions-maxpixelbytes).
+- [`ObjectDisposedException`](https://learn.microsoft.com/dotnet/api/system.objectdisposedexception) — The file is disposed.
+
+<a id="eleris-tiffnet-tiffimage-readpixels-1-0-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder"></a>
+### `ReadPixels<T>(T[], TiffPixelScale, TiffPixelOrder)`
+
+Reads the samples into an array of the caller, decoding on every core, without allocating one.
+
+```csharp
+public void ReadPixels<T>(T[] destination, TiffPixelScale scale = TiffPixelScale.Stored, TiffPixelOrder order = TiffPixelOrder.Interleaved) where T : unmanaged, INumber<T>
+```
+
+**Type parameters**
+
+- `T` — As for [`TiffImage.ReadPixels`](#eleris-tiffnet-tiffimage-readpixels-1-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder).
+
+**Parameters**
+
+- `destination` — Exactly `Width × Height × Channels` samples.
+- `scale` — The stored values, or values normalised to \[0, 1\].
+- `order` — Interleaved or planar.
+
+**Exceptions**
+
+- [`ArgumentNullException`](https://learn.microsoft.com/dotnet/api/system.argumentnullexception) — `destination` is `null`.
 - [`ArgumentException`](https://learn.microsoft.com/dotnet/api/system.argumentexception) — `destination` is not of the size of the image.
 - [`InvalidOperationException`](https://learn.microsoft.com/dotnet/api/system.invalidoperationexception) — The conversion could lose values.
 - [`NotSupportedException`](https://learn.microsoft.com/dotnet/api/system.notsupportedexception) — The library does not handle the format of the image.

@@ -136,7 +136,10 @@ public class RowConversionTests
                 TOut expected = double.IsNaN(maximum)
                     ? TOut.CreateTruncating(source[i])
                     : TOut.CreateTruncating(double.CreateTruncating(source[i]) / maximum);
-                if (!expected.Equals(bulk[i]) && !(TOut.IsNaN(expected) && TOut.IsNaN(bulk[i])))
+                // Bit for bit: the sign of a zero counts, any NaN is one.
+                bool same = System.Runtime.InteropServices.MemoryMarshal.AsBytes(new[] { expected }.AsSpan())
+                    .SequenceEqual(System.Runtime.InteropServices.MemoryMarshal.AsBytes(new[] { bulk[i] }.AsSpan()));
+                if (!same && !(TOut.IsNaN(expected) && TOut.IsNaN(bulk[i])))
                 {
                     Assert.Fail($"{typeof(TD).Name} {source[i]} / {maximum} gives {bulk[i]} instead of {expected} as {typeof(TOut).Name}");
                 }

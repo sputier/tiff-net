@@ -36,10 +36,11 @@ internal static class Channels
             return;
         }
 
-        // The last sample read and written are checked once; the loop then goes through references.
-        _ = pixels[(count - 1) * channels + channel];
+        // Both ends are checked (the slice, then the last sample); the loop then goes through references.
+        var samples = pixels[channel..];
+        _ = samples[(count - 1) * channels];
         _ = plane[count - 1];
-        ref T source = ref Unsafe.Add(ref MemoryMarshal.GetReference(pixels), channel);
+        ref T source = ref MemoryMarshal.GetReference(samples);
         ref T target = ref MemoryMarshal.GetReference(plane);
         for (int i = 0; i < count; i++)
         {

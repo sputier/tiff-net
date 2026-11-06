@@ -61,6 +61,24 @@ public sealed partial class TiffImage
         Dispatch(PixelPlan.Create(Descriptor, budget, request, SampleConversion.SizeOf(SampleType), parallel: false), destination, null, budget);
     }
 
+    /// <summary>Reads the samples into an array of the caller, decoding on every core, without allocating one.</summary>
+    /// <typeparam name="T">As for <see cref="ReadPixels{T}(TiffPixelScale, TiffPixelOrder)"/>.</typeparam>
+    /// <param name="destination">Exactly <c>Width × Height × Channels</c> samples.</param>
+    /// <param name="scale">The stored values, or values normalised to [0, 1].</param>
+    /// <param name="order">Interleaved or planar.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="destination"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="destination"/> is not of the size of the image.</exception>
+    /// <exception cref="InvalidOperationException">The conversion could lose values.</exception>
+    /// <exception cref="NotSupportedException">The library does not handle the format of the image.</exception>
+    /// <exception cref="TiffException">The pixel data is damaged, or the decoding buffers exceed <see cref="TiffReadOptions.MaxPixelBytes"/>.</exception>
+    /// <exception cref="ObjectDisposedException">The file is disposed.</exception>
+    public void ReadPixels<T>(T[] destination, TiffPixelScale scale = TiffPixelScale.Stored, TiffPixelOrder order = TiffPixelOrder.Interleaved)
+        where T : unmanaged, INumber<T>
+    {
+        ArgumentNullException.ThrowIfNull(destination);
+        ReadPixels(destination.AsMemory(), scale, order);
+    }
+
     /// <summary>Reads the samples into a buffer of the caller, decoding on every core, without allocating an array for them.</summary>
     /// <typeparam name="T">As for <see cref="ReadPixels{T}(TiffPixelScale, TiffPixelOrder)"/>.</typeparam>
     /// <param name="destination">Exactly <c>Width × Height × Channels</c> samples; not used by the caller until the method returns.</param>
@@ -81,7 +99,13 @@ public sealed partial class TiffImage
             throw new ArgumentException($"The image has {count} samples, the destination {destination.Length}.", nameof(destination));
         }
 
-        var budget = Budget(CancellationToken.None);
+        ReadInto(request, destination, CancellationToken.None);
+    }
+
+    /// <summary>Reads a request (checked by <see cref="Prepare{T}"/>) into a buffer of its size, decoding on every core.</summary>
+    internal void ReadInto<T>(PixelRequest request, Memory<T> destination, CancellationToken cancellationToken) where T : unmanaged, INumber<T>
+    {
+        var budget = Budget(cancellationToken);
         var plan = PixelPlan.Create(Descriptor, budget, request, SampleConversion.SizeOf(SampleType), parallel: true);
         Dispatch(plan, destination.Span, destination, budget);
     }
