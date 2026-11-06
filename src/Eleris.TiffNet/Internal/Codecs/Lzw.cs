@@ -80,7 +80,9 @@ internal static class Lzw
         ulong bits = 0;
         int count = 0, position = 0, written = 0, width = 9, free = FirstFree, previous = -1;
         overflow = false;
-        while (true)
+
+        // Locals are initialised and the loop has no condition so that every rewrite of a mutation tool still compiles.
+        for (;;)
         {
             while (count <= 56 && position < source.Length)
             {
@@ -132,7 +134,7 @@ internal static class Lzw
             // The previous string is the last thing written.
             int previousLength = previous < 256 ? 1 : length[previous];
             int previousStart = written - previousLength;
-            int from, size;
+            int from = 0, size = 0;
             if (code < 256)
             {
                 from = -1;
