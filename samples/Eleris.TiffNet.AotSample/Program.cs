@@ -40,7 +40,14 @@ try
 }
 finally
 {
-    Directory.Delete(folder, recursive: true);
+    try
+    {
+        Directory.Delete(folder, recursive: true);
+    }
+    catch (IOException)
+    {
+        // Left behind: the outcome of the check matters more.
+    }
 }
 
 Console.WriteLine(failures == 0 ? "All images read back as written." : $"{failures} image(s) differ.");

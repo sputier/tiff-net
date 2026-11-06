@@ -12,7 +12,7 @@ public sealed class TiffImageWriter : IDisposable
 
 **Remarks**
 
-The image is up to 4 294 967 295 pixels wide and high; the file is BigTIFF when its size could exceed 4 GB ([`TiffBigTiff.Auto`](Eleris.TiffNet.TiffBigTiff.md#eleris-tiffnet-tiffbigtiff-auto) decides from the geometry, before the first byte is written). Strips or tiles are encoded on the cores as they come, at most 2 × [`TiffWriteOptions.MaxDegreeOfParallelism`](Eleris.TiffNet.TiffWriteOptions.md#eleris-tiffnet-tiffwriteoptions-maxdegreeofparallelism) at once, which bounds the memory.
+The image is up to 2 147 483 647 pixels wide and high (what the library reads back); the file is BigTIFF when its size could exceed 4 GB ([`TiffBigTiff.Auto`](Eleris.TiffNet.TiffBigTiff.md#eleris-tiffnet-tiffbigtiff-auto) decides from the geometry, before the first byte is written). Strips or tiles are encoded on the cores as they come, at most 2 × [`TiffWriteOptions.MaxDegreeOfParallelism`](Eleris.TiffNet.TiffWriteOptions.md#eleris-tiffnet-tiffwriteoptions-maxdegreeofparallelism) at once, which bounds the memory.
 
 The path overload writes a temporary file that replaces the target on [`TiffImageWriter.Complete`](#eleris-tiffnet-tiffimagewriter-complete), as [`TiffFile.Save`](Eleris.TiffNet.TiffFile.md#eleris-tiffnet-tifffile-save-system-string-eleris-tiffnet-tiffwriteoptions) does; [`TiffImageWriter.Dispose`](#eleris-tiffnet-tiffimagewriter-dispose) without [`TiffImageWriter.Complete`](#eleris-tiffnet-tiffimagewriter-complete) abandons it. A writer is used from one thread.
 
@@ -81,8 +81,8 @@ public static TiffImageWriter Create(Stream stream, long width, long height, Tif
 **Parameters**
 
 - `stream` — The stream.
-- `width` — The width, in pixels (up to 4 294 967 295).
-- `height` — The height, in pixels (up to 4 294 967 295).
+- `width` — The width, in pixels (up to 2 147 483 647).
+- `height` — The height, in pixels (up to 2 147 483 647).
 - `sampleType` — The type of the samples.
 - `channels` — The channels per pixel.
 - `colorModel` — What the colour channels are; required with 3 channels or more.
@@ -109,8 +109,8 @@ public static TiffImageWriter Create(string path, long width, long height, TiffS
 **Parameters**
 
 - `path` — The path of the file.
-- `width` — The width, in pixels (up to 4 294 967 295).
-- `height` — The height, in pixels (up to 4 294 967 295).
+- `width` — The width, in pixels (up to 2 147 483 647).
+- `height` — The height, in pixels (up to 2 147 483 647).
 - `sampleType` — The type of the samples given to [`TiffImageWriter.WriteRows`](#eleris-tiffnet-tiffimagewriter-writerows-1-system-readonlyspan-0-system-int32) or [`TiffImageWriter.WriteTile`](#eleris-tiffnet-tiffimagewriter-writetile-1-system-int64-system-int64-system-readonlyspan-0).
 - `channels` — The channels per pixel: the colour channels (1 for grey, 3 for RGB), then extra channels (of kind Data).
 - `colorModel` — What the colour channels are; required with 3 channels or more.

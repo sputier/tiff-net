@@ -17,7 +17,7 @@ float[] values = file.Primary.ReadPixels<float>();
 ```
 
 - **Reads** classic TIFF and BigTIFF, strips and tiles, interleaved and planar, none, PackBits, LZW, Deflate and JPEG
-  (baseline and progressive), samples of 1 to 64 bits, regions and channels, with every orientation applied.
+  (baseline and progressive), samples of 1 to 16, 32 and 64 bits, regions and channels, with every orientation applied.
 - **Writes** none, PackBits, LZW and Deflate with predictors, strips or tiles, BigTIFF when needed, and images larger than an
   array piece by piece (`TiffImageWriter`).
 - **Safe on untrusted files**: every allocation a file asks for is bounded by `TiffReadOptions`.

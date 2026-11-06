@@ -27,4 +27,5 @@ Console.WriteLine($"{read.Software}, {read.Resolution!.X} dpi, {read[65000]!.AsS
 - **Saving again** keeps every tag except those that hold offsets into the file (EXIF, GPS and Interoperability
   sub-directories, `SubIFDs`, `FreeOffsets`, and any tag of type `IFD`): they would point nowhere in a new file. The EXIF and GPS
   tags are readable (`Exif`, `Gps`) but not written in this version.
-- Text is ASCII as TIFF says, UTF-8 accepted on reading.
+- Text is read as UTF-8 when it is valid UTF-8 (ASCII is), as Latin-1 otherwise; it is written as ASCII when it is, as UTF-8
+  otherwise.

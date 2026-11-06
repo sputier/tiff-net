@@ -48,8 +48,9 @@ Legend: **R** read, **W** write, — not supported (`NotSupportedException` with
 
 ## Images
 
-- Required tags: `ImageWidth`, `ImageLength`, `BitsPerSample`, `PhotometricInterpretation`, `StripOffsets`/`TileOffsets`,
-  `StripByteCounts`/`TileByteCounts` (a missing byte count is computed for uncompressed data only, as libtiff does).
+- Required tags: `ImageWidth`, `ImageLength`, `StripOffsets`/`TileOffsets`, and `StripByteCounts`/`TileByteCounts` (a missing
+  byte count is computed for uncompressed data, as libtiff does, refused with `Strict`). A missing `BitsPerSample` is 1, as the
+  specification says; a missing `PhotometricInterpretation` is grey or RGB from the samples (refused with `Strict`).
 - `SamplesPerPixel` at most 65 535 (the field is 16-bit); `BitsPerSample` the same for all samples (otherwise
   `NotSupportedException`).
 - `NewSubfileType`: bits 0 (reduced resolution) and 2 (transparency mask) are exposed and decide which image is
@@ -74,9 +75,9 @@ Legend: **R** read, **W** write, — not supported (`NotSupportedException` with
 | 3 | 24 | — | `NotSupportedException` |
 | 5, 6 (complex) | any | — | `NotSupportedException` |
 
-`MinIsWhite` grey images, at every depth, are read with their values inverted (`max − value` for integers, where `max` is
-`2^bits − 1` of the stored depth, so 1 − value for a bilevel mask; `−value` for floating point), so that they behave like
-`MinIsBlack`; `TiffStorage` keeps what the file said.
+`MinIsWhite` grey images, at every depth, are read with their values inverted (`max − value` for unsigned integers, where
+`max` is `2^bits − 1` of the stored depth, so 1 − value for a bilevel mask; `−value` for signed integers and floating point),
+so that they behave like `MinIsBlack`; `TiffStorage` keeps what the file said.
 
 ## Colour
 
@@ -151,7 +152,7 @@ Tags not written back: the structure, which the library computes (254, 256 to 25
 317, 320, 322 to 325, 338, 339, 347, 512 to 521, 529 to 532, 32997, 32998), and the tags that hold offsets into the file, which
 would point nowhere in a new file: `FreeOffsets` and `FreeByteCounts` (288, 289), `SubIFDs` (330), the EXIF, GPS and
 Interoperability sub-directories (34665, 34853, 40965), and every tag of type `IFD` or `IFD8`. Sub-images (`SubIFDs`) are read
-only in 1.0: a saved file holds its pages.
+only in this version: a saved file holds its pages.
 
 Text values: ASCII as the specification says, and UTF-8 accepted on reading (common in practice); multiple strings in one tag
 (NUL-separated) are kept. Writing: ASCII when possible, UTF-8 otherwise, without BOM.
@@ -167,10 +168,10 @@ of the bridge with FitsNet, and is documented there.
 
 | Limit | Value |
 | --- | --- |
-| Pixels read in one array | 2³¹ − 1 samples (8 GB of `float`); larger images by region |
+| Pixels read in one array | 2 147 483 591 elements, within `MaxPixelBytes` (2 147 483 591 bytes by default); larger images by region |
 | Image written | one array per image with `TiffImage`; any size with `TiffImageWriter` |
 | File | 2⁶³ bytes (BigTIFF) |
-| Width, height | 2³² − 1 (the fields), within the limits above |
+| Width, height | 2³¹ − 1 read and written (the fields allow 2³² − 1: larger images are listed as unsupported) |
 | Channels | 65 535 |
 | Configurable | see `TiffReadOptions` in the [API](design/api.md#options) |
 
