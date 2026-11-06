@@ -43,8 +43,9 @@ public sealed class TiffImageWriter : IDisposable
     private readonly long[] _offsets;
     private readonly long[] _counts;
     private readonly bool[] _written;
-    private readonly Queue<(long Block, Task<EncodedBlock> Encoding)> _pending = new();
-    private readonly SemaphoreSlim _workers;
+    private readonly Queue<PendingBlock> _pending = new();
+    private readonly object _sync = new();
+    private int _helpers;
 
     // Strips: the rows of the strip being filled.
     private byte[]? _strip;
@@ -52,6 +53,9 @@ public sealed class TiffImageWriter : IDisposable
     private long _rowsWritten;
     private bool _completed;
     private bool _disposed;
+
+    // A write failed (an encoding, the output): what is written is inconsistent, the writer only disposes.
+    private bool _faulted;
 
     private TiffImageWriter(Stream output, TemporaryFile? temporary, long width, long height, TiffSampleType sampleType, int channels,
         TiffColorModel? colorModel, TiffMetadata? metadata, TiffWriteOptions? options)
@@ -88,6 +92,9 @@ public sealed class TiffImageWriter : IDisposable
         _tiled = _options.Layout == TiffLayout.Tiles;
         _planar = _options.PlanarConfiguration == TiffPixelOrder.Planar && channels > 1;
         long pixelBytes = (long)channels * _bytesPerSample;
+
+        // A strip in the file holds one channel when planar: its rows are counted with one sample.
+        long stripRowBytes = width * (_planar ? 1 : channels) * _bytesPerSample;
         if (_tiled)
         {
             _blockWidth = _blockHeight = _options.TileSize;
@@ -100,7 +107,7 @@ public sealed class TiffImageWriter : IDisposable
             }
 
             _blockWidth = (int)width;
-            _blockHeight = (int)Math.Clamp(ImageEncoder.StripBytes / (width * pixelBytes), 1, height);
+            _blockHeight = (int)Math.Clamp(ImageEncoder.StripBytes / stripRowBytes, 1, height);
         }
 
         if ((long)_blockWidth * _blockHeight * pixelBytes > Array.MaxLength)
@@ -119,14 +126,15 @@ public sealed class TiffImageWriter : IDisposable
         _offsets = new long[blocks];
         _counts = new long[blocks];
         _written = new bool[_across * _down];
-        _workers = new SemaphoreSlim(_options.Degree);
 
-        long raw = width * height * pixelBytes;
+        // The most the blocks can take once encoded (compression can expand), as the writer of a whole image decides.
+        long blockRaw = (long)_blockWidth * _blockHeight * (_planar ? 1 : channels) * _bytesPerSample;
+        long encoded = BlockCodec.MaxEncoded(_options.Compression, blockRaw, _blockHeight) * blocks;
         bool bigTiff = _options.BigTiff switch
         {
             TiffBigTiff.Always => true,
             TiffBigTiff.Never => false,
-            _ => raw + raw / 64 + blocks * 32 + _metadata.Sum(t => (long)t.AsBytes().Length + 32) + 65536 > uint.MaxValue,
+            _ => encoded + blocks * 34 + _metadata.Sum(t => (long)t.AsBytes().Length + 32) + 65536 > uint.MaxValue,
         };
         _writer = new FileWriter(output, bigTiff);
     }
@@ -218,20 +226,29 @@ public sealed class TiffImageWriter : IDisposable
 
         var bytes = MemoryMarshal.AsBytes(pixels);
         int rowBytes = (int)(rowSamples * _bytesPerSample);
-        for (int r = 0; r < rowCount; r++)
+        try
         {
-            int rowsOfStrip = (int)Math.Min(_blockHeight, Height - _rowsWritten + _stripRows);
-            _strip ??= System.Buffers.ArrayPool<byte>.Shared.Rent(rowBytes * rowsOfStrip);
-            bytes.Slice(r * rowBytes, rowBytes).CopyTo(_strip.AsSpan(_stripRows * rowBytes));
-            _stripRows++;
-            _rowsWritten++;
-            if (_stripRows == rowsOfStrip)
+            for (int r = 0; r < rowCount; r++)
             {
-                long strip = (_rowsWritten - 1) / _blockHeight;
-                Submit(strip, _strip, rowsOfStrip, (int)Width);
-                _strip = null;
-                _stripRows = 0;
+                int rowsOfStrip = (int)Math.Min(_blockHeight, Height - _rowsWritten + _stripRows);
+                _strip ??= System.Buffers.ArrayPool<byte>.Shared.Rent(rowBytes * rowsOfStrip);
+                bytes.Slice(r * rowBytes, rowBytes).CopyTo(_strip.AsSpan(_stripRows * rowBytes));
+                _stripRows++;
+                _rowsWritten++;
+                if (_stripRows == rowsOfStrip)
+                {
+                    // The buffer is handed over before it is submitted: whatever fails then, it is not returned twice.
+                    byte[] strip = _strip;
+                    _strip = null;
+                    _stripRows = 0;
+                    Submit((_rowsWritten - 1) / _blockHeight, strip, rowsOfStrip, (int)Width);
+                }
             }
+        }
+        catch
+        {
+            _faulted = true;
+            throw;
         }
     }
 
@@ -289,11 +306,19 @@ public sealed class TiffImageWriter : IDisposable
         }
 
         _written[index] = true;
-        Submit(index, tile, _blockHeight, _blockWidth);
+        try
+        {
+            Submit(index, tile, _blockHeight, _blockWidth);
+        }
+        catch
+        {
+            _faulted = true;
+            throw;
+        }
     }
 
     /// <summary>Writes what is left and the directory; for a path, puts the file in place of the target.</summary>
-    /// <exception cref="InvalidOperationException">Rows or tiles are missing.</exception>
+    /// <exception cref="InvalidOperationException">Rows or tiles are missing, or an earlier write failed.</exception>
     public void Complete()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -301,6 +326,8 @@ public sealed class TiffImageWriter : IDisposable
         {
             return;
         }
+
+        ThrowIfFaulted();
 
         if (!_tiled && _rowsWritten != Height)
         {
@@ -313,10 +340,19 @@ public sealed class TiffImageWriter : IDisposable
             throw new InvalidOperationException($"The tile {missing % _across}, {missing / _across} is not written.");
         }
 
-        Drain(0);
-        _writer.WriteDirectory(Entries());
-        _output.Flush();
-        _temporary?.Commit();
+        try
+        {
+            Drain(0);
+            _writer.WriteDirectory(Entries());
+            _output.Flush();
+            _temporary?.Commit();
+        }
+        catch
+        {
+            _faulted = true;
+            throw;
+        }
+
         _completed = true;
     }
 
@@ -329,16 +365,30 @@ public sealed class TiffImageWriter : IDisposable
         }
 
         _disposed = true;
-        foreach (var (_, encoding) in _pending)
+        lock (_sync)
         {
-            try
+            // Abandoned blocks: those not started are released, those being encoded are waited for (they use their buffers).
+            foreach (var item in _pending)
             {
-                encoding.GetAwaiter().GetResult().Return();
+                if (item.State == PendingBlock.Waiting)
+                {
+                    item.State = PendingBlock.Done;
+                    System.Buffers.ArrayPool<byte>.Shared.Return(item.Raw);
+                    continue;
+                }
+
+                while (item.State != PendingBlock.Done)
+                {
+                    Monitor.Wait(_sync);
+                }
+
+                if (item.Error is null)
+                {
+                    item.Result.Return();
+                }
             }
-            catch (Exception ex) when (ex is not OutOfMemoryException)
-            {
-                // Abandoned.
-            }
+
+            _pending.Clear();
         }
 
         if (_strip is not null)
@@ -348,7 +398,6 @@ public sealed class TiffImageWriter : IDisposable
         }
 
         _temporary?.Dispose();
-        _workers.Dispose();
     }
 
     private void CheckOpen<T>() where T : unmanaged
@@ -359,9 +408,18 @@ public sealed class TiffImageWriter : IDisposable
             throw new InvalidOperationException("The image is completed.");
         }
 
+        ThrowIfFaulted();
         if (SampleConversion.ClrType(_sampleType) != typeof(T))
         {
             throw new ArgumentException($"The samples are declared {_sampleType}: give them as {SampleConversion.ClrType(_sampleType).Name}, not {typeof(T).Name}.");
+        }
+    }
+
+    private void ThrowIfFaulted()
+    {
+        if (_faulted)
+        {
+            throw new InvalidOperationException("An earlier write failed: the image is incomplete; dispose the writer.");
         }
     }
 
@@ -379,42 +437,95 @@ public sealed class TiffImageWriter : IDisposable
         }
 
         int pixelBytes = _channels * _bytesPerSample;
-        for (int c = 0; c < _channels; c++)
+        try
         {
-            byte[] plane = System.Buffers.ArrayPool<byte>.Shared.Rent(rows * width * _bytesPerSample);
-            for (int p = 0; p < rows * width; p++)
+            for (int c = 0; c < _channels; c++)
             {
-                raw.AsSpan(p * pixelBytes + c * _bytesPerSample, _bytesPerSample).CopyTo(plane.AsSpan(p * _bytesPerSample));
+                byte[] plane = System.Buffers.ArrayPool<byte>.Shared.Rent(rows * width * _bytesPerSample);
+                for (int p = 0; p < rows * width; p++)
+                {
+                    raw.AsSpan(p * pixelBytes + c * _bytesPerSample, _bytesPerSample).CopyTo(plane.AsSpan(p * _bytesPerSample));
+                }
+
+                Enqueue(c * perPlane + index, plane, rows, width * _bytesPerSample, 1);
             }
-
-            Enqueue(c * perPlane + index, plane, rows, width * _bytesPerSample, 1);
         }
-
-        System.Buffers.ArrayPool<byte>.Shared.Return(raw);
+        finally
+        {
+            System.Buffers.ArrayPool<byte>.Shared.Return(raw);
+        }
     }
 
+    /// <summary>
+    /// Queues a block (taking its buffer) and starts a helper on the pool when one is free. Helpers encode the waiting blocks
+    /// and stop when there is none; the calling thread encodes, when it needs it, a block no helper took, so that a busy pool
+    /// slows the write down but never stops it.
+    /// </summary>
     private void Enqueue(long block, byte[] raw, int rows, int rowBytes, int samples)
     {
         Drain(2 * _options.Degree - 1);
-        var predictor = _predictor;
-        var compression = _options.Compression;
-        var level = _options.Level;
-        int bytes = _bytesPerSample;
-        Task<EncodedBlock> encoding = _options.Degree <= 1
-            ? Task.FromResult(BlockCodec.Encode(raw, rows, rowBytes, samples, bytes, predictor, compression, level))
-            : Task.Run(async () =>
+        bool start = false;
+        lock (_sync)
+        {
+            _pending.Enqueue(new PendingBlock(block, raw, rows, rowBytes, samples));
+            if (_helpers < _options.Degree - 1)
             {
-                await _workers.WaitAsync().ConfigureAwait(false);
-                try
+                _helpers++;
+                start = true;
+            }
+        }
+
+        if (start)
+        {
+            ThreadPool.UnsafeQueueUserWorkItem(static writer => writer.Help(), this, preferLocal: false);
+        }
+    }
+
+    private void Help()
+    {
+        while (true)
+        {
+            PendingBlock? item = null;
+            lock (_sync)
+            {
+                foreach (var waiting in _pending)
                 {
-                    return BlockCodec.Encode(raw, rows, rowBytes, samples, bytes, predictor, compression, level);
+                    if (waiting.State == PendingBlock.Waiting)
+                    {
+                        item = waiting;
+                        item.State = PendingBlock.Encoding;
+                        break;
+                    }
                 }
-                finally
+
+                if (item is null)
                 {
-                    _workers.Release();
+                    _helpers--;
+                    return;
                 }
-            });
-        _pending.Enqueue((block, encoding));
+            }
+
+            Encode(item);
+        }
+    }
+
+    private void Encode(PendingBlock item)
+    {
+        try
+        {
+            item.Result = BlockCodec.Encode(item.Raw, item.Rows, item.RowBytes, item.Samples, _bytesPerSample, _predictor,
+                _options.Compression, _options.Level);
+        }
+        catch (Exception ex)
+        {
+            item.Error = System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(ex);
+        }
+
+        lock (_sync)
+        {
+            item.State = PendingBlock.Done;
+            Monitor.PulseAll(_sync);
+        }
     }
 
     /// <summary>Writes the encoded blocks, in order, until at most <paramref name="keep"/> are in flight.</summary>
@@ -422,12 +533,69 @@ public sealed class TiffImageWriter : IDisposable
     {
         while (_pending.Count > keep)
         {
-            var (block, encoding) = _pending.Dequeue();
-            var encoded = encoding.GetAwaiter().GetResult();
-            _offsets[block] = _writer.Append(encoded.Span);
-            _counts[block] = encoded.Length;
-            encoded.Return();
+            PendingBlock item;
+            bool mine = false;
+            lock (_sync)
+            {
+                item = _pending.Peek();
+                if (item.State == PendingBlock.Waiting)
+                {
+                    item.State = PendingBlock.Encoding;
+                    mine = true;
+                }
+                else
+                {
+                    while (item.State != PendingBlock.Done)
+                    {
+                        Monitor.Wait(_sync);
+                    }
+                }
+            }
+
+            if (mine)
+            {
+                Encode(item);
+            }
+
+            lock (_sync)
+            {
+                _pending.Dequeue();
+            }
+
+            item.Error?.Throw();
+            try
+            {
+                _offsets[item.Block] = _writer.Append(item.Result.Span);
+                _counts[item.Block] = item.Result.Length;
+            }
+            finally
+            {
+                item.Result.Return();
+            }
         }
+    }
+
+    /// <summary>A block queued for encoding: its raw rows (owned until encoded), then its encoding or its failure.</summary>
+    private sealed class PendingBlock(long block, byte[] raw, int rows, int rowBytes, int samples)
+    {
+        public const int Waiting = 0, Encoding = 1, Done = 2;
+
+        public long Block { get; } = block;
+
+        public byte[] Raw { get; } = raw;
+
+        public int Rows { get; } = rows;
+
+        public int RowBytes { get; } = rowBytes;
+
+        public int Samples { get; } = samples;
+
+        /// <summary>Changed under the lock of the writer.</summary>
+        public int State { get; set; }
+
+        public EncodedBlock Result { get; set; }
+
+        public System.Runtime.ExceptionServices.ExceptionDispatchInfo? Error { get; set; }
     }
 
     private List<DirectoryEntry> Entries()

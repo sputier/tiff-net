@@ -82,6 +82,9 @@ public sealed partial class TiffImage
 
     internal ImageDescriptor Descriptor => _descriptor;
 
+    /// <summary>Whether the pixels are those the application gave (in memory), not those of a file.</summary>
+    internal bool InMemory => _pixels is not null;
+
     internal bool IsFullResolution => !_descriptor.IsReducedResolution && !_descriptor.IsMask;
 
     /// <summary>Whether the orientation swaps rows and columns (Orientation 5 to 8).</summary>
