@@ -394,20 +394,8 @@ public sealed partial class TiffImage
         // Several threads pay for decoding; rows stored as they are only need to be copied.
         bool parallel = degree > 1 && Descriptor.Compression != TiffCompression.None;
         var plan = PixelPlan.Create(Descriptor, budget, request, SampleConversion.SizeOf(SampleType), parallel, maxWorkers: degree);
-        switch (SampleType)
-        {
-            case TiffSampleType.UInt8: Dispatch(plan, destination.Span, destination, budget, cache); break;
-            case TiffSampleType.Int8: ReadBandAs<sbyte>(plan, destination, budget, cache); break;
-            case TiffSampleType.UInt16: ReadBandAs<ushort>(plan, destination, budget, cache); break;
-            case TiffSampleType.Int16: ReadBandAs<short>(plan, destination, budget, cache); break;
-            case TiffSampleType.UInt32: ReadBandAs<uint>(plan, destination, budget, cache); break;
-            case TiffSampleType.Int32: ReadBandAs<int>(plan, destination, budget, cache); break;
-            case TiffSampleType.UInt64: ReadBandAs<ulong>(plan, destination, budget, cache); break;
-            case TiffSampleType.Int64: ReadBandAs<long>(plan, destination, budget, cache); break;
-            case TiffSampleType.Float16: ReadBandAs<Half>(plan, destination, budget, cache); break;
-            case TiffSampleType.Float32: ReadBandAs<float>(plan, destination, budget, cache); break;
-            default: ReadBandAs<double>(plan, destination, budget, cache); break;
-        }
+        var visitor = new BandVisitor(this, plan, destination, budget, cache);
+        SampleTypes.Visit(SampleType, ref visitor);
     }
 
     /// <summary>Reads into the bytes of a band, seen as samples of their type (the workers of a parallel read share it as memory).</summary>
@@ -422,20 +410,25 @@ public sealed partial class TiffImage
     {
         var source = _pixels ?? File!.Source;
         bool little = _pixels is not null ? BitConverter.IsLittleEndian : !Storage!.BigEndian;
-        int c = Channels;
-        switch (SampleType)
-        {
-            case TiffSampleType.UInt8: PixelReader.Read<byte, T>(plan, source, budget, c, little, destination, array, cache); break;
-            case TiffSampleType.Int8: PixelReader.Read<sbyte, T>(plan, source, budget, c, little, destination, array, cache); break;
-            case TiffSampleType.UInt16: PixelReader.Read<ushort, T>(plan, source, budget, c, little, destination, array, cache); break;
-            case TiffSampleType.Int16: PixelReader.Read<short, T>(plan, source, budget, c, little, destination, array, cache); break;
-            case TiffSampleType.UInt32: PixelReader.Read<uint, T>(plan, source, budget, c, little, destination, array, cache); break;
-            case TiffSampleType.Int32: PixelReader.Read<int, T>(plan, source, budget, c, little, destination, array, cache); break;
-            case TiffSampleType.UInt64: PixelReader.Read<ulong, T>(plan, source, budget, c, little, destination, array, cache); break;
-            case TiffSampleType.Int64: PixelReader.Read<long, T>(plan, source, budget, c, little, destination, array, cache); break;
-            case TiffSampleType.Float16: PixelReader.Read<Half, T>(plan, source, budget, c, little, destination, array, cache); break;
-            case TiffSampleType.Float32: PixelReader.Read<float, T>(plan, source, budget, c, little, destination, array, cache); break;
-            default: PixelReader.Read<double, T>(plan, source, budget, c, little, destination, array, cache); break;
-        }
+        var visitor = new ReadVisitor<T>(plan, source, budget, Channels, little, destination, array, cache);
+        SampleTypes.Visit(SampleType, ref visitor);
+    }
+
+    /// <summary>Reads the rows of a band as the type of the samples (a writer reads its source band after band).</summary>
+    private readonly struct BandVisitor(TiffImage image, PixelPlan plan, Memory<byte> destination, ResourceBudget budget, ScratchCache cache)
+        : ISampleVisitor
+    {
+        public void Visit<TD>() where TD : unmanaged, INumber<TD> => image.ReadBandAs<TD>(plan, destination, budget, cache);
+    }
+
+    /// <summary>Reads a plan into a destination of <typeparamref name="T"/>, the stored samples being of the visited type.</summary>
+    private readonly ref struct ReadVisitor<T>(PixelPlan plan, TiffSource source, ResourceBudget budget, int channels, bool little,
+        Span<T> destination, Memory<T>? array, ScratchCache? cache) : ISampleVisitor
+        where T : unmanaged, INumber<T>
+    {
+        private readonly Span<T> _destination = destination;
+
+        public void Visit<TD>() where TD : unmanaged, INumber<TD> =>
+            PixelReader.Read<TD, T>(plan, source, budget, channels, little, _destination, array, cache);
     }
 }
