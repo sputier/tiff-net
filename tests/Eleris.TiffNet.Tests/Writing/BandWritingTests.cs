@@ -28,6 +28,30 @@ public class BandWritingTests
     }
 
     [Theory]
+    [InlineData(TiffCompression.None, TiffPredictor.None, TiffLayout.Strips, TiffPixelOrder.Interleaved)]
+    [InlineData(TiffCompression.None, TiffPredictor.Horizontal, TiffLayout.Strips, TiffPixelOrder.Interleaved)]
+    [InlineData(TiffCompression.Deflate, TiffPredictor.Horizontal, TiffLayout.Strips, TiffPixelOrder.Interleaved)]
+    [InlineData(TiffCompression.Lzw, TiffPredictor.None, TiffLayout.Tiles, TiffPixelOrder.Interleaved)]
+    [InlineData(TiffCompression.None, TiffPredictor.None, TiffLayout.Strips, TiffPixelOrder.Planar)]
+    [InlineData(TiffCompression.None, TiffPredictor.None, TiffLayout.Tiles, TiffPixelOrder.Interleaved)]
+    [InlineData(TiffCompression.PackBits, TiffPredictor.None, TiffLayout.Strips, TiffPixelOrder.Planar)]
+    public void Pixels_in_memory_are_written_as_the_same_pixels_read_band_after_band(TiffCompression compression, TiffPredictor predictor,
+        TiffLayout layout, TiffPixelOrder order)
+    {
+        // An image of the application is encoded from its pixels, without bands; the same image read from a file goes through
+        // bands. Both give the same file, byte for byte, on one thread and on several.
+        var image = Gradient(1500, 700, 3);
+        var options = TiffWriteOptions.Default with { Compression = compression, Predictor = predictor, Layout = layout, PlanarConfiguration = order };
+        byte[] fromMemory = Bytes(image, options with { MaxDegreeOfParallelism = 1 });
+        using var file = TiffFile.Read(new MemoryStream(Bytes(image, TiffWriteOptions.Default with { Compression = TiffCompression.Lzw })));
+
+        byte[] fromBands = Bytes(file.Primary, options with { MaxDegreeOfParallelism = 1 });
+
+        Assert.Equal(fromMemory, Bytes(image, options with { MaxDegreeOfParallelism = 4 }));
+        Assert.Equal(fromMemory, fromBands);
+    }
+
+    [Theory]
     [InlineData(256, 1, 256)]      // no source block: the target
     [InlineData(256, 100, 200)]    // short source strips: a multiple of them
     [InlineData(256, 300, 150)]    // long source strips: a divisor of them
