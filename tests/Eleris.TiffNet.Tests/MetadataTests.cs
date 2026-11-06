@@ -255,4 +255,48 @@ public class MetadataTests
             Assert.True(codes.SequenceEqual(read), $"{name}: [{string.Join(",", read)}] instead of [{string.Join(",", codes)}]");
         }
     }
+
+    [Fact]
+    public void Tags_of_the_values_of_the_pixels_follow_the_pixels()
+    {
+        var image = TiffImage.Create<ushort>(new ushort[16], 4, 4);
+        image.Metadata.SampleRange = (10, 4000);
+        image.Metadata.Set(TiffTag.FromNumbers<ushort>(281, [4000]));
+        image.Metadata.Software = "kept";
+
+        image.SetPixels<float>(new float[4], 2, 2);
+
+        Assert.Null(image.Metadata.SampleRange);
+        Assert.Null(image.Metadata[281]);
+        Assert.Equal("kept", image.Metadata.Software);
+    }
+
+    [Fact]
+    public void A_MinIsWhite_image_is_read_without_the_ranges_of_its_stored_values()
+    {
+        var builder = new TiffBuilder { Data = new byte[16] };
+        builder.AddDirectory().Image(4, 4, photometric: 0).Add(340, TiffTagType.Short, 0).Add(341, TiffTagType.Short, 200).Text(305, "scanner").Sorted();
+        using var file = TiffFile.Read(new MemoryStream(builder.Build()));
+
+        Assert.Null(file.Primary.Metadata.SampleRange);
+        Assert.Equal("scanner", file.Primary.Metadata.Software);
+    }
+
+    [Fact]
+    public void Metadata_is_copied_from_another_image_with_exclusions()
+    {
+        var source = TiffImage.Create<byte>(new byte[4], 2, 2);
+        source.Metadata.Software = "Siril";
+        source.Metadata.Description = "SIMPLE  = T";
+        source.Metadata.SampleRange = (0, 255);
+        var target = TiffImage.Create<byte>(new byte[4], 2, 2);
+        target.Metadata.Artist = "replaced";
+
+        target.Metadata.CopyFrom(source.Metadata, TiffMetadata.PixelTags);
+
+        Assert.Equal("Siril", target.Metadata.Software);
+        Assert.Equal("SIMPLE  = T", target.Metadata.Description);
+        Assert.Null(target.Metadata.SampleRange);
+        Assert.Null(target.Metadata.Artist);
+    }
 }
