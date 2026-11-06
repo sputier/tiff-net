@@ -38,7 +38,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Eleris.TiffNet.Tests" />
     <InternalsVisibleTo Include="Eleris.TiffNet.Benchmarks" />
-    <InternalsVisibleTo Include="Fuzz" />
+    <InternalsVisibleTo Include="Eleris.TiffNet.Fuzz" />
   </ItemGroup>
 
 </Project>

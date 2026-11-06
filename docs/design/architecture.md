@@ -199,7 +199,7 @@ The layers of this page, with the names of the code of version 0.1.0:
 
 **References instead of `unsafe` blocks.** No `unsafe` block exists (`AllowUnsafeBlocks` is set for `[SkipLocalsInit]` only).
 Four hot loops go through references with `System.Runtime.CompilerServices.Unsafe`, each after the check that keeps it in
-bounds (elsewhere, `Unsafe.SizeOf` gives the size of a sample type, and `Unsafe.As` in `Pixels/PixelReader.Convert`
+bounds (elsewhere, `Unsafe.SizeOf` gives the size of a sample type, and `Unsafe.As` in the context of a read, `Pixels/PixelReader.Context.cs`,
 reinterprets a sample as itself when the stored and delivered types are the same):
 
 - `Codecs/Lzw.Decode`: every write is preceded by `written < capacity` (a string is cut to the room left), and a string is

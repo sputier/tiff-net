@@ -73,12 +73,7 @@ internal static class TiffFileWriter
     {
         int samples = e.Channels;
         int bits = Pixels.SampleConversion.SizeOf(e.SampleType) * 8;
-        int format = e.SampleType switch
-        {
-            TiffSampleType.Float16 or TiffSampleType.Float32 or TiffSampleType.Float64 => 3,
-            TiffSampleType.Int8 or TiffSampleType.Int16 or TiffSampleType.Int32 or TiffSampleType.Int64 => 2,
-            _ => 1,
-        };
+        int format = Pixels.SampleTypes.Of(e.SampleType).Format;
         var entries = new List<DirectoryEntry>
         {
             DirectoryEntry.Long(ImageWidth, e.Width),
