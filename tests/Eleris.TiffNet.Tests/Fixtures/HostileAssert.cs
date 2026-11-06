@@ -37,8 +37,44 @@ internal static class HostileAssert
     public static void OpensOrFailsWithinBounds(HostileCase hostile, Action read) =>
         FailsWithinBounds(read, hostile.Outcome, hostile.MaxTime, hostile.MaxAllocatedBytes, hostile.ToString(), successAllowed: true);
 
+    /// <summary>
+    /// The time bounds scale with TIFFNET_TIME_FACTOR (1 by default; a slow or shared runner can set more). A read over its time
+    /// is measured once more: the first run of a path after a build pays for compiling it, which is not what the bound is about.
+    /// </summary>
+    private static readonly double TimeFactor =
+        double.TryParse(Environment.GetEnvironmentVariable("TIFFNET_TIME_FACTOR"), System.Globalization.CultureInfo.InvariantCulture, out double f) && f > 0 ? f : 1;
+
     public static void FailsWithinBounds(Action read, string outcome, TimeSpan maxTime, long maxAllocatedBytes, string what,
         bool successAllowed = false)
+    {
+        maxTime *= TimeFactor;
+        var (thrown, elapsed, allocated) = Measure(read);
+        if (elapsed > maxTime)
+        {
+            (thrown, elapsed, allocated) = Measure(read);
+        }
+
+        if (thrown is null && !successAllowed)
+        {
+            throw new XunitException($"{what}: no exception, {outcome} expected.");
+        }
+
+        if (thrown is null)
+        {
+            CheckBounds(what, elapsed, maxTime, allocated, maxAllocatedBytes);
+            return;
+        }
+
+        string actual = thrown is TiffException { Limit: { } limit } ? $"TiffException:{limit}" : thrown.GetType().Name;
+        if (!outcome.Split('|').Any(expected => Matches(expected, thrown)))
+        {
+            throw new XunitException($"{what}: {actual} ({thrown.Message}) instead of {outcome}.");
+        }
+
+        CheckBounds(what, elapsed, maxTime, allocated, maxAllocatedBytes);
+    }
+
+    private static (Exception? Thrown, TimeSpan Elapsed, long Allocated) Measure(Action read)
     {
         GC.Collect();
         long before = GC.GetTotalAllocatedBytes(precise: true);
@@ -54,26 +90,7 @@ internal static class HostileAssert
         }
 
         clock.Stop();
-        long allocated = GC.GetTotalAllocatedBytes(precise: true) - before;
-
-        if (thrown is null && !successAllowed)
-        {
-            throw new XunitException($"{what}: no exception, {outcome} expected.");
-        }
-
-        if (thrown is null)
-        {
-            CheckBounds(what, clock.Elapsed, maxTime, allocated, maxAllocatedBytes);
-            return;
-        }
-
-        string actual = thrown is TiffException { Limit: { } limit } ? $"TiffException:{limit}" : thrown.GetType().Name;
-        if (!outcome.Split('|').Any(expected => Matches(expected, thrown)))
-        {
-            throw new XunitException($"{what}: {actual} ({thrown.Message}) instead of {outcome}.");
-        }
-
-        CheckBounds(what, clock.Elapsed, maxTime, allocated, maxAllocatedBytes);
+        return (thrown, clock.Elapsed, GC.GetTotalAllocatedBytes(precise: true) - before);
     }
 
     private static void CheckBounds(string what, TimeSpan elapsed, TimeSpan maxTime, long allocated, long maxAllocatedBytes)

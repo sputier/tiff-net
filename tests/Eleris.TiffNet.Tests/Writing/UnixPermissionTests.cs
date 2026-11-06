@@ -7,13 +7,11 @@ public class UnixPermissionTests
 {
     private const UnixFileMode Private = UnixFileMode.UserRead | UnixFileMode.UserWrite;
 
-    [Fact]
+    [SkippableFact]
+    [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
     public void The_temporary_file_of_a_private_target_is_private_while_it_is_written()
     {
-        if (OperatingSystem.IsWindows())
-        {
-            return;   // permissions of Unix (the job on Linux runs it)
-        }
+        Skip.If(OperatingSystem.IsWindows(), "Permissions of Unix (the job on Linux runs it).");
 
         string path = SaveTests.Temporary();
         File.WriteAllBytes(path, [1, 2, 3]);
@@ -34,13 +32,11 @@ public class UnixPermissionTests
         }
     }
 
-    [Fact]
+    [SkippableFact]
+    [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
     public void The_buffer_of_a_stream_that_cannot_seek_is_readable_by_its_owner_only()
     {
-        if (OperatingSystem.IsWindows())
-        {
-            return;
-        }
+        Skip.If(OperatingSystem.IsWindows(), "Permissions of Unix (the job on Linux runs it).");
 
         using var buffer = SafeFile.Buffer();
 

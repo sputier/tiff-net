@@ -2,6 +2,7 @@ namespace Eleris.TiffNet.Tests.Interop;
 
 // The corpus is the independent oracle of the readers: these tests make sure it is complete and well described. The tests that
 // read its files come with the readers.
+[Trait("Category", "Interop")]
 public class InteropCorpusTests
 {
     [Fact]
@@ -56,16 +57,11 @@ public class InteropCorpusTests
         Assert.Throws<FormatException>(() => InteropCorpus.Parse("other.tif", datasets, ["zlib"]));
     }
 
-    [Fact]
+    [SkippableFact]
+    [Trait("Category", "Interop")]
     public void The_generated_corpus_matches_the_manifest()
     {
-        if (!Directory.Exists(InteropCorpus.Folder))
-        {
-            Assert.True(InteropCorpus.Skipped,
-                $"The interop corpus is not generated in {InteropCorpus.Folder}: run python -I tools/make_fixtures.py "
-                + $"(pip install -r tools/requirements-interop.txt), or set {InteropCorpus.SkipVariable}=1 to skip.");
-            return;
-        }
+        InteropCorpus.RequireGenerated();
 
         var missing = InteropCorpus.Files.Where(f => !File.Exists(Path.Combine(InteropCorpus.Folder, f.Name))).Select(f => f.Name).ToList();
         Assert.True(missing.Count == 0, $"{missing.Count} files missing, first: {missing.FirstOrDefault()}");

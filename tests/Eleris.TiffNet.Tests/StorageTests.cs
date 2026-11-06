@@ -45,14 +45,11 @@ public class StorageTests
         Assert.Equal((TiffLayout.Strips, 0, 0), (Of("multipage.tif").Layout, Of("multipage.tif").TileWidth, Of("multipage.tif").TileHeight));
     }
 
-    [Fact]
+    [SkippableFact]
+    [Trait("Category", "Interop")]
     public void The_storage_of_every_interop_file_matches_its_name()
     {
-        if (!Directory.Exists(InteropCorpus.Folder))
-        {
-            Assert.True(InteropCorpus.Skipped, $"The interop corpus is not generated; set {InteropCorpus.SkipVariable}=1 to skip.");
-            return;
-        }
+        InteropCorpus.RequireGenerated();
 
         foreach (var f in InteropCorpus.Files)
         {
