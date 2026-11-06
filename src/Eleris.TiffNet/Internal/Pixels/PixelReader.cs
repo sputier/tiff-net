@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.IO.Compression;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -51,7 +52,9 @@ internal static partial class PixelReader
 
         try
         {
-            Parallel.ForEach(plan.Units(), new ParallelOptions { MaxDegreeOfParallelism = plan.Workers }, () => Scratch<TD>.Take(cache, plan),
+            // One unit at a time: the default partitioner hands out chunks that grow, and the last worker is left with several
+            // units while the others wait. A unit is a block or more (0.3 ms and up): taking each under a lock costs nothing.
+            Parallel.ForEach(Partitioner.Create(plan.Units(), EnumerablePartitionerOptions.NoBuffering), new ParallelOptions { MaxDegreeOfParallelism = plan.Workers }, () => Scratch<TD>.Take(cache, plan),
                 (unit, _, scratch) =>
                 {
                     budget.ThrowIfCancelled();
