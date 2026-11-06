@@ -1,5 +1,6 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
+using Eleris.TiffNet.Internal.Pixels;
 using Eleris.TiffNet.Tests.Interop;
 
 namespace Eleris.TiffNet.Tests;
@@ -21,6 +22,7 @@ public class EverySampleWrittenTests
         }
 
         int images = 0;
+        reads = 0;
         foreach (string path in folders.SelectMany(f => Directory.EnumerateFiles(f, "*.tif")))
         {
             TiffFile file;
@@ -44,11 +46,29 @@ public class EverySampleWrittenTests
                         Check<float>(image, TiffPixelScale.Stored, order, path);
                         CheckRaw(image, order, path);
                     }
+
+                    // Regions cutting blocks at their edges, and each channel: the requests the arrays of results serve.
+                    var random = new Random(image.Width * 31 + image.Height);
+                    for (int k = 0; k < 3; k++)
+                    {
+                        int x = random.Next(image.Width), y = random.Next(image.Height);
+                        int w = random.Next(1, image.Width - x + 1), h = random.Next(1, image.Height - y + 1);
+                        foreach (var order in new[] { TiffPixelOrder.Interleaved, TiffPixelOrder.Planar })
+                        {
+                            CheckRequest<double>(image, new PixelRequest(x, y, w, h, null, order, TiffPixelScale.Normalized), path);
+                        }
+                    }
+
+                    for (int c = 0; c < image.Channels; c++)
+                    {
+                        CheckRequest<double>(image, new PixelRequest(0, 0, image.Width, image.Height, c, TiffPixelOrder.Interleaved, TiffPixelScale.Stored), path);
+                    }
                 }
             }
         }
 
         Assert.True(images > 20, $"only {images} images read");
+        Assert.True(reads > images * 4, $"only {reads} reads succeeded for {images} images");
     }
 
     /// <summary>The samples of their own type: the copies and the direct paths.</summary>
@@ -70,6 +90,33 @@ public class EverySampleWrittenTests
         }
     }
 
+    private static int reads;
+
+    /// <summary>A request of any region or channel, through the path that the arrays of results take.</summary>
+    private static void CheckRequest<T>(TiffImage image, PixelRequest request, string path) where T : unmanaged, INumber<T>
+    {
+        int count = (int)request.Count(image.Channels);
+        var first = new T[count];
+        var second = new T[count];
+        MemoryMarshal.AsBytes(first.AsSpan()).Fill(0x55);
+        MemoryMarshal.AsBytes(second.AsSpan()).Fill(0xAA);
+        try
+        {
+            image.ReadInto<T>(request, first, CancellationToken.None);
+            image.ReadInto<T>(request, second, CancellationToken.None);
+        }
+        catch (Exception ex) when (ex is TiffException)
+        {
+            return;
+        }
+
+        reads++;
+        if (!MemoryMarshal.AsBytes(first.AsSpan()).SequenceEqual(MemoryMarshal.AsBytes(second.AsSpan())))
+        {
+            Assert.Fail($"{Path.GetFileName(path)} ({request}): a sample of {count} is not written");
+        }
+    }
+
     private static void Check<T>(TiffImage image, TiffPixelScale scale, TiffPixelOrder order, string path) where T : unmanaged, INumber<T>
     {
         int count = image.Width * image.Height * image.Channels;
@@ -86,6 +133,8 @@ public class EverySampleWrittenTests
         {
             return;   // a damaged image, or a conversion that would lose values: nothing is returned
         }
+
+        reads++;
 
         if (!MemoryMarshal.AsBytes(first.AsSpan()).SequenceEqual(MemoryMarshal.AsBytes(second.AsSpan())))
         {

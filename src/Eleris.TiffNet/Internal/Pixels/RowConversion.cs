@@ -42,6 +42,7 @@ internal static class RowConversion<TD, TOut>
     /// <paramref name="sourceStart"/>, into <paramref name="destination"/> every <paramref name="destinationStride"/> samples
     /// from <paramref name="destinationStart"/>: one channel of interleaved pixels into a plane, or back.
     /// </summary>
+    [SkipLocalsInit]
     public static void Strided(ReadOnlySpan<TD> source, int sourceStart, int sourceStride, Span<TOut> destination, int destinationStart,
         int destinationStride, int count, bool identity, double maximum)
     {
@@ -50,17 +51,19 @@ internal static class RowConversion<TD, TOut>
             return;
         }
 
+        // Both ends of each run are checked (the slices, then their last samples); the loops then go through references.
+        var from = source[sourceStart..];
+        var to = destination[destinationStart..];
+        _ = from[(count - 1) * sourceStride];
+        _ = to[(count - 1) * destinationStride];
         if (sourceStride == 1 && destinationStride == 1)
         {
-            Run(source.Slice(sourceStart, count), destination.Slice(destinationStart, count), identity, maximum);
+            Run(from[..count], to[..count], identity, maximum);
             return;
         }
 
-        // The last samples touched are checked once; the loop then goes through references.
-        _ = source[sourceStart + (count - 1) * sourceStride];
-        _ = destination[destinationStart + (count - 1) * destinationStride];
-        ref TD s = ref Unsafe.Add(ref MemoryMarshal.GetReference(source), sourceStart);
-        ref TOut d = ref Unsafe.Add(ref MemoryMarshal.GetReference(destination), destinationStart);
+        ref TD s = ref MemoryMarshal.GetReference(from);
+        ref TOut d = ref MemoryMarshal.GetReference(to);
         if (identity)
         {
             for (int k = 0; k < count; k++)
@@ -72,18 +75,35 @@ internal static class RowConversion<TD, TOut>
             return;
         }
 
-        // A conversion: the samples are gathered into a contiguous chunk, converted with vectors, then spread.
+        // A conversion: the samples are gathered into a contiguous chunk (unless they are), converted with vectors straight into
+        // the destination when it is contiguous, otherwise into a chunk spread afterwards.
         Span<TD> gathered = stackalloc TD[Chunk];
         Span<TOut> converted = stackalloc TOut[Chunk];
         for (int k0 = 0; k0 < count; k0 += Chunk)
         {
             int n = Math.Min(Chunk, count - k0);
-            for (int k = 0; k < n; k++)
+            scoped ReadOnlySpan<TD> run;
+            if (sourceStride == 1)
             {
-                gathered[k] = Unsafe.Add(ref s, (k0 + k) * sourceStride);
+                run = from.Slice(k0, n);
+            }
+            else
+            {
+                for (int k = 0; k < n; k++)
+                {
+                    gathered[k] = Unsafe.Add(ref s, (k0 + k) * sourceStride);
+                }
+
+                run = gathered[..n];
             }
 
-            Run(gathered[..n], converted[..n], identity: false, maximum);
+            if (destinationStride == 1)
+            {
+                Run(run, to.Slice(k0, n), identity: false, maximum);
+                continue;
+            }
+
+            Run(run, converted[..n], identity: false, maximum);
             for (int k = 0; k < n; k++)
             {
                 Unsafe.Add(ref d, (k0 + k) * destinationStride) = converted[k];
@@ -115,7 +135,7 @@ internal static class RowConversion<TD, TOut>
     /// <summary>The samples converted with vectors (whole vectors only); the number done.</summary>
     private static int Vectorised(ReadOnlySpan<TD> source, Span<TOut> destination, double maximum)
     {
-        if (typeof(TOut) == typeof(float))
+        if (typeof(TOut) == typeof(float) && (double.IsNaN(maximum) || (float)maximum == maximum))
         {
             var target = MemoryMarshal.Cast<TOut, float>(destination);
             if (typeof(TD) == typeof(ushort))
@@ -215,6 +235,8 @@ internal static class Wide
         return i;
     }
 
+    // 16-bit integers are exact in float, and float to double is exact: through float, without 64-bit integer lanes (their
+    // conversion to double has no instruction before AVX-512).
     public static int ToDouble(ReadOnlySpan<ushort> source, Span<double> destination, double maximum)
     {
         int lanes = Vector<ushort>.Count, quarter = lanes / 4, i = 0;
@@ -223,12 +245,12 @@ internal static class Wide
         for (; i <= source.Length - lanes; i += lanes)
         {
             Vector.Widen(new Vector<ushort>(source[i..]), out Vector<uint> low, out Vector<uint> high);
-            Vector.Widen(low, out Vector<ulong> a, out Vector<ulong> b);
-            Vector.Widen(high, out Vector<ulong> c, out Vector<ulong> d);
-            Store(Vector.ConvertToDouble(a), destination[i..], divide, max);
-            Store(Vector.ConvertToDouble(b), destination[(i + quarter)..], divide, max);
-            Store(Vector.ConvertToDouble(c), destination[(i + 2 * quarter)..], divide, max);
-            Store(Vector.ConvertToDouble(d), destination[(i + 3 * quarter)..], divide, max);
+            Vector.Widen(Vector.ConvertToSingle(Vector.AsVectorInt32(low)), out Vector<double> a, out Vector<double> b);
+            Vector.Widen(Vector.ConvertToSingle(Vector.AsVectorInt32(high)), out Vector<double> c, out Vector<double> d);
+            Store(a, destination[i..], divide, max);
+            Store(b, destination[(i + quarter)..], divide, max);
+            Store(c, destination[(i + 2 * quarter)..], divide, max);
+            Store(d, destination[(i + 3 * quarter)..], divide, max);
         }
 
         return i;
@@ -242,12 +264,12 @@ internal static class Wide
         for (; i <= source.Length - lanes; i += lanes)
         {
             Vector.Widen(new Vector<short>(source[i..]), out Vector<int> low, out Vector<int> high);
-            Vector.Widen(low, out Vector<long> a, out Vector<long> b);
-            Vector.Widen(high, out Vector<long> c, out Vector<long> d);
-            Store(Vector.ConvertToDouble(a), destination[i..], divide, max);
-            Store(Vector.ConvertToDouble(b), destination[(i + quarter)..], divide, max);
-            Store(Vector.ConvertToDouble(c), destination[(i + 2 * quarter)..], divide, max);
-            Store(Vector.ConvertToDouble(d), destination[(i + 3 * quarter)..], divide, max);
+            Vector.Widen(Vector.ConvertToSingle(low), out Vector<double> a, out Vector<double> b);
+            Vector.Widen(Vector.ConvertToSingle(high), out Vector<double> c, out Vector<double> d);
+            Store(a, destination[i..], divide, max);
+            Store(b, destination[(i + quarter)..], divide, max);
+            Store(c, destination[(i + 2 * quarter)..], divide, max);
+            Store(d, destination[(i + 3 * quarter)..], divide, max);
         }
 
         return i;
@@ -290,9 +312,9 @@ internal static class Wide
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void Quarter(Vector<uint> values, Span<double> destination, bool divide, Vector<double> maximum, int eighth)
     {
-        Vector.Widen(values, out Vector<ulong> low, out Vector<ulong> high);
-        Store(Vector.ConvertToDouble(low), destination, divide, maximum);
-        Store(Vector.ConvertToDouble(high), destination[eighth..], divide, maximum);
+        Vector.Widen(Vector.ConvertToSingle(Vector.AsVectorInt32(values)), out Vector<double> low, out Vector<double> high);
+        Store(low, destination, divide, maximum);
+        Store(high, destination[eighth..], divide, maximum);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
