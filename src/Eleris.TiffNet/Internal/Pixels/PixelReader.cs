@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
@@ -27,6 +28,18 @@ internal sealed class PixelPlan
 {
     /// <summary>The bytes of stored rows read at once from an uncompressed strip or tile.</summary>
     private const int ChunkBytes = 1 << 20;
+
+    /// <summary>
+    /// The decoded bytes beyond which a Deflate block is inflated as a stream, rows by rows, straight to the destination, instead of
+    /// whole into a buffer: an image of one large strip costs its pixels and about a megabyte, not twice its pixels.
+    /// </summary>
+    internal const long StreamBytes = 4 << 20;
+
+    /// <summary>Whether the rows of a block that a read needs are inflated as a stream (Deflate only: its decoder resumes).</summary>
+    internal static bool Streamed(ImageDescriptor d, long needed) => d.Compression == TiffCompression.Deflate && needed > StreamBytes;
+
+    /// <summary>The rows inflated at once by a streamed block.</summary>
+    internal static int StreamRows(long rowBytes) => (int)Math.Max(1, ChunkBytes / Math.Max(1, rowBytes));
 
     private PixelPlan(ImageDescriptor d, PixelRequest request, StoredRect stored, long rowBytes, int rowsPerUnit)
     {
@@ -147,8 +160,16 @@ internal sealed class PixelPlan
                         + "its rows need: the file is damaged or truncated.");
                 }
 
-                largestCompressed = Math.Max(largestCompressed, CompressedToRead(d.Compression, d.ByteCounts[block], needed));
-                largestDecoded = Math.Max(largestDecoded, needed);
+                if (Streamed(d, needed))
+                {
+                    // Read through a stream and inflated a few rows at a time: no buffer of the block.
+                    largestDecoded = Math.Max(largestDecoded, StreamRows(rowBytes) * rowBytes);
+                }
+                else
+                {
+                    largestCompressed = Math.Max(largestCompressed, CompressedToRead(d.Compression, d.ByteCounts[block], needed));
+                    largestDecoded = Math.Max(largestDecoded, needed);
+                }
             }
             else if (needed > d.ByteCounts[block])
             {
@@ -447,6 +468,12 @@ internal static class PixelReader
                 return;
             }
 
+            if (_compressed && PixelPlan.Streamed(_d, (unit.FirstRow + unit.Rows) * _rowBytes))
+            {
+                Inflate(unit, destination, scratch, deliveredPerPixel, rowSamples, straight);
+                return;
+            }
+
             Span<byte> rows;
             if (_compressed)
             {
@@ -461,19 +488,97 @@ internal static class PixelReader
 
             for (int r = 0; r < unit.Rows; r++)
             {
-                Span<byte> stored = rows.Slice((int)(r * _rowBytes), (int)_rowBytes);
-                if (straight)
+                Deliver(unit, r, rows.Slice((int)(r * _rowBytes), (int)_rowBytes), destination, scratch, deliveredPerPixel, rowSamples, straight);
+            }
+        }
+
+        /// <summary>Row <paramref name="r"/> of a unit (decoded, predictor undone) into its place in the destination.</summary>
+        private void Deliver(PixelUnit unit, long r, Span<byte> stored, Span<TOut> destination, Scratch<TD> scratch, int deliveredPerPixel,
+            int rowSamples, bool straight)
+        {
+            if (straight)
+            {
+                // Nothing to reorder or convert: the row is unpacked straight into its place in the destination.
+                long at = ((unit.Y0 + r - _request.Y) * _request.Width + (unit.X0 - _request.X)) * _channels;
+                Span<TD> target = MemoryMarshal.Cast<TOut, TD>(destination.Slice((int)at, rowSamples));
+                SampleUnpacker.Unpack<TD>(_d, unit.Plane, stored, (int)_d.BlockWidth, target, _little);
+                return;
+            }
+
+            Span<TD> row = scratch.Row.AsSpan(0, rowSamples);
+            SampleUnpacker.Unpack<TD>(_d, unit.Plane, stored, (int)_d.BlockWidth, row, _little);
+            Place(unit, unit.Y0 + r, row, deliveredPerPixel, destination);
+        }
+
+        /// <summary>
+        /// A large Deflate block, inflated as a stream read from the file, a few rows at a time: the rows before the unit are
+        /// inflated and dropped, those of the unit delivered as they come. Bounded as <see cref="Decode"/> is: the compressed bytes a
+        /// read can need, the rows the unit needs.
+        /// </summary>
+        private void Inflate(PixelUnit unit, Span<TOut> destination, Scratch<TD> scratch, int deliveredPerPixel, int rowSamples, bool straight)
+        {
+            int block = unit.Block;
+            long last = unit.FirstRow + unit.Rows;
+            long count = PixelPlan.CompressedToRead(_d.Compression, _d.ByteCounts[block], last * _rowBytes);
+            string kind = _d.Layout == TiffLayout.Tiles ? "tile" : "strip";
+            int chunkRows = PixelPlan.StreamRows(_rowBytes);
+            Span<byte> chunk = scratch.Decoded.AsSpan(0, (int)(chunkRows * _rowBytes));
+            try
+            {
+                using var zlib = new ZLibStream(new BufferedStream(_source.OpenRange(_d.Offsets[block], count), 1 << 16), CompressionMode.Decompress);
+                for (long row = 0; row < last; row += chunkRows)
                 {
-                    // Nothing to reorder or convert: the row is unpacked straight into its place in the destination.
-                    long at = ((unit.Y0 + r - _request.Y) * _request.Width + (unit.X0 - _request.X)) * _channels;
-                    Span<TD> target = MemoryMarshal.Cast<TOut, TD>(destination.Slice((int)at, rowSamples));
-                    SampleUnpacker.Unpack<TD>(_d, unit.Plane, stored, (int)_d.BlockWidth, target, _little);
-                    continue;
+                    _budget.ThrowIfCancelled();
+                    int n = (int)Math.Min(chunkRows, last - row);
+                    Span<byte> part = chunk[..(int)(n * _rowBytes)];
+                    int got = zlib.ReadAtLeast(part, part.Length, throwOnEndOfStream: false);
+                    if (got < part.Length)
+                    {
+                        throw _budget.Invalid($"{kind} {block} decodes to {row * _rowBytes + got} bytes, {last * _rowBytes} are needed: the file is damaged or truncated.");
+                    }
+
+                    for (int r = 0; r < n; r++)
+                    {
+                        long stored = row + r;
+                        if (stored < unit.FirstRow)
+                        {
+                            continue;
+                        }
+
+                        Span<byte> rowBytes = part.Slice((int)(r * _rowBytes), (int)_rowBytes);
+                        UndoPredictor(rowBytes, scratch);
+                        Deliver(unit, stored - unit.FirstRow, rowBytes, destination, scratch, deliveredPerPixel, rowSamples, straight);
+                    }
                 }
 
-                Span<TD> row = scratch.Row.AsSpan(0, rowSamples);
-                SampleUnpacker.Unpack<TD>(_d, unit.Plane, stored, (int)_d.BlockWidth, row, _little);
-                Place(unit, unit.Y0 + r, row, deliveredPerPixel, destination);
+                long blockRows = PixelPlan.BlockRows(_d, unit.Y0 - unit.FirstRow);
+                Span<byte> one = stackalloc byte[1];
+                if (_budget.Options.Strict && last == blockRows && zlib.Read(one) > 0)
+                {
+                    throw _budget.Invalid($"{kind} {block} holds more data than its {blockRows} rows of {_rowBytes} bytes.");
+                }
+            }
+            catch (IOException ex) when (ex is not EndOfStreamException)
+            {
+                // zlib reports damaged streams as an InvalidDataException or a ZLibException (an IOException).
+                throw _budget.Invalid($"{kind} {block} cannot be decoded ({_d.Compression}): {ex.Message}");
+            }
+            catch (InvalidDataException ex)
+            {
+                throw _budget.Invalid($"{kind} {block} cannot be decoded ({_d.Compression}): {ex.Message}");
+            }
+        }
+
+        /// <summary>Undoes the predictor of one decoded row, in place.</summary>
+        private void UndoPredictor(Span<byte> row, Scratch<TD> scratch)
+        {
+            if (_predictor == TiffPredictor.Horizontal)
+            {
+                Predictors.UndoHorizontal(row, _d.BitsPerSample / 8, SampleUnpacker.StoredSamples(_d), _little);
+            }
+            else if (_predictor == TiffPredictor.FloatingPoint)
+            {
+                Predictors.UndoFloatingPoint(row, scratch.Predictor, _d.BitsPerSample / 8, SampleUnpacker.StoredSamples(_d), _little);
             }
         }
 

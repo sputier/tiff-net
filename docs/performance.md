@@ -25,6 +25,9 @@ JPEG (12 MP, quality 90, one thread) is decoded in 1.1 to 1.35 times the time of
 - A whole-image read allocates its pixels and the buffers of one strip or tile per thread: 1.00 to 1.07 times the pixels
   above about 50 MB, at most 1.1 times. `ReadPixels(Memory<T>)` reads into a buffer of the application.
 - A region reads only the strips or tiles under it, and decodes a compressed strip only up to the last row it needs.
+- A Deflate strip of more than 4 MB (an image written in one strip) is inflated as a stream, a megabyte of rows at a time,
+  straight to the destination: it costs its pixels, not twice its pixels. LZW and PackBits strips are still decoded whole into
+  a buffer of the strip.
 - Writing holds a band of rows of the source (the whole image when the source is one compressed strip, or stored on its
   side) and at most 2 × `MaxDegreeOfParallelism` encoded blocks; `TiffImageWriter` writes an
   image of any size with a bounded window (under 16 MB for 64 MB of pixels).
