@@ -180,6 +180,35 @@ public sealed partial class TiffImage
         return Task.Run(() => ReadArray<T>(request, raw: false, cancellationToken, progress), cancellationToken);
     }
 
+    /// <summary>
+    /// The indices of a palette image, before the colour map expands them to RGB: a classification map or a label image keeps its
+    /// classes. Then the extra samples, as stored, for each pixel (interleaved).
+    /// </summary>
+    /// <returns>A new array of <c>Width × Height × samples per pixel</c> values (1 to 65 535, the depth of the indices).</returns>
+    /// <exception cref="InvalidOperationException">The image is not a palette image.</exception>
+    /// <exception cref="NotSupportedException">The library does not handle the format of the image.</exception>
+    /// <exception cref="TiffException">The pixel data is damaged, or exceeds <see cref="TiffReadOptions.MaxPixelBytes"/>.</exception>
+    /// <exception cref="ObjectDisposedException">The file is disposed.</exception>
+    public ushort[] ReadIndices()
+    {
+        ThrowIfUnsupported();
+        if (Descriptor.Photometric != TiffPhotometric.Palette || _pixels is not null)
+        {
+            throw new InvalidOperationException("The image is not a palette image: its samples are its values (ReadRawPixels).");
+        }
+
+        var d = Descriptor.AsIndices();
+        var budget = Budget(CancellationToken.None);
+        var request = new PixelRequest(0, 0, Width, Height, null, TiffPixelOrder.Interleaved, TiffPixelScale.Stored);
+        long count = request.Count(d.Channels);
+        budget.ReservePixels(count * sizeof(ushort), "the indices");
+        ThrowIfLargerThanAnArray(count);
+        var plan = PixelPlan.Create(d, budget, request, sizeof(ushort), parallel: true);
+        var result = GC.AllocateUninitializedArray<ushort>((int)count);
+        PixelReader.Read<ushort, ushort>(plan, File!.Source, budget, d.Channels, !Storage!.BigEndian, result, result);
+        return result;
+    }
+
     /// <summary>Reads a region on a thread of the pool, as <see cref="ReadRegion{T}"/>.</summary>
     /// <typeparam name="T">As for <see cref="ReadPixels{T}(TiffPixelScale, TiffPixelOrder)"/>.</typeparam>
     /// <param name="x">The first column.</param>

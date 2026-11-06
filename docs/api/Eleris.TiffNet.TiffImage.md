@@ -39,6 +39,7 @@ An image can be read from several threads at once. Changing it ([`TiffImage.SetP
 | [`Create<T>(ReadOnlySpan<T>, int, int, int, TiffColorModel?, TiffPixelOrder)`](#eleris-tiffnet-tiffimage-create-1-system-readonlyspan-0-system-int32-system-int32-system-int32-system-nullable-eleris-tiffnet-tiffcolormodel-eleris-tiffnet-tiffpixelorder) | Creates an image from pixels of the application, which are copied once. |
 | [`ReadChannel<T>(int, TiffPixelScale)`](#eleris-tiffnet-tiffimage-readchannel-1-system-int32-eleris-tiffnet-tiffpixelscale) | One channel of the image, converted as by [`TiffImage.ReadPixels`](#eleris-tiffnet-tiffimage-readpixels-1-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder). |
 | [`ReadChannelAsync<T>(int, TiffPixelScale, IProgress<double>, CancellationToken)`](#eleris-tiffnet-tiffimage-readchannelasync-1-system-int32-eleris-tiffnet-tiffpixelscale-system-iprogress-system-double-system-threading-cancellationtoken) | Reads one channel on a thread of the pool, as [`TiffImage.ReadChannel`](#eleris-tiffnet-tiffimage-readchannel-1-system-int32-eleris-tiffnet-tiffpixelscale). |
+| [`ReadIndices()`](#eleris-tiffnet-tiffimage-readindices) | The indices of a palette image, before the colour map expands them to RGB: a classification map or a label image keeps its classes. |
 | [`ReadPixels<T>(TiffPixelScale, TiffPixelOrder)`](#eleris-tiffnet-tiffimage-readpixels-1-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder) | The samples, converted to `T`, as stored or normalised. |
 | [`ReadPixels<T>(Memory<T>, TiffPixelScale, TiffPixelOrder)`](#eleris-tiffnet-tiffimage-readpixels-1-system-memory-0-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder) | Reads the samples into a buffer of the caller, decoding on every core, without allocating an array for them. |
 | [`ReadPixels<T>(Span<T>, TiffPixelScale, TiffPixelOrder)`](#eleris-tiffnet-tiffimage-readpixels-1-system-span-0-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder) | Reads the samples into a buffer of the caller, on the calling thread, without allocating an array for them; the [`Memory`](https://learn.microsoft.com/dotnet/api/system.memory-1) overload decodes on every core. |
@@ -261,6 +262,26 @@ A new array of `Width × Height` samples; every failure is reported by the task.
 - [`NotSupportedException`](https://learn.microsoft.com/dotnet/api/system.notsupportedexception) — The library does not handle the format of the image.
 - [`TiffException`](Eleris.TiffNet.TiffException.md) — The pixel data is damaged.
 - [`OperationCanceledException`](https://learn.microsoft.com/dotnet/api/system.operationcanceledexception) — `cancellationToken` was cancelled.
+
+<a id="eleris-tiffnet-tiffimage-readindices"></a>
+### `ReadIndices()`
+
+The indices of a palette image, before the colour map expands them to RGB: a classification map or a label image keeps its classes. Then the extra samples, as stored, for each pixel (interleaved).
+
+```csharp
+public ushort[] ReadIndices()
+```
+
+**Returns**
+
+A new array of `Width × Height × samples per pixel` values (1 to 65 535, the depth of the indices).
+
+**Exceptions**
+
+- [`InvalidOperationException`](https://learn.microsoft.com/dotnet/api/system.invalidoperationexception) — The image is not a palette image.
+- [`NotSupportedException`](https://learn.microsoft.com/dotnet/api/system.notsupportedexception) — The library does not handle the format of the image.
+- [`TiffException`](Eleris.TiffNet.TiffException.md) — The pixel data is damaged, or exceeds [`TiffReadOptions.MaxPixelBytes`](Eleris.TiffNet.TiffReadOptions.md#eleris-tiffnet-tiffreadoptions-maxpixelbytes).
+- [`ObjectDisposedException`](https://learn.microsoft.com/dotnet/api/system.objectdisposedexception) — The file is disposed.
 
 <a id="eleris-tiffnet-tiffimage-readpixels-1-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder"></a>
 ### `ReadPixels<T>(TiffPixelScale, TiffPixelOrder)`
