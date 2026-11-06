@@ -38,6 +38,7 @@ nav:
     - Coverage of the standard: standard-coverage.md
   - Design:
     - Public API: design/api.md
+    - TIFF coverage (superseded): design/coverage.md
     - Architecture: design/architecture.md
     - Backlog: design/backlog.md
     - Review of the first implementation: review-2026-11-05.md
