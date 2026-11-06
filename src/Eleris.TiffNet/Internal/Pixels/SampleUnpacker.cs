@@ -39,21 +39,22 @@ internal static class SampleUnpacker
 
         if (!palette && bits == Unsafe.SizeOf<TD>() * 8)
         {
-            // Whole bytes per sample, the delivered type: a copy, swapped when the file is big endian.
-            Span<TD> values = MemoryMarshal.Cast<byte, TD>(raw[..(count * (bits / 8))]);
-            values.CopyTo(destination);
+            // Whole bytes per sample, the delivered type: a copy, swapped in the same pass when the file is big endian.
+            ReadOnlySpan<byte> values = raw[..(count * (bits / 8))];
+            Span<byte> target = MemoryMarshal.AsBytes(destination[..count]);
             if (!littleEndian && bits > 8)
             {
-                Swap(MemoryMarshal.AsBytes(destination[..count]), bits / 8);
+                CopySwapped(values, target, bits / 8);
+            }
+            else
+            {
+                values.CopyTo(target);
             }
         }
         else if (!palette)
         {
             // 1 to 7 bits (delivered as bytes) or 9 to 15 bits (delivered as 16-bit words): a stream of bits, most significant first.
-            for (int i = 0; i < count; i++)
-            {
-                destination[i] = TD.CreateTruncating(Bits(raw, i, bits, littleEndian));
-            }
+            UnpackBits(raw, count, bits, destination);
         }
 
         if (d.Photometric == TiffPhotometric.MinIsWhite && (!d.Planar || plane == 0))
@@ -65,6 +66,28 @@ internal static class SampleUnpacker
         if (palette)
         {
             Expand(d, plane, raw, pixels, destination, littleEndian);
+        }
+    }
+
+    /// <summary>
+    /// <paramref name="count"/> samples of <paramref name="bits"/> bits (1 to 7, 9 to 15), most significant bit first: each read
+    /// through the 8 bytes that hold it, shifted, rather than bit by bit; the last ones, too close to the end of the row for 8
+    /// bytes, bit by bit.
+    /// </summary>
+    private static void UnpackBits<TD>(ReadOnlySpan<byte> raw, int count, int bits, Span<TD> destination) where TD : unmanaged, INumber<TD>
+    {
+        _ = destination[count - 1];
+        int shift = 64 - bits, i = 0;
+        long bit = 0;
+        for (; i < count && (bit >> 3) + 8 <= raw.Length; i++, bit += bits)
+        {
+            ulong window = BinaryPrimitives.ReadUInt64BigEndian(raw[(int)(bit >> 3)..]);
+            destination[i] = TD.CreateTruncating((window << (int)(bit & 7)) >> shift);
+        }
+
+        for (; i < count; i++)
+        {
+            destination[i] = TD.CreateTruncating(Bits(raw, i, bits, littleEndian: false));
         }
     }
 
@@ -143,7 +166,25 @@ internal static class SampleUnpacker
         }
     }
 
-    private static void Swap(Span<byte> bytes, int size)
+    /// <summary>Copies samples of <paramref name="size"/> bytes, reversing the order of their bytes.</summary>
+    private static void CopySwapped(ReadOnlySpan<byte> source, Span<byte> destination, int size)
+    {
+        switch (size)
+        {
+            case 2:
+                BinaryPrimitives.ReverseEndianness(MemoryMarshal.Cast<byte, ushort>(source), MemoryMarshal.Cast<byte, ushort>(destination));
+                break;
+            case 4:
+                BinaryPrimitives.ReverseEndianness(MemoryMarshal.Cast<byte, uint>(source), MemoryMarshal.Cast<byte, uint>(destination));
+                break;
+            default:
+                BinaryPrimitives.ReverseEndianness(MemoryMarshal.Cast<byte, ulong>(source), MemoryMarshal.Cast<byte, ulong>(destination));
+                break;
+        }
+    }
+
+    /// <summary>Reverses the order of the bytes of samples of <paramref name="size"/> bytes, in place.</summary>
+    internal static void Swap(Span<byte> bytes, int size)
     {
         switch (size)
         {
