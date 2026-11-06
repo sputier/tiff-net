@@ -57,7 +57,7 @@ Console.WriteLine($"region {crop.Length}, channel {green.Length}, cube {cube.Len
 using var file = TiffFile.Open(path);
 var image = file.Primary;
 
-// No array allocated for the pixels: the caller's buffer, filled on the calling thread.
+// No array allocated for the pixels: the caller's buffer, decoded on every core (a Span<T> is filled on the calling thread).
 var buffer = new double[image.Width * image.Height * image.Channels];
 image.ReadPixels<double>(buffer);
 
