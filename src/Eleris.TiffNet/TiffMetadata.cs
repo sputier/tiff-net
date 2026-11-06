@@ -219,19 +219,27 @@ public sealed class TiffMetadata : IEnumerable<TiffTag>
 
     /// <summary>
     /// The tags that describe the values of the pixels (<c>MinSampleValue</c>, <c>MaxSampleValue</c>, <c>SMinSampleValue</c>,
-    /// <c>SMaxSampleValue</c>; 280, 281, 340, 341): removed when the pixels change, and from images whose values the library
-    /// inverts (MinIsWhite), since they would describe other values.
+    /// <c>SMaxSampleValue</c>; 280, 281, 340, 341): removed when the pixels change, and from images whose values the library does
+    /// not deliver as stored (MinIsWhite inverted, palette indices expanded, YCbCr converted), since they would describe other values.
     /// </summary>
     public static IReadOnlyList<int> PixelTags { get; } = [280, 281, MinSampleValueTag, MaxSampleValueTag];
 
     /// <summary>
-    /// Replaces the tags of these metadata by those of <paramref name="other"/> (the metadata of another image), except the codes
-    /// of <paramref name="excluded"/>; the EXIF and GPS tags, read only, are not copied.
+    /// Replaces every tag of these metadata by the tags of <paramref name="other"/> (the metadata of another image); the EXIF and
+    /// GPS tags, read only, are not copied.
+    /// </summary>
+    /// <param name="other">The metadata to copy.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="other"/> is null.</exception>
+    public void CopyFrom(TiffMetadata other) => CopyFrom(other, []);
+
+    /// <summary>
+    /// Replaces every tag of these metadata by the tags of <paramref name="other"/>, except the codes of
+    /// <paramref name="excluded"/>, which these metadata no longer hold either; the EXIF and GPS tags are not copied.
     /// </summary>
     /// <param name="other">The metadata to copy.</param>
     /// <param name="excluded">The codes of the tags not to copy (for example <see cref="PixelTags"/> when the pixels differ).</param>
     /// <exception cref="ArgumentNullException"><paramref name="other"/> or <paramref name="excluded"/> is null.</exception>
-    public void CopyFrom(TiffMetadata other, params IEnumerable<int> excluded)
+    public void CopyFrom(TiffMetadata other, IEnumerable<int> excluded)
     {
         ArgumentNullException.ThrowIfNull(other);
         ArgumentNullException.ThrowIfNull(excluded);

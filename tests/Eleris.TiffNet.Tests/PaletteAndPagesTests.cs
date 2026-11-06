@@ -27,11 +27,23 @@ public class PaletteAndPagesTests
 
         var builder = new TiffBuilder { Data = data };
         builder.AddDirectory().Image(5, 2, bits: (ushort)bits, photometric: 3).Remove(279).Add(279, TiffTagType.Long, data.Length)
-            .Add(320, TiffTagType.Short, map).Sorted();
+            .Add(320, TiffTagType.Short, map).Add(340, TiffTagType.Short, 0).Add(341, TiffTagType.Short, 9).Sorted();
         using var file = TiffFile.Read(new MemoryStream(builder.Build()));
 
         Assert.Equal(classes.Select(c => (ushort)c), file.Primary.ReadIndices());
+        Assert.Null(file.Primary.Metadata.SampleRange);   // the range of the indices, not of the RGB delivered
         Assert.Equal(classes.Select(c => (ushort)(c * 1000)), file.Primary.ReadRawPixels<ushort>().Where((_, i) => i % 3 == 0));
+    }
+
+    [Fact]
+    public void A_save_with_no_readable_page_left_says_so()
+    {
+        var builder = new TiffBuilder { Data = new byte[64] };
+        builder.AddDirectory().Image(4, 4, samples: 4, photometric: 5).Sorted();
+        using var file = TiffFile.Read(new MemoryStream(builder.Build()));
+
+        var thrown = Assert.Throws<InvalidOperationException>(() => file.Save(Stream.Null, TiffWriteOptions.Default with { SkipUnsupportedPages = true }));
+        Assert.Contains("None of the 1 pages", thrown.Message, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -25,7 +25,7 @@ Console.WriteLine($"{read.Software}, {read.Resolution!.X} dpi, {read[65000]!.AsS
   byte for byte when a file is read and saved again. Converting it to FITS cards, and flipping rows (FITS counts them from the
   bottom), is the job of the bridge with Eleris.FitsNet.
 - **Pixels that change** (`SetPixels`) drop the tags that describe their values (`TiffMetadata.PixelTags`: minimum and
-  maximum sample values); images whose values the library inverts (MinIsWhite) are read without them. A FITS header in the
+  maximum sample values); images whose values the library does not deliver as stored (MinIsWhite, palette, YCbCr) are read without them. A FITS header in the
   description still describes the pixels it came with: update it with the pixels. `CopyFrom` copies the metadata of another
   image, with exclusions.
 - **Saving again** keeps every tag except those that hold offsets into the file (EXIF, GPS and Interoperability

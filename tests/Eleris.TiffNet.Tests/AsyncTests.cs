@@ -94,7 +94,9 @@ public class AsyncTests
         {
             double[] values = [.. _values];
             Assert.NotEmpty(values);
-            Assert.Equal(1.0, values.Max());
+            Assert.Equal(1.0, values[^1]);
+            Assert.Equal(values.Order(), values);   // increasing, never back
+            Assert.Equal(values.Length, values.Distinct().Count());
             Assert.All(values, v => Assert.InRange(v, 0.0, 1.0));
             Assert.True(values.Length <= 101, $"{values.Length} reports");
         }
