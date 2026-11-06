@@ -189,7 +189,9 @@ internal sealed class ImageEncoder
         // Enough blocks for the threads: 8 per thread, so that the pause between bands (the read of the next one) costs little.
         // Planar files take a fixed number, since the blocks of a band are written plane after plane: the file would otherwise
         // depend on the number of threads.
-        int blocksWanted = Tiled ? 1 : Planar ? 16 : Math.Max(16, 8 * degree);
+        // The threads ask for more blocks only within the budget of a band (a very wide image has large strips).
+        long blockBytes = Math.Max(1, RowBytes * BlockHeight * Planes);
+        int blocksWanted = Tiled ? 1 : Planar ? 16 : (int)Math.Max(16, Math.Min(8L * degree, BandBudget / blockBytes));
         long wanted = Math.Max(aligned, (long)BlockHeight * blocksWanted);
         long rows = (wanted + aligned - 1) / aligned * aligned;
         return (int)Math.Min(rows, (Height + BlockHeight - 1L) / BlockHeight * BlockHeight);

@@ -8,12 +8,14 @@ on:
     paths:
       - "src/Eleris.TiffNet/Internal/Writing/**"
       - "src/Eleris.TiffNet/Internal/Structure/**"
+      - "src/Eleris.TiffNet/Internal/Pixels/**"
       - "src/Eleris.TiffNet/TiffImageWriter.cs"
       - ".github/workflows/huge.yml"
   pull_request:
     paths:
       - "src/Eleris.TiffNet/Internal/Writing/**"
       - "src/Eleris.TiffNet/Internal/Structure/**"
+      - "src/Eleris.TiffNet/Internal/Pixels/**"
       - "src/Eleris.TiffNet/TiffImageWriter.cs"
       - ".github/workflows/huge.yml"
   schedule:
@@ -36,7 +38,7 @@ jobs:
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           global-json-file: global.json
-      - name: Free disk space (the file is 4.3 GB)
+      - name: Show the free disk space (the file is 4.4 GB)
         run: df -h /tmp
       - name: Build
         run: dotnet build tests/Eleris.TiffNet.Tests -c Release

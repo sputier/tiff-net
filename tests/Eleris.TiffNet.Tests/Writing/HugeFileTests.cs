@@ -6,7 +6,7 @@ namespace Eleris.TiffNet.Tests.Writing;
 /// A file beyond 4 GB, written with TiffImageWriter and read back by region: BigTIFF from the geometry, offsets beyond 32 bits.
 /// It takes minutes and 4.3 GB of disk: it runs when <c>TIFFNET_HUGE=1</c>, in a dedicated CI job (huge.yml).
 /// </summary>
-public class HugeFileTests
+public class HugeFileTests(Xunit.Abstractions.ITestOutputHelper output)
 {
     public const string Variable = "TIFFNET_HUGE";
 
@@ -52,7 +52,7 @@ public class HugeFileTests
                 writer.Complete();
             }
 
-            Console.WriteLine($"written {new FileInfo(path).Length / 1e9:F2} GB in {clock.Elapsed.TotalSeconds:F0} s");
+            output.WriteLine($"written {new FileInfo(path).Length / 1e9:F2} GB in {clock.Elapsed.TotalSeconds:F0} s");
             Assert.True(new FileInfo(path).Length > 4L << 30);
 
             using var file = TiffFile.Open(path);
@@ -65,13 +65,16 @@ public class HugeFileTests
             foreach (var (x, y) in new[] { (0, 0), (Side - 300, Side - 200) }.Concat(Enumerable.Range(0, 30).Select(_ => (random.Next(Side - 300), random.Next(Side - 200)))))
             {
                 var region = image.ReadRawRegion<ushort>(x, y, 300, 200);
+                var expected = new ushort[300 * 200];
                 for (int r = 0; r < 200; r++)
                 {
                     for (int c = 0; c < 300; c++)
                     {
-                        Assert.True(Sample(x + c, y + r) == region[r * 300 + c], $"sample {x + c}, {y + r}");
+                        expected[r * 300 + c] = Sample(x + c, y + r);
                     }
                 }
+
+                Assert.Equal(expected, region);
             }
         }
         finally
