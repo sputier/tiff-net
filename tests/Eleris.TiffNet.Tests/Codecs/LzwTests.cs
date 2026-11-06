@@ -83,8 +83,14 @@ public class LzwTests
         if (current != -1)
         {
             Put(current);
-            // The decoder adds an entry for this code too: the width may grow before the end code.
-            if (++free >= threshold(width) && width < 12)
+            // The decoder adds an entry for this code too (libtiff's LZWPostEncode): the table may be full (a clear code, back to
+            // 9 bits, when the encoder clears a full table) or the width may grow before the end code.
+            if (++free == 4094 && clearWhenFull)
+            {
+                Put(256);
+                width = 9;
+            }
+            else if (free >= threshold(width) && width < 12)
             {
                 width++;
             }

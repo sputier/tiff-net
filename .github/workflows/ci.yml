@@ -52,6 +52,12 @@ jobs:
         run: dotnet build Eleris.TiffNet.slnx -c Release
       - name: Test with the corpus (every test, the interop gate included)
         run: dotnet test tests/Eleris.TiffNet.Tests -c Release --no-build
+      - name: Write the written corpus (every combination the library writes)
+        run: dotnet test tests/Eleris.TiffNet.Tests -c Release --no-build --filter "FullyQualifiedName~WrittenCorpus"
+        env:
+          TIFFNET_WRITTEN_DIR: written
+      - name: Read the written corpus back with tifffile and Pillow
+        run: python -I tools/check_written.py tests/Eleris.TiffNet.Tests/bin/Release/net10.0/written
 
   checks:
     runs-on: ubuntu-latest

@@ -45,6 +45,7 @@ nav:
       - "TiffExtraChannelKind": api/Eleris.TiffNet.TiffExtraChannelKind.md
       - "TiffFile": api/Eleris.TiffNet.TiffFile.md
       - "TiffImage": api/Eleris.TiffNet.TiffImage.md
+      - "TiffImageWriter": api/Eleris.TiffNet.TiffImageWriter.md
       - "TiffLayout": api/Eleris.TiffNet.TiffLayout.md
       - "TiffMetadata": api/Eleris.TiffNet.TiffMetadata.md
       - "TiffPhotometric": api/Eleris.TiffNet.TiffPhotometric.md
