@@ -8,7 +8,7 @@ namespace Eleris.TiffNet.Internal.Jpeg;
 /// <summary>
 /// The islow inverse DCT of <see cref="JpegIdct"/> on eight lanes at once (AVX2): the eight columns of pass 1 together, a
 /// transposition, the eight rows of pass 2 together, a transposition back. The arithmetic is that of libjpeg in 32 bits (as
-/// libjpeg-turbo computes it), which equals the scalar transform for every block a valid stream holds.
+/// libjpeg-turbo computes it), as the scalar transform's: both give the same samples for any block.
 /// </summary>
 internal static class JpegIdctAvx2
 {
@@ -17,14 +17,16 @@ internal static class JpegIdctAvx2
     public static bool IsSupported => Avx2.IsSupported;
 
     /// <summary>Transforms one block, as <see cref="JpegIdct.Transform"/>.</summary>
-    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     public static void Transform(ReadOnlySpan<short> coefficients, ReadOnlySpan<ushort> quantization, Span<byte> output, int stride)
     {
-        if (coefficients.Length < 64 || quantization.Length < 64 || output.Length < 7 * stride + 8)
-        {
-            throw new ArgumentException("A block needs 64 coefficients, 64 quantization steps and 8 rows of output.");
-        }
+        JpegIdct.CheckBounds(coefficients, quantization, output, stride);
+        TransformChecked(coefficients, quantization, output, stride);
+    }
 
+    /// <summary>Transforms one block whose bounds the caller checked.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    internal static void TransformChecked(ReadOnlySpan<short> coefficients, ReadOnlySpan<ushort> quantization, Span<byte> output, int stride)
+    {
         ref short co = ref MemoryMarshal.GetReference(coefficients);
         ref ushort q = ref MemoryMarshal.GetReference(quantization);
 
