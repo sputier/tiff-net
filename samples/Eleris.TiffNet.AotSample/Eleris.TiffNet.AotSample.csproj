@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- A console application published with NativeAOT: the library must trim and compile ahead of time without any warning.
+       dotnet publish samples/Eleris.TiffNet.AotSample -c Release -r win-x64 (or linux-x64) -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <PublishAot>true</PublishAot>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <TrimmerSingleWarn>false</TrimmerSingleWarn>
+    <IlcTreatWarningsAsErrors>true</IlcTreatWarningsAsErrors>
+    <!-- The runtime packs of 10.0.12 have a known vulnerability (GHSA-p3jp-9v83-76w9, the Brotli decoder): publish with the
+         patched ones, whatever the SDK brings. -->
+    <RuntimeFrameworkVersion>10.0.14</RuntimeFrameworkVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Eleris.TiffNet\Eleris.TiffNet.csproj" />
+  </ItemGroup>
+
+</Project>
