@@ -41,6 +41,7 @@ A damaged or hostile file fails with a [`TiffException`](Eleris.TiffNet.TiffExce
 | [`Insert(int, TiffImage)`](#eleris-tiffnet-tifffile-insert-system-int32-eleris-tiffnet-tiffimage) | Inserts a page. |
 | [`Open(string, TiffReadOptions)`](#eleris-tiffnet-tifffile-open-system-string-eleris-tiffnet-tiffreadoptions) | Opens a file and reads its directories; the pixels are read on demand, until the file is disposed. |
 | [`Open(Stream, TiffReadOptions, bool)`](#eleris-tiffnet-tifffile-open-system-io-stream-eleris-tiffnet-tiffreadoptions-system-boolean) | Opens a TIFF stream that seeks, from its current position, and reads its directories; the pixels are read from the stream on demand, until the file is disposed, without copying the stream into memory (a [`FileStream`](https://learn.microsoft.com/dotnet/api/system.io.filestream) is read through its handle, from several threads at once). |
+| [`OpenAsync(string, TiffReadOptions, CancellationToken)`](#eleris-tiffnet-tifffile-openasync-system-string-eleris-tiffnet-tiffreadoptions-system-threading-cancellationtoken) | Opens a file on a thread of the pool, as [`TiffFile.Open`](#eleris-tiffnet-tifffile-open-system-string-eleris-tiffnet-tiffreadoptions). |
 | [`Read(ReadOnlyMemory<byte>, TiffReadOptions)`](#eleris-tiffnet-tifffile-read-system-readonlymemory-system-byte-eleris-tiffnet-tiffreadoptions) | Reads TIFF data the application holds in memory, without copying it: the memory must not change while the file is used. |
 | [`Read(Stream, TiffReadOptions)`](#eleris-tiffnet-tifffile-read-system-io-stream-eleris-tiffnet-tiffreadoptions) | Reads a TIFF stream into memory, from its current position: the stream can be closed afterwards, and need not be able to seek. |
 | [`ReadAsync(Stream, TiffReadOptions, CancellationToken)`](#eleris-tiffnet-tifffile-readasync-system-io-stream-eleris-tiffnet-tiffreadoptions-system-threading-cancellationtoken) | Reads a TIFF stream into memory asynchronously, from its current position. |
@@ -48,7 +49,8 @@ A damaged or hostile file fails with a [`TiffException`](Eleris.TiffNet.TiffExce
 | [`RemoveAt(int)`](#eleris-tiffnet-tifffile-removeat-system-int32) | Removes a page. |
 | [`Save(Stream, TiffWriteOptions, CancellationToken)`](#eleris-tiffnet-tifffile-save-system-io-stream-eleris-tiffnet-tiffwriteoptions-system-threading-cancellationtoken) | Writes the pages into a stream, from its current position; the stream is left open. |
 | [`Save(string, TiffWriteOptions, CancellationToken)`](#eleris-tiffnet-tifffile-save-system-string-eleris-tiffnet-tiffwriteoptions-system-threading-cancellationtoken) | Writes the pages into a file. |
-| [`SaveAsync(Stream, TiffWriteOptions, CancellationToken)`](#eleris-tiffnet-tifffile-saveasync-system-io-stream-eleris-tiffnet-tiffwriteoptions-system-threading-cancellationtoken) | Writes the pages into a stream as [`TiffFile.Save`](#eleris-tiffnet-tifffile-save-system-io-stream-eleris-tiffnet-tiffwriteoptions-system-threading-cancellationtoken), encoding on the threads of the pool; a stream that cannot seek (a response body) is written asynchronously. |
+| [`SaveAsync(Stream, TiffWriteOptions, IProgress<double>, CancellationToken)`](#eleris-tiffnet-tifffile-saveasync-system-io-stream-eleris-tiffnet-tiffwriteoptions-system-iprogress-system-double-system-threading-cancellationtoken) | Writes the pages into a stream as [`TiffFile.Save`](#eleris-tiffnet-tifffile-save-system-io-stream-eleris-tiffnet-tiffwriteoptions-system-threading-cancellationtoken), encoding on the threads of the pool; a stream that cannot seek (a response body) is written asynchronously. |
+| [`SaveAsync(string, TiffWriteOptions, IProgress<double>, CancellationToken)`](#eleris-tiffnet-tifffile-saveasync-system-string-eleris-tiffnet-tiffwriteoptions-system-iprogress-system-double-system-threading-cancellationtoken) | Writes the pages into a file as [`TiffFile.Save`](#eleris-tiffnet-tifffile-save-system-string-eleris-tiffnet-tiffwriteoptions-system-threading-cancellationtoken) does, on a thread of the pool: a temporary file next to the target replaces it, a failure or a cancellation leaves an existing file as it was. |
 
 ## Constructor details
 
@@ -219,6 +221,25 @@ The file, to dispose when its pixels are no longer needed.
 - [`TiffException`](Eleris.TiffNet.TiffException.md) — The data is not TIFF, is damaged, or exceeds a limit of `options`.
 - [`IOException`](https://learn.microsoft.com/dotnet/api/system.io.ioexception) — The stream cannot be read.
 
+<a id="eleris-tiffnet-tifffile-openasync-system-string-eleris-tiffnet-tiffreadoptions-system-threading-cancellationtoken"></a>
+### `OpenAsync(string, TiffReadOptions, CancellationToken)`
+
+Opens a file on a thread of the pool, as [`TiffFile.Open`](#eleris-tiffnet-tifffile-open-system-string-eleris-tiffnet-tiffreadoptions).
+
+```csharp
+public static Task<TiffFile> OpenAsync(string path, TiffReadOptions? options = null, CancellationToken cancellationToken = default)
+```
+
+**Parameters**
+
+- `path` — The path of the file.
+- `options` — The tolerance and the limits of the read; [`TiffReadOptions.Default`](Eleris.TiffNet.TiffReadOptions.md#eleris-tiffnet-tiffreadoptions-default) when `null`.
+- `cancellationToken` — Stops the reading of the directories.
+
+**Returns**
+
+The file, to dispose when its pixels are no longer needed; every failure but of the arguments is reported by the task.
+
 <a id="eleris-tiffnet-tifffile-read-system-readonlymemory-system-byte-eleris-tiffnet-tiffreadoptions"></a>
 ### `Read(ReadOnlyMemory<byte>, TiffReadOptions)`
 
@@ -370,19 +391,20 @@ public void Save(string path, TiffWriteOptions? options = null, CancellationToke
 
 A file holds its pages: the sub-images of a page ([`TiffImage.SubImages`](Eleris.TiffNet.TiffImage.md#eleris-tiffnet-tiffimage-subimages)), read only in this version, are not written, nor are the EXIF and GPS sub-directories (see the coverage of the standard). The pages must not change during the save.
 
-<a id="eleris-tiffnet-tifffile-saveasync-system-io-stream-eleris-tiffnet-tiffwriteoptions-system-threading-cancellationtoken"></a>
-### `SaveAsync(Stream, TiffWriteOptions, CancellationToken)`
+<a id="eleris-tiffnet-tifffile-saveasync-system-io-stream-eleris-tiffnet-tiffwriteoptions-system-iprogress-system-double-system-threading-cancellationtoken"></a>
+### `SaveAsync(Stream, TiffWriteOptions, IProgress<double>, CancellationToken)`
 
 Writes the pages into a stream as [`TiffFile.Save`](#eleris-tiffnet-tifffile-save-system-io-stream-eleris-tiffnet-tiffwriteoptions-system-threading-cancellationtoken), encoding on the threads of the pool; a stream that cannot seek (a response body) is written asynchronously. The pages are those of the file when the method is called. Failures of the arguments are thrown, every other failure is reported by the task.
 
 ```csharp
-public Task SaveAsync(Stream stream, TiffWriteOptions? options = null, CancellationToken cancellationToken = default)
+public Task SaveAsync(Stream stream, TiffWriteOptions? options = null, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
 ```
 
 **Parameters**
 
 - `stream` — The stream, left open.
 - `options` — How to write; [`TiffWriteOptions.Default`](Eleris.TiffNet.TiffWriteOptions.md#eleris-tiffnet-tiffwriteoptions-default) when `null`.
+- `progress` — Receives the fraction written, 0 to 1, at most once a percent.
 - `cancellationToken` — Stops the write between strips or tiles; what is written of the stream is then incomplete.
 
 **Returns**
@@ -392,3 +414,23 @@ The task of the write.
 **Exceptions**
 
 - [`OperationCanceledException`](https://learn.microsoft.com/dotnet/api/system.operationcanceledexception) — `cancellationToken` was cancelled.
+
+<a id="eleris-tiffnet-tifffile-saveasync-system-string-eleris-tiffnet-tiffwriteoptions-system-iprogress-system-double-system-threading-cancellationtoken"></a>
+### `SaveAsync(string, TiffWriteOptions, IProgress<double>, CancellationToken)`
+
+Writes the pages into a file as [`TiffFile.Save`](#eleris-tiffnet-tifffile-save-system-string-eleris-tiffnet-tiffwriteoptions-system-threading-cancellationtoken) does, on a thread of the pool: a temporary file next to the target replaces it, a failure or a cancellation leaves an existing file as it was. The pages are those of the file when the method is called. Failures of the arguments are thrown, every other failure is reported by the task.
+
+```csharp
+public Task SaveAsync(string path, TiffWriteOptions? options = null, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
+```
+
+**Parameters**
+
+- `path` — The path of the file.
+- `options` — How to write; [`TiffWriteOptions.Default`](Eleris.TiffNet.TiffWriteOptions.md#eleris-tiffnet-tiffwriteoptions-default) when `null`.
+- `progress` — Receives the fraction written, 0 to 1, at most once a percent.
+- `cancellationToken` — Stops the write between strips or tiles.
+
+**Returns**
+
+The task of the write.
