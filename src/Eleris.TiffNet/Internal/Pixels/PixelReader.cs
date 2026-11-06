@@ -366,10 +366,15 @@ internal static class PixelReader
         /// <summary>Buffers from the cache (large enough ones are reused for another plan of the same read or writer), or new ones.</summary>
         public static Scratch<TD> Take(ScratchCache cache, PixelPlan plan)
         {
-            if (cache.TryTake(out object? item) && item is Scratch<TD> scratch)
+            if (cache.TryTake(out object? item))
             {
-                scratch._plan = plan;
-                return scratch;
+                if (item is Scratch<TD> scratch)
+                {
+                    scratch._plan = plan;
+                    return scratch;
+                }
+
+                cache.Put(item!);
             }
 
             return new Scratch<TD>(plan);

@@ -196,13 +196,14 @@ public sealed partial class TiffImage
         : new(File!.Options, File.Source.Name, cancellationToken);
 
     /// <summary>Checks that rows of the image can be read (support, blocks, buffers) before the band that holds them is allocated.</summary>
-    internal void ValidateBand(int y, int rows)
+    internal void ValidateBand(int y, int rows, int degree = 1)
     {
         ThrowIfUnsupported();
         var request = new PixelRequest(0, y, Width, rows, null, TiffPixelOrder.Interleaved, TiffPixelScale.Stored);
         var budget = Budget(CancellationToken.None);
         budget.ReservePixels((long)rows * Width * Channels * SampleConversion.SizeOf(SampleType), "the rows read to be written");
-        _ = PixelPlan.Create(Descriptor, budget, request, SampleConversion.SizeOf(SampleType), parallel: false);
+        bool parallel = degree > 1 && Descriptor.Compression != TiffCompression.None;
+        _ = PixelPlan.Create(Descriptor, budget, request, SampleConversion.SizeOf(SampleType), parallel, maxWorkers: degree);
     }
 
     /// <summary>
