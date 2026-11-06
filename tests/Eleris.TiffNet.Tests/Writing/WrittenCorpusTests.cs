@@ -17,14 +17,11 @@ public class WrittenCorpusTests
 
     private static readonly TiffCompression[] Compressions = [TiffCompression.None, TiffCompression.PackBits, TiffCompression.Lzw, TiffCompression.Deflate];
 
-    [Fact]
+    [SkippableFact]
     public void The_written_corpus_is_written_with_its_expectations()
     {
         string? folder = Environment.GetEnvironmentVariable(FolderVariable);
-        if (string.IsNullOrEmpty(folder))
-        {
-            return;   // only when the interop job asks for it
-        }
+        Skip.If(string.IsNullOrEmpty(folder), $"Only with {FolderVariable} set (the interop job).");
 
         Directory.CreateDirectory(folder);
         var expected = new SortedDictionary<string, string>(StringComparer.Ordinal);

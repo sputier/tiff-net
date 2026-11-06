@@ -21,12 +21,17 @@ TIFFNET_SKIP_INTEROP=1 dotnet test Eleris.TiffNet.slnx   # every test but the in
 pip install -r tools/requirements-interop.txt               # Python 3.12: tifffile, imagecodecs, Pillow
 python -I tools/make_fixtures.py                            # generate the corpus, then:
 dotnet test Eleris.TiffNet.slnx
+dotnet test tests/Eleris.TiffNet.Tests --filter "Category!=Slow"   # without the fuzzing campaigns of the suite
 dotnet run -c Release --project tools/DocGen              # regenerate the API pages and the samples in the pages
 dotnet run -c Release --project tools/DocGen -- --check   # fail if they are not up to date (CI)
 pip install -r docs/requirements.txt
 python tools/check_docs.py                                # format, links and anchors of the Markdown
 mkdocs build --strict                                     # the site, in site/
 ```
+
+Tests that need what a machine may not have are reported as skipped, not passed: the interop corpus (category `Interop`;
+`TIFFNET_SKIP_INTEROP=1`), the 4.4 GB file (`Huge`; `TIFFNET_HUGE=1`), the written corpus (`TIFFNET_WRITTEN_DIR`), AVX2, Unix
+permissions. `TIFFNET_TIME_FACTOR` scales the time bounds of the tests of hostile files on a slow machine.
 
 The fixtures of the tests are described in [tests/Fixtures/README.md](tests/Fixtures/README.md). The fuzzer mutates them
 structurally and saves every input that crashes, hangs or allocates too much, with the seed and iteration that reproduce it:
