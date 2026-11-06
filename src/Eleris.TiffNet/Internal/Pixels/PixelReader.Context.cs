@@ -35,6 +35,7 @@ internal static partial class PixelReader
         private readonly bool _uniformMaxima;
         private readonly bool _inPlace;
         private readonly bool _inPlaceSwap;
+        private readonly bool _decodeInto;
 
         public Context(PixelPlan plan, TiffSource source, ResourceBudget budget, int channels, bool littleEndian)
         {
@@ -64,6 +65,9 @@ internal static partial class PixelReader
             _inPlace = _d.BitsPerSample == Unsafe.SizeOf<TD>() * 8 && !_d.ReversedBits
                 && _d.Photometric is not (TiffPhotometric.MinIsWhite or TiffPhotometric.Palette);
             _inPlaceSwap = _inPlace && _d.BitsPerSample > 8 && littleEndian != BitConverter.IsLittleEndian;
+            // A compressed block whose rows are delivered as they are decodes straight into the destination (not JPEG, whose
+            // components are converted into the rows).
+            _decodeInto = _compressed && _identity && _inPlace && _d.Compression != TiffCompression.Jpeg;
             _maxima = _request.Scale == TiffPixelScale.Normalized ? Maxima(_d, channels) : null;
             _uniformMaxima = _maxima is null || Array.TrueForAll(_maxima, m => m == _maxima[0]);
         }
@@ -87,16 +91,37 @@ internal static partial class PixelReader
                 return;
             }
 
+            // The rows of the unit, whole and contiguous in the destination, from the first row of their block: decoded there.
+            Span<byte> into = straight && _decodeInto && unit.FirstRow == 0 && unit.X0 == _request.X && _d.BlockWidth == _request.Width
+                ? MemoryMarshal.AsBytes(destination.Slice((int)((unit.Y0 - _request.Y) * _request.Width * _channels), unit.Rows * rowSamples))
+                : default;
+            if (into.Length != unit.Rows * _rowBytes)
+            {
+                // The rows of the destination are the decoded ones only when their sizes agree (whole samples, no expansion).
+                into = default;
+            }
+
             if (_compressed && PixelPlan.Streamed(_d, (unit.FirstRow + unit.Rows) * _rowBytes))
             {
-                Inflate(unit, destination, scratch, deliveredPerPixel, rowSamples, straight);
+                Inflate(unit, destination, scratch, deliveredPerPixel, rowSamples, straight, into);
                 return;
             }
 
             Span<byte> rows;
+            if (!into.IsEmpty)
+            {
+                Decode(unit, scratch, into);
+                if (_inPlaceSwap)
+                {
+                    SampleUnpacker.Swap(into, _d.BitsPerSample / 8);
+                }
+
+                return;
+            }
+
             if (_compressed)
             {
-                rows = Decode(unit, scratch);
+                rows = Decode(unit, scratch, default);
             }
             else
             {
@@ -146,17 +171,19 @@ internal static partial class PixelReader
 
         /// <summary>
         /// A large Deflate block, inflated as a stream read from the file, a few rows at a time: the rows before the unit are
-        /// inflated and dropped, those of the unit delivered as they come. Bounded as <see cref="Decode"/> is: the compressed bytes a
-        /// read can need, the rows the unit needs.
+        /// inflated and dropped, those of the unit delivered as they come (or inflated in their place, <paramref name="into"/>,
+        /// when the unit starts the block and its rows are delivered as they are). Bounded as <see cref="Decode"/> is: the
+        /// compressed bytes a read can need, the rows the unit needs.
         /// </summary>
-        private void Inflate(PixelUnit unit, Span<TOut> destination, Scratch<TD> scratch, int deliveredPerPixel, int rowSamples, bool straight)
+        private void Inflate(PixelUnit unit, Span<TOut> destination, Scratch<TD> scratch, int deliveredPerPixel, int rowSamples, bool straight,
+            Span<byte> into)
         {
             int block = unit.Block;
             long last = unit.FirstRow + unit.Rows;
             long count = PixelPlan.CompressedToRead(_d.Compression, _d.ByteCounts[block], last * _rowBytes);
             string kind = _d.Layout == TiffLayout.Tiles ? "tile" : "strip";
             int chunkRows = PixelPlan.StreamRows(_rowBytes);
-            Span<byte> chunk = scratch.Decoded.AsSpan(0, (int)(chunkRows * _rowBytes));
+            Span<byte> chunk = into.IsEmpty ? scratch.Decoded.AsSpan(0, (int)(chunkRows * _rowBytes)) : default;
             var range = _source.OpenRange(_d.Offsets[block], count);
             try
             {
@@ -165,7 +192,7 @@ internal static partial class PixelReader
                 {
                     _budget.ThrowIfCancelled();
                     int n = (int)Math.Min(chunkRows, last - row);
-                    Span<byte> part = chunk[..(int)(n * _rowBytes)];
+                    Span<byte> part = into.IsEmpty ? chunk[..(int)(n * _rowBytes)] : into.Slice((int)(row * _rowBytes), (int)(n * _rowBytes));
                     int got = zlib.ReadAtLeast(part, part.Length, throwOnEndOfStream: false);
                     if (got < part.Length)
                     {
@@ -182,6 +209,16 @@ internal static partial class PixelReader
 
                         Span<byte> rowBytes = part.Slice((int)(r * _rowBytes), (int)_rowBytes);
                         UndoPredictor(rowBytes, scratch);
+                        if (!into.IsEmpty)
+                        {
+                            if (_inPlaceSwap)
+                            {
+                                SampleUnpacker.Swap(rowBytes, _d.BitsPerSample / 8);
+                            }
+
+                            continue;
+                        }
+
                         Deliver(unit, stored - unit.FirstRow, rowBytes, destination, scratch, deliveredPerPixel, rowSamples, straight);
                     }
                 }
@@ -225,9 +262,11 @@ internal static partial class PixelReader
 
         /// <summary>
         /// Decodes a compressed block up to the last row of the unit; returns the rows of the unit. The output is bounded by what
-        /// the unit needs: a block that would decode to more stops there, one that decodes to less is damaged.
+        /// the unit needs: a block that would decode to more stops there, one that decodes to less is damaged. It is the scratch of
+        /// the worker, or <paramref name="into"/>: the place of the rows in the destination, for a unit that starts its block
+        /// (never JPEG).
         /// </summary>
-        private Span<byte> Decode(PixelUnit unit, Scratch<TD> scratch)
+        private Span<byte> Decode(PixelUnit unit, Scratch<TD> scratch, Span<byte> into)
         {
             int block = unit.Block;
             long blockRows = PixelPlan.BlockRows(_d, unit.Y0 - unit.FirstRow);
@@ -246,7 +285,7 @@ internal static partial class PixelReader
 
             // Data beyond the block is ignored, as libtiff does, unless the read is strict and the whole block is decoded.
             bool whole = unit.FirstRow + unit.Rows == blockRows;
-            Span<byte> output = scratch.Decoded.AsSpan(0, needed);
+            Span<byte> output = into.IsEmpty ? scratch.Decoded.AsSpan(0, needed) : into;
             int written;
             bool overflow;
             try

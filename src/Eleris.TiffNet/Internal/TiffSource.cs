@@ -90,6 +90,9 @@ internal abstract class TiffSource : IDisposable
         }
     }
 
+    /// <summary>The bytes of a source held in one block of memory, which can be read without a copy; otherwise null.</summary>
+    public virtual ReadOnlyMemory<byte>? Memory => null;
+
     /// <summary>A source over bytes already in memory.</summary>
     public static TiffSource FromMemory(ReadOnlyMemory<byte> data, string name = "memory") => new MemorySource(data, name);
 
@@ -285,6 +288,8 @@ internal abstract class TiffSource : IDisposable
 
     private sealed class MemorySource(ReadOnlyMemory<byte> data, string name) : TiffSource(name, data.Length)
     {
+        public override ReadOnlyMemory<byte>? Memory => data;
+
         protected override void ReadCore(long offset, Span<byte> destination) =>
             data.Span.Slice((int)offset, destination.Length).CopyTo(destination);
     }
