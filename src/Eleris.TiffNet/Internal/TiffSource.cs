@@ -94,6 +94,18 @@ internal abstract class TiffSource : IDisposable
     public static TiffSource FromMemory(ReadOnlyMemory<byte> data, string name = "memory") => new MemorySource(data, name);
 
     /// <summary>
+    /// A source read on demand from a stream that seeks, from its current position: through the handle of a file stream (reads at
+    /// explicit offsets, from several threads at once), otherwise one read at a time.
+    /// </summary>
+    public static TiffSource FromOpenStream(Stream stream, bool leaveOpen, string name)
+    {
+        long start = stream.Position;
+        return stream is FileStream { SafeFileHandle: { IsInvalid: false } handle }
+            ? new FileStreamSource(stream, handle, start, leaveOpen, name)
+            : new SeekingSource(stream, start, leaveOpen, name);
+    }
+
+    /// <summary>
     /// The remaining bytes of a stream, held in memory: from the current position of a seekable stream, or everything a stream
     /// that cannot seek gives. At most <see cref="TiffReadOptions.MaxInputBytes"/> bytes are taken, and never more than one .NET
     /// array can hold.
@@ -209,6 +221,62 @@ internal abstract class TiffSource : IDisposable
             if (disposing)
             {
                 handle.Dispose();
+            }
+
+            base.Dispose(disposing);
+        }
+    }
+
+    /// <summary>A file stream of the application, read through its handle at explicit offsets (thread-safe), from a start.</summary>
+    private sealed class FileStreamSource(Stream stream, SafeFileHandle handle, long start, bool leaveOpen, string name)
+        : TiffSource(name, RandomAccess.GetLength(handle) - start)
+    {
+        protected override void ReadCore(long offset, Span<byte> destination)
+        {
+            offset += start;
+            while (destination.Length > 0)
+            {
+                int read = RandomAccess.Read(handle, destination, offset);
+                if (read == 0)
+                {
+                    throw new IOException($"{Name} became shorter while it was being read.");
+                }
+
+                destination = destination[read..];
+                offset += read;
+            }
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && !leaveOpen)
+            {
+                stream.Dispose();
+            }
+
+            base.Dispose(disposing);
+        }
+    }
+
+    /// <summary>Another stream that seeks: one read at a time (a stream has one position), from a start.</summary>
+    private sealed class SeekingSource(Stream stream, long start, bool leaveOpen, string name) : TiffSource(name, stream.Length - start)
+    {
+        private readonly Lock _sync = new();
+
+        protected override void ReadCore(long offset, Span<byte> destination)
+        {
+            lock (_sync)
+            {
+                stream.Position = start + offset;
+                stream.ReadExactly(destination);
+            }
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && !leaveOpen)
+            {
+                stream.Dispose();
             }
 
             base.Dispose(disposing);
