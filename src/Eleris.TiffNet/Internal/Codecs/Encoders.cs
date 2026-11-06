@@ -1,0 +1,173 @@
+using System.IO.Compression;
+using System.Runtime.CompilerServices;
+
+namespace Eleris.TiffNet.Internal.Codecs;
+
+/// <summary>The PackBits encoder of TIFF 6.0 (section 9): each row on its own, runs of 3 or more as a repeated byte.</summary>
+internal static class PackBitsEncoder
+{
+    /// <summary>The most bytes a row of <paramref name="length"/> bytes encodes to: one header per 128 literal bytes.</summary>
+    public static int MaxEncoded(int length) => length + (length + 127) / 128;
+
+    /// <summary>Encodes one row; returns the bytes written into <paramref name="destination"/> (at least <see cref="MaxEncoded"/>).</summary>
+    public static int EncodeRow(ReadOnlySpan<byte> row, Span<byte> destination)
+    {
+        int i = 0, o = 0, n = row.Length;
+        while (i < n)
+        {
+            byte value = row[i];
+            int run = 1;
+            while (i + run < n && run < 128 && row[i + run] == value)
+            {
+                run++;
+            }
+
+            if (run >= 3)
+            {
+                destination[o++] = (byte)(1 - run);
+                destination[o++] = value;
+                i += run;
+                continue;
+            }
+
+            // Literal bytes until a run of 3 begins (or 128 bytes).
+            int j = i;
+            while (j < n && j - i < 128 && !(j + 2 < n && row[j] == row[j + 1] && row[j] == row[j + 2]))
+            {
+                j++;
+            }
+
+            destination[o++] = (byte)(j - i - 1);
+            row[i..j].CopyTo(destination[o..]);
+            o += j - i;
+            i = j;
+        }
+
+        return o;
+    }
+}
+
+/// <summary>
+/// The LZW encoder of TIFF 6.0 (section 13), as libtiff writes it: codes of 9 to 12 bits, most significant bit first, the width
+/// growing one code early for the decoder, a clear code when the table is full; a hash table finds the strings.
+/// </summary>
+internal static class LzwEncoder
+{
+    private const int Clear = 256, End = 257, FirstFree = 258, Full = 4094, HashBits = 13, HashSize = 1 << HashBits;
+
+    /// <summary>The most bytes <paramref name="length"/> bytes encode to (12 bits a byte at worst, the clear codes and the end).</summary>
+    public static int MaxEncoded(int length) => length * 3 / 2 + length / 2000 * 2 + 16;
+
+    /// <summary>Encodes a strip or tile; returns the bytes written into <paramref name="destination"/> (at least <see cref="MaxEncoded"/>).</summary>
+    [SkipLocalsInit]
+    public static int Encode(ReadOnlySpan<byte> source, Span<byte> destination)
+    {
+        // Open addressing: a key (prefix code << 8 | byte, plus 1 so that 0 is empty) and its code.
+        Span<int> keys = stackalloc int[HashSize];
+        Span<short> codes = stackalloc short[HashSize];
+        keys.Clear();
+
+        ulong bits = 0;
+        int count = 0, written = 0, width = 9, free = FirstFree;
+        void Put(int code, Span<byte> output)
+        {
+            bits = (bits << width) | (uint)code;
+            count += width;
+            while (count >= 8)
+            {
+                count -= 8;
+                output[written++] = (byte)(bits >> count);
+            }
+        }
+
+        Put(Clear, destination);
+        if (source.IsEmpty)
+        {
+            Put(End, destination);
+            Flush(ref bits, ref count, ref written, destination);
+            return written;
+        }
+
+        int prefix = source[0];
+        for (int i = 1; i < source.Length; i++)
+        {
+            byte value = source[i];
+            int key = (prefix << 8 | value) + 1;
+            int slot = (int)((uint)(key * -1640531535) >> (32 - HashBits));
+            while (keys[slot] != 0 && keys[slot] != key)
+            {
+                slot = (slot + 1) & (HashSize - 1);
+            }
+
+            if (keys[slot] == key)
+            {
+                prefix = codes[slot];
+                continue;
+            }
+
+            Put(prefix, destination);
+            keys[slot] = key;
+            codes[slot] = (short)free++;
+            prefix = value;
+            if (free == Full)
+            {
+                // The table is full: a clear code, written at the width reached, then 9 bits again.
+                Put(Clear, destination);
+                keys.Clear();
+                free = FirstFree;
+                width = 9;
+            }
+            else if (free > (1 << width) - 1 && width < 12)
+            {
+                width++;
+            }
+        }
+
+        // The last string; the decoder adds an entry for it before the end code, so the width may grow first.
+        Put(prefix, destination);
+        if (++free > (1 << width) - 1 && width < 12)
+        {
+            width++;
+        }
+
+        Put(End, destination);
+        Flush(ref bits, ref count, ref written, destination);
+        return written;
+    }
+
+    private static void Flush(ref ulong bits, ref int count, ref int written, Span<byte> output)
+    {
+        if (count > 0)
+        {
+            output[written++] = (byte)(bits << (8 - count));
+            count = 0;
+        }
+    }
+}
+
+/// <summary>The Deflate encoder: a zlib stream written by System.IO.Compression, at the level the options ask for.</summary>
+internal static class DeflateEncoder
+{
+    /// <summary>Compresses a strip or tile into a new array.</summary>
+    public static byte[] Encode(ReadOnlySpan<byte> source, TiffCompressionLevel level)
+    {
+        using var output = new MemoryStream(source.Length / 2 + 64);
+        using (var zlib = new ZLibStream(output, Options(level), leaveOpen: true))
+        {
+            zlib.Write(source);
+        }
+
+        return output.ToArray();
+    }
+
+    /// <summary>zlib levels 1 (fastest), 6 (the default of zlib and libtiff) and 9 (smallest).</summary>
+    private static ZLibCompressionOptions Options(TiffCompressionLevel level) => new()
+    {
+        CompressionLevel = level switch
+        {
+            TiffCompressionLevel.Fastest => 1,
+            TiffCompressionLevel.SmallestSize => 9,
+            _ => 6,
+        },
+    };
+}
