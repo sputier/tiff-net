@@ -70,6 +70,12 @@ jobs:
             echo "::error::Some text files have CRLF or mixed line endings"
             exit 1
           fi
+      - name: No unsafe block in the library (references are listed with their bounds in docs/design/architecture.md)
+        run: |
+          if grep -rnwE "unsafe" --include=*.cs src/; then
+            echo "::error::An unsafe block or member is in the library"
+            exit 1
+          fi
 
   docs:
     runs-on: ubuntu-latest

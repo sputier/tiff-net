@@ -1,13 +1,15 @@
 # Architecture — design
 
-Status: **validated on 2026-11-05**. How the library is organised to meet the security, performance and maintainability
-requirements of the [review](../review-2026-11-05.md). The public surface is in [api.md](api.md), the format coverage in
-[coverage.md](coverage.md).
+Status: **design record, validated on 2026-11-05**. How the library was planned to meet the security, performance and
+maintainability requirements of the [review](../review-2026-11-05.md). The public surface is in [api.md](api.md), the format
+coverage in [standard-coverage.md](../standard-coverage.md). The library as built keeps this design with other names: see
+[As built](#as-built) at the end.
 
 ## Constraints
 
 - net10.0 only; Windows, Linux, .NET MAUI (Android, iOS): no reflection that trimming cannot see, no native code, no
-  `unsafe` (Span, `MemoryMarshal`, `BinaryPrimitives` and `System.Numerics.Vector` instead), `IsTrimmable` and
+  `unsafe` blocks (Span, `MemoryMarshal`, `BinaryPrimitives` and `System.Numerics.Vector` instead; as built, `Unsafe.Add`
+  and `Unsafe.WriteUnaligned` go through references in four hot loops, each after a bounds check, see [As built](#as-built)), `IsTrimmable` and
   `IsAotCompatible` with zero warnings, little and big endian *files* on little endian *machines* (a check refuses big endian
   machines at start-up rather than giving wrong pixels).
 - No dependency. Deflate through `System.IO.Compression` (zlib-ng in .NET 10); everything else written here.
@@ -157,7 +159,7 @@ measured by the benchmarks of the repository.
 ## Repository layout
 
 ```text
-src/Eleris.TiffNet/              the library (Structure/, Codecs/, Jpeg/, Pipeline/, public types at the root)
+src/Eleris.TiffNet/              the library (Internal/Structure, Pixels, Codecs, Jpeg, Writing; public types at the root)
 tests/Eleris.TiffNet.Tests/      unit, interop, hostile, documentation examples
 tests/Fixtures/                  committed fixtures with a README of their provenance; the tifffile corpus is generated
 benchmarks/Eleris.TiffNet.Benchmarks/
@@ -180,3 +182,32 @@ by SHA, minimal `permissions:`, Dependabot.
 | 4 | Low bit depths, palette | **Read**: samples of 1 to 16 bits unpacked (covers masks and 12/14-bit packed camera data) and palettes expanded to RGB 16-bit. **Not** the CCITT fax compressions (about 1 000 lines, a large share of libtiff's CVEs). |
 | 5 | Images larger than one array | **In 1.0, in its own lot**: `TiffImageWriter` (rows in order or tiles in any order, BigTIFF). The pipeline is already strip-based; the cost is mostly the tests on files beyond 4 GB, isolated in a dedicated CI job. |
 | 6 | TIFF ↔ FITS bridge | **A separate package** referencing both libraries (Astro-TIFF header ↔ `FitsHeader`, row flip, `WCS`/`BAYERPAT` adaptation, interleaved ↔ planar). It needs a text header parser in FitsNet (`FitsHeader.Parse`). |
+
+## As built
+
+The layers of this page, with the names of the code of version 0.1.0:
+
+| Planned | As built (`src/Eleris.TiffNet/Internal`) |
+| --- | --- |
+| `ITiffSource` | `TiffSource` (abstract; a file read with `RandomAccess`, or bytes in memory) |
+| `DirectoryReader` | `Structure/StructureReader` (header, directories, tag values) and `Structure/ImageDescriptor` (the image a directory describes, checked against the file) |
+| `DecodeContext`, `Pipeline/` | `Pixels/PixelPlan` (the blocks under a request, checked and reserved before any allocation) and `Pixels/PixelReader` (decoding in parallel into the destination) |
+| `ITiffDecoder` | static codecs: `Codecs/Lzw`, `PackBits`, `Deflate`, `Predictors`; `Jpeg/JpegDecoder` |
+| `ITiffEncoder`, `EncodeContext` | `Writing/ImageEncoder` (bands of rows, blocks), `BlockPipeline` (parallel, in order), `BlockCodec` and `Codecs/Encoders` |
+| `DirectoryWriter` | `Writing/FileWriter` (offsets, values, chaining) and `TiffFileWriter` (the entries of an image) |
+| — | `ResourceBudget` (every limit of the read options), `Writing/SafeFile` (temporary files, replacement) |
+
+**References instead of `unsafe` blocks.** No `unsafe` block exists (`AllowUnsafeBlocks` is set for `[SkipLocalsInit]` only).
+Four hot loops go through references with `System.Runtime.CompilerServices.Unsafe`, each after the check that keeps it in
+bounds:
+
+- `Codecs/Lzw.Decode`: every write is preceded by `written < capacity` (a string is cut to the room left), and a string is
+  copied from what is already written (`from + size <= written` + 1 for the string being defined).
+- `Codecs/Predictors`: the loops run over the length of the row they are given (`UndoFloatingPoint` copies the row into a
+  scratch buffer of at least that length, which throws otherwise).
+- `Jpeg/JpegColour.Convert`: the length of the rows is checked first; the range-limit table covers every index a sample can
+  give.
+- `Jpeg/JpegIdct` and `JpegIdctAvx2`: `JpegIdct.CheckBounds` (64 coefficients, 64 steps, 8 rows of output) before the transform.
+
+Tests write beyond the end of a row with sentinels after it for the predictors (`CodecBoundaryTests`), and the fuzzer runs
+every decoder on hostile data.

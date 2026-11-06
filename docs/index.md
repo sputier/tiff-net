@@ -12,7 +12,6 @@ How the library was designed:
 | Page | Content |
 | --- | --- |
 | [Public API](design/api.md) | the types and members of the library |
-| [TIFF coverage](design/coverage.md) | what is read and written, what is refused and why |
 | [Architecture](design/architecture.md) | layers, resource limits, parallelism, tests, performance targets, decisions |
 | [Backlog](design/backlog.md) | how the work is cut; progress is followed in the GitHub issues |
 | [Review of the first implementation](review-2026-11-05.md) | the findings that motivate the design (in French) |
