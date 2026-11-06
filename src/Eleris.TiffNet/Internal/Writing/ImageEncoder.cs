@@ -134,7 +134,7 @@ internal sealed class ImageEncoder
             sourceRows = Height;
         }
 
-        long wanted = Math.Max(sourceRows, (long)BlockHeight * (Tiled ? 1 : 2 * Math.Max(1, degree)));
+        long wanted = Math.Max(sourceRows, (long)BlockHeight * (Tiled ? 1 : 8 * Math.Max(1, degree)));
         long rows = (wanted + BlockHeight - 1) / BlockHeight * BlockHeight;
         return (int)Math.Min(rows, (Height + BlockHeight - 1L) / BlockHeight * BlockHeight);
     }

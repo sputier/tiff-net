@@ -47,3 +47,35 @@ public class HuffmanTableTests
     public void The_standard_tables_are_valid() =>
         Assert.All([(true, true), (true, false), (false, true), (false, false)], t => HuffmanTable.Standard(t.Item1, t.Item2));
 }
+
+public class IdctTests
+{
+    [Fact]
+    public void The_vectorised_transform_gives_the_samples_of_the_scalar_one()
+    {
+        if (!Internal.Jpeg.JpegIdctAvx2.IsSupported)
+        {
+            return;   // the scalar transform is the one used
+        }
+
+        var random = new Random(48);
+        short[] block = new short[64];
+        ushort[] quantization = new ushort[64];
+        byte[] scalar = new byte[8 * 11], vector = new byte[8 * 11];
+        for (int n = 0; n < 200_000; n++)
+        {
+            // Dequantized coefficients within what 8-bit samples give (+-2^11), sparse as in photographs.
+            int density = random.Next(1, 64);
+            for (int k = 0; k < 64; k++)
+            {
+                quantization[k] = (ushort)random.Next(1, n % 3 == 0 ? 4 : 120);
+                int limit = 2047 / quantization[k];
+                block[k] = k == 0 || random.Next(64) < density ? (short)random.Next(-limit, limit + 1) : (short)0;
+            }
+
+            Internal.Jpeg.JpegIdct.TransformScalar(block, quantization, scalar, 11);
+            Internal.Jpeg.JpegIdctAvx2.Transform(block, quantization, vector, 11);
+            Assert.True(scalar.AsSpan().SequenceEqual(vector), $"block {n}");
+        }
+    }
+}

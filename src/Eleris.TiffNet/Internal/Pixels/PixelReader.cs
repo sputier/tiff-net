@@ -371,6 +371,7 @@ internal static class PixelReader
         private readonly int _orientation;
         private readonly double[]? _maxima;
         private readonly bool _identity;
+        private readonly bool _direct;
 
         public Context(PixelPlan plan, TiffSource source, ResourceBudget budget, int channels, bool littleEndian)
         {
@@ -387,6 +388,10 @@ internal static class PixelReader
             _orientation = _d.Orientation;
             _rowBytes = plan.RowBytes;
             _identity = typeof(TD) == typeof(TOut) && _request.Scale == TiffPixelScale.Stored;
+            // Unpacking is a plain copy: uncompressed, whole bytes of the delivered type, in the byte order of the machine, nothing
+            // to invert, expand or reverse.
+            _direct = !_compressed && _identity && _d.BitsPerSample == Unsafe.SizeOf<TD>() * 8 && littleEndian == BitConverter.IsLittleEndian
+                && !_d.ReversedBits && _d.Photometric is not (TiffPhotometric.MinIsWhite or TiffPhotometric.Palette);
             _maxima = _request.Scale == TiffPixelScale.Normalized ? Maxima(_d, channels) : null;
         }
 
@@ -395,6 +400,15 @@ internal static class PixelReader
             int deliveredPerPixel = SampleUnpacker.DeliveredChannels(_d, unit.Plane);
             int rowSamples = (int)(_d.BlockWidth * deliveredPerPixel);
             bool straight = Straight(unit);
+            if (straight && _direct && unit.X0 == _request.X && _d.BlockWidth == _request.Width)
+            {
+                // The stored rows are the delivered ones, whole and contiguous: read straight into the destination, one copy.
+                long at = (unit.Y0 - _request.Y) * _request.Width * _channels;
+                var target = MemoryMarshal.AsBytes(destination.Slice((int)at, unit.Rows * rowSamples));
+                _source.ReadExactly(_d.Offsets[unit.Block] + unit.FirstRow * _rowBytes, target);
+                return;
+            }
+
             Span<byte> rows;
             if (_compressed)
             {
