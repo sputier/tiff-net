@@ -68,4 +68,5 @@ Console.WriteLine($"{buffer.Length} and {pixels.Length} samples");
 ```
 <!-- /example -->
 
-An image of more than 2 147 483 591 samples does not fit in one array: read it by region.
+An array holds at most 2 147 483 591 elements, and a read is also bounded by `MaxPixelBytes` (2 147 483 591 bytes by
+default, so 536 million `float` samples): raise it for a larger array, or read by region.

@@ -9,7 +9,8 @@ The first version, written from scratch after the [review of the first implement
 ### Reading
 
 - Classic TIFF and BigTIFF, both byte orders, multi-page files, `SubIFDs`, EXIF and GPS sub-directories (read only).
-- Grey, RGB, `MinIsWhite`, palette; samples of 1 to 64 bits, unsigned, signed and floating point (16, 32, 64 bits); extra
+- Grey, RGB, `MinIsWhite`, palette; unsigned samples of 1 to 16, 32 and 64 bits, signed ones of 8 to 64 bits, floating point
+  of 16, 32 and 64 bits; extra
   channels (data and alpha).
 - Strips and tiles, interleaved and planar; the 8 orientations applied, pixels always delivered top-down.
 - Compressions: none, PackBits, LZW, Deflate, JPEG (baseline and progressive, bit-exact with libjpeg-turbo); horizontal and
@@ -23,7 +24,8 @@ The first version, written from scratch after the [review of the first implement
 
 ### Writing
 
-- `TiffFile.Save` and `SaveAsync`, to a path (through a temporary file that replaces the target) or to a stream; none,
+- `TiffFile.Save`, to a path (through a temporary file that replaces the target) or to a stream, and `SaveAsync` to a stream;
+  none,
   PackBits, LZW and Deflate with the predictor that suits the samples, strips or tiles, interleaved or planar, BigTIFF when
   needed; encoded on every core, the file identical whatever the number of threads.
 - `TiffImageWriter` writes images larger than an array, rows in order or tiles in any order, with bounded memory.
@@ -32,5 +34,6 @@ The first version, written from scratch after the [review of the first implement
 
 ### Platforms
 
-- net10.0 on Windows and Linux, NativeAOT (checked in CI), .NET MAUI on Android (built in CI, run on an emulator by hand).
+- net10.0 on Windows and Linux, NativeAOT (checked in CI), .NET MAUI on Android (built in CI, run on an emulator by hand);
+  little-endian processors.
   Trimmable and AOT-compatible, no dependency.

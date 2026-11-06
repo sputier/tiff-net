@@ -180,8 +180,8 @@ public static class WritingExamples
         #region Example:WritingExamples.Options
         var options = TiffWriteOptions.Default with
         {
-            Compression = TiffCompression.Lzw,              // Deflate (default), LZW, PackBits or None
-            Level = TiffCompressionLevel.Fastest,           // for Deflate
+            Compression = TiffCompression.Deflate,          // Deflate (default), LZW, PackBits or None
+            Level = TiffCompressionLevel.Fastest,           // of Deflate: faster, files larger
             Layout = TiffLayout.Tiles,                      // 256 x 256 tiles (TileSize)
             PlanarConfiguration = TiffPixelOrder.Planar,    // each channel in its own plane
         };
@@ -217,7 +217,7 @@ public static class LargeImageExamples
     {
         string path = Path.Combine(Path.GetTempPath(), "mosaic.tif");
         #region Example:LargeImageExamples.Mosaic
-        // 1 024 x 768 f32 grey, written tile by tile in any order, without the image in memory (up to 4 294 967 295 pixels a
+        // 1 024 x 768 f32 grey, written tile by tile in any order, without the image in memory (up to 2 147 483 647 pixels a
         // side; BigTIFF when the file could exceed 4 GB).
         var options = TiffWriteOptions.Default with { Layout = TiffLayout.Tiles, TileSize = 256 };
         using (var writer = TiffImageWriter.Create(path, 1024, 768, TiffSampleType.Float32, options: options))

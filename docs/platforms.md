@@ -1,6 +1,8 @@
 # Platforms
 
-The library targets `net10.0`, without native code or dependency: it runs wherever .NET 10 runs. Three uses are checked.
+The library targets `net10.0`, in managed code (Deflate is that of the runtime), without dependency: it runs wherever .NET 10
+runs on a little-endian processor (x64, ARM64; a big-endian one gets a `PlatformNotSupportedException`). Three uses are
+checked.
 
 | Platform | How it is checked |
 | --- | --- |

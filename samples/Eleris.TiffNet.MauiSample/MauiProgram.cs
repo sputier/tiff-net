@@ -18,19 +18,32 @@ public sealed class MainPage : ContentPage
     public MainPage()
     {
         var button = new Button { Text = "Write and read a TIFF file", Margin = 20 };
-        button.Clicked += async (_, _) => _result.Text = await Task.Run(Check);
+        button.Clicked += async (_, _) => _result.Text = await Task.Run(TryCheck);
         Content = new VerticalStackLayout { Children = { button, _result } };
 
         // Run once at start, and write the result to the log (logcat on Android), so that the check can be automated.
         Loaded += async (_, _) =>
         {
-            string result = await Task.Run(Check);
+            string result = await Task.Run(TryCheck);
             _result.Text = result;
             foreach (string line in result.Split(Environment.NewLine))
             {
                 Console.WriteLine($"TIFFNET-CHECK {line}");
             }
         };
+    }
+
+    /// <summary>The check, its failure shown rather than ending the application (an event handler must not throw).</summary>
+    private static string TryCheck()
+    {
+        try
+        {
+            return Check();
+        }
+        catch (Exception ex)
+        {
+            return $"FAILED: {ex.GetType().Name}: {ex.Message}";
+        }
     }
 
     /// <summary>The check the documentation describes: every compression, written and read back on the device.</summary>
