@@ -48,6 +48,9 @@ internal abstract class TiffSource : IDisposable
         }
     }
 
+    /// <summary>The bytes from <paramref name="offset"/> to <paramref name="offset"/> + <paramref name="length"/>, as a stream read in order.</summary>
+    public RangeStream OpenRange(long offset, long length) => new(this, offset, length);
+
     /// <summary>Reads exactly <paramref name="destination"/>.Length bytes at <paramref name="offset"/>, which are within bounds.</summary>
     protected abstract void ReadCore(long offset, Span<byte> destination);
 
@@ -89,6 +92,18 @@ internal abstract class TiffSource : IDisposable
 
     /// <summary>A source over bytes already in memory.</summary>
     public static TiffSource FromMemory(ReadOnlyMemory<byte> data, string name = "memory") => new MemorySource(data, name);
+
+    /// <summary>
+    /// A source read on demand from a stream that seeks, from its current position: through the handle of a file stream (reads at
+    /// explicit offsets, from several threads at once), otherwise one read at a time.
+    /// </summary>
+    public static TiffSource FromOpenStream(Stream stream, bool leaveOpen, string name)
+    {
+        long start = stream.Position;
+        return stream is FileStream { SafeFileHandle: { IsInvalid: false } handle }
+            ? new FileStreamSource(stream, handle, start, leaveOpen, name)
+            : new SeekingSource(stream, start, leaveOpen, name);
+    }
 
     /// <summary>
     /// The remaining bytes of a stream, held in memory: from the current position of a seekable stream, or everything a stream
@@ -212,6 +227,62 @@ internal abstract class TiffSource : IDisposable
         }
     }
 
+    /// <summary>A file stream of the application, read through its handle at explicit offsets (thread-safe), from a start.</summary>
+    private sealed class FileStreamSource(Stream stream, SafeFileHandle handle, long start, bool leaveOpen, string name)
+        : TiffSource(name, RandomAccess.GetLength(handle) - start)
+    {
+        protected override void ReadCore(long offset, Span<byte> destination)
+        {
+            offset += start;
+            while (destination.Length > 0)
+            {
+                int read = RandomAccess.Read(handle, destination, offset);
+                if (read == 0)
+                {
+                    throw new IOException($"{Name} became shorter while it was being read.");
+                }
+
+                destination = destination[read..];
+                offset += read;
+            }
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && !leaveOpen)
+            {
+                stream.Dispose();
+            }
+
+            base.Dispose(disposing);
+        }
+    }
+
+    /// <summary>Another stream that seeks: one read at a time (a stream has one position), from a start.</summary>
+    private sealed class SeekingSource(Stream stream, long start, bool leaveOpen, string name) : TiffSource(name, stream.Length - start)
+    {
+        private readonly Lock _sync = new();
+
+        protected override void ReadCore(long offset, Span<byte> destination)
+        {
+            lock (_sync)
+            {
+                stream.Position = start + offset;
+                stream.ReadExactly(destination);
+            }
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && !leaveOpen)
+            {
+                stream.Dispose();
+            }
+
+            base.Dispose(disposing);
+        }
+    }
+
     private sealed class MemorySource(ReadOnlyMemory<byte> data, string name) : TiffSource(name, data.Length)
     {
         protected override void ReadCore(long offset, Span<byte> destination) =>
@@ -234,4 +305,59 @@ internal abstract class TiffSource : IDisposable
             }
         }
     }
+}
+
+/// <summary>A range of a source read in order (a compressed block inflated as a stream), in reads of what the caller asks.</summary>
+internal sealed class RangeStream(TiffSource source, long offset, long length) : Stream
+{
+    private long _position;
+
+    public override bool CanRead => true;
+
+    public override bool CanSeek => false;
+
+    public override bool CanWrite => false;
+
+    public override long Length => length;
+
+    public override long Position
+    {
+        get => _position;
+        set => throw new NotSupportedException();
+    }
+
+    /// <summary>
+    /// The failure of the source (the file or the stream of the application) during the last read: kept so that the decoder can
+    /// give it to the caller as it is, not as damaged data.
+    /// </summary>
+    public Exception? Failure { get; private set; }
+
+    public override int Read(Span<byte> buffer)
+    {
+        int count = (int)Math.Min(buffer.Length, length - _position);
+        try
+        {
+            source.ReadExactly(offset + _position, buffer[..count]);
+        }
+        catch (Exception ex)
+        {
+            Failure = ex;
+            throw;
+        }
+
+        _position += count;
+        return count;
+    }
+
+    public override int Read(byte[] buffer, int offset, int count) => Read(buffer.AsSpan(offset, count));
+
+    public override void Flush()
+    {
+    }
+
+    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+    public override void SetLength(long value) => throw new NotSupportedException();
+
+    public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
 }

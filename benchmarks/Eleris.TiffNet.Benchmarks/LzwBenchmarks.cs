@@ -14,6 +14,7 @@ public class LzwBenchmarks
 {
     private byte[] _encoded = [];
     private byte[] _decoded = [];
+    private byte[] _output = [];
 
     [Params("noisy", "flat")]
     public string Image { get; set; } = "noisy";
@@ -32,6 +33,7 @@ public class LzwBenchmarks
         byte[] data = MemoryMarshal.AsBytes(samples.AsSpan()).ToArray();
         _encoded = Encoder.Encode(data);
         _decoded = new byte[data.Length];
+        _output = new byte[LzwEncoder.MaxEncoded(data.Length)];
         if (Library() != data.Length || !_decoded.AsSpan().SequenceEqual(data) || Prototype() != data.Length)
         {
             throw new InvalidOperationException("The decoders do not give the data back.");
@@ -43,6 +45,10 @@ public class LzwBenchmarks
 
     [Benchmark]
     public int Library() => Lzw.Decode(_encoded, _decoded, out _);
+
+    /// <summary>The encoder of the library on the same data (what a write costs besides the predictor).</summary>
+    [Benchmark]
+    public int LibraryEncode() => LzwEncoder.Encode(_decoded, _output);
 
     /// <summary>The prototype of the review, unchanged.</summary>
     private static class PrototypeLzw
