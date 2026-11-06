@@ -40,6 +40,7 @@ new TiffFile().Add(image).Save(path, options);
 | `PlanarConfiguration` | interleaved, or one plane per channel | interleaved |
 | `BigTiff` | `Auto`, `Never`, `Always` | `Auto` |
 | `MaxDegreeOfParallelism` | -1 (every core) or a number of threads | -1 |
+| `SkipUnsupportedPages` | leave out the pages the library cannot read, instead of failing | false |
 
 The file does not depend on the number of threads. To save an image as its file stored it:
 

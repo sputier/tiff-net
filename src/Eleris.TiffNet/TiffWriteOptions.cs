@@ -89,6 +89,13 @@ public sealed record TiffWriteOptions
         init => _planarConfiguration = Enum.IsDefined(value) ? value : throw new ArgumentOutOfRangeException(nameof(value), value, "Not an order.");
     }
 
+    /// <summary>
+    /// Whether a save leaves out the pages the library cannot read (<see cref="TiffImage.UnsupportedReason"/>: a CMYK thumbnail
+    /// beside the main image, for example) instead of failing with a <see cref="NotSupportedException"/>; false by default, so that
+    /// no page is lost without the application asking.
+    /// </summary>
+    public bool SkipUnsupportedPages { get; init; }
+
     /// <summary>Classic TIFF or BigTIFF: <see cref="TiffBigTiff.Auto"/> (the default) writes BigTIFF only when the file could exceed 4 GB.</summary>
     /// <exception cref="ArgumentOutOfRangeException">The value is not a choice of the enumeration.</exception>
     public TiffBigTiff BigTiff
