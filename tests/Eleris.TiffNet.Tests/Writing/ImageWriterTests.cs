@@ -26,7 +26,11 @@ public class ImageWriterTests
         ushort[] pixels = image.ReadRawPixels<ushort>();
         var options = TiffWriteOptions.Default with
         {
-            Layout = layout, PlanarConfiguration = order, Compression = compression, TileSize = 64, MaxDegreeOfParallelism = threads,
+            Layout = layout,
+            PlanarConfiguration = order,
+            Compression = compression,
+            TileSize = 64,
+            MaxDegreeOfParallelism = threads,
         };
         using var stream = new MemoryStream();
 

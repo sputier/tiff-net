@@ -113,8 +113,12 @@ public class WrittenCorpusTests
                             {
                                 var options = TiffWriteOptions.Default with
                                 {
-                                    Compression = compression, Predictor = predictor, Layout = layout, PlanarConfiguration = order,
-                                    BigTiff = bigTiff, TileSize = 16,
+                                    Compression = compression,
+                                    Predictor = predictor,
+                                    Layout = layout,
+                                    PlanarConfiguration = order,
+                                    BigTiff = bigTiff,
+                                    TileSize = 16,
                                 };
                                 string name = $"{type}-c{channels}-{compression.ToString().ToLowerInvariant()}-p{(predictor == TiffPredictor.Auto ? 1 : 0)}"
                                     + $"-t{(layout == TiffLayout.Tiles ? 1 : 0)}-pl{(order == TiffPixelOrder.Planar ? 1 : 0)}-b{(bigTiff == TiffBigTiff.Always ? 1 : 0)}.tif";
