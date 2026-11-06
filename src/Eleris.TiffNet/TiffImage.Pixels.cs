@@ -164,6 +164,8 @@ public sealed partial class TiffImage
     /// <typeparam name="T">As for <see cref="ReadPixels{T}(TiffPixelScale, TiffPixelOrder)"/>.</typeparam>
     /// <param name="scale">The stored values, or values normalised to [0, 1].</param>
     /// <param name="order">Interleaved or planar.</param>
+    /// <param name="progress">Receives the fraction read, 0 to 1, at most once a percent and in increasing order, from the threads that
+    /// decode; 1 once the array is complete. A <see cref="Progress{T}"/> posts its reports: its last may run after the task ends.</param>
     /// <param name="cancellationToken">Stops the read between strips or tiles.</param>
     /// <returns>A new array of <c>Width × Height × Channels</c> samples. Every failure, including a type that cannot be read,
     /// is reported by the task, never thrown by the call.</returns>
@@ -173,10 +175,88 @@ public sealed partial class TiffImage
     /// <exception cref="ObjectDisposedException">The file is disposed.</exception>
     /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled.</exception>
     public Task<T[]> ReadPixelsAsync<T>(TiffPixelScale scale = TiffPixelScale.Stored, TiffPixelOrder order = TiffPixelOrder.Interleaved,
-        CancellationToken cancellationToken = default) where T : unmanaged, INumber<T>
+        IProgress<double>? progress = null, CancellationToken cancellationToken = default) where T : unmanaged, INumber<T>
     {
         var request = Whole(order, scale);
-        return Task.Run(() => ReadArray<T>(request, raw: false, cancellationToken), cancellationToken);
+        return Task.Run(() => ReadArray<T>(request, raw: false, cancellationToken, progress), cancellationToken);
+    }
+
+    /// <summary>
+    /// The indices of a palette image, before the colour map expands them to RGB: a classification map or a label image keeps its
+    /// classes. Then the extra samples, as stored, for each pixel (interleaved).
+    /// </summary>
+    /// <returns>A new array of <c>Width × Height × samples per pixel</c> values, each below 2^BitsPerSample.</returns>
+    /// <exception cref="InvalidOperationException">The image is not a palette image.</exception>
+    /// <exception cref="NotSupportedException">The library does not handle the format of the image.</exception>
+    /// <exception cref="TiffException">The pixel data is damaged, or exceeds <see cref="TiffReadOptions.MaxPixelBytes"/>.</exception>
+    /// <exception cref="ObjectDisposedException">The file is disposed.</exception>
+    public ushort[] ReadIndices()
+    {
+        ThrowIfUnsupported();
+        if (Descriptor.Photometric != TiffPhotometric.Palette || _pixels is not null)
+        {
+            throw new InvalidOperationException("The image is not a palette image: its samples are its values (ReadRawPixels).");
+        }
+
+        var d = Descriptor.AsIndices();
+        var budget = Budget(CancellationToken.None);
+        var request = new PixelRequest(0, 0, Width, Height, null, TiffPixelOrder.Interleaved, TiffPixelScale.Stored);
+        long count = request.Count(d.Channels);
+        budget.ReservePixels(count * sizeof(ushort), "the indices");
+        ThrowIfLargerThanAnArray(count);
+        var plan = PixelPlan.Create(d, budget, request, sizeof(ushort), parallel: true);
+        var result = GC.AllocateUninitializedArray<ushort>((int)count);
+        PixelReader.Read<ushort, ushort>(plan, File!.Source, budget, d.Channels, !Storage!.BigEndian, result, result);
+        return result;
+    }
+
+    /// <summary>Reads a region on a thread of the pool, as <see cref="ReadRegion{T}"/>.</summary>
+    /// <typeparam name="T">As for <see cref="ReadPixels{T}(TiffPixelScale, TiffPixelOrder)"/>.</typeparam>
+    /// <param name="x">The first column.</param>
+    /// <param name="y">The first row, from the top.</param>
+    /// <param name="width">The number of columns.</param>
+    /// <param name="height">The number of rows.</param>
+    /// <param name="scale">The stored values, or values normalised to [0, 1].</param>
+    /// <param name="order">Interleaved or planar.</param>
+    /// <param name="progress">Receives the fraction read, 0 to 1, at most once a percent and in increasing order; 1 once the array is complete.</param>
+    /// <param name="cancellationToken">Stops the read between strips or tiles.</param>
+    /// <returns>A new array of <c>width × height × Channels</c> samples; a region outside the image is thrown, every other failure
+    /// is reported by the task.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">The region is empty or not within the image.</exception>
+    /// <exception cref="InvalidOperationException">The conversion could lose values.</exception>
+    /// <exception cref="NotSupportedException">The library does not handle the format of the image.</exception>
+    /// <exception cref="TiffException">The pixel data is damaged.</exception>
+    /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled.</exception>
+    public Task<T[]> ReadRegionAsync<T>(int x, int y, int width, int height, TiffPixelScale scale = TiffPixelScale.Stored,
+        TiffPixelOrder order = TiffPixelOrder.Interleaved, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
+        where T : unmanaged, INumber<T>
+    {
+        var request = Region(x, y, width, height, null, order, scale);
+        return Task.Run(() => ReadArray<T>(request, raw: false, cancellationToken, progress), cancellationToken);
+    }
+
+    /// <summary>Reads one channel on a thread of the pool, as <see cref="ReadChannel{T}"/>.</summary>
+    /// <typeparam name="T">As for <see cref="ReadPixels{T}(TiffPixelScale, TiffPixelOrder)"/>.</typeparam>
+    /// <param name="channel">The channel: 0 for grey or red, 1 for green…, then the extra channels.</param>
+    /// <param name="scale">The stored values, or values normalised to [0, 1].</param>
+    /// <param name="progress">Receives the fraction read, 0 to 1, at most once a percent and in increasing order; 1 once the array is complete.</param>
+    /// <param name="cancellationToken">Stops the read between strips or tiles.</param>
+    /// <returns>A new array of <c>Width × Height</c> samples; every failure is reported by the task.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">There is no such channel.</exception>
+    /// <exception cref="InvalidOperationException">The conversion could lose values.</exception>
+    /// <exception cref="NotSupportedException">The library does not handle the format of the image.</exception>
+    /// <exception cref="TiffException">The pixel data is damaged.</exception>
+    /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled.</exception>
+    public Task<T[]> ReadChannelAsync<T>(int channel, TiffPixelScale scale = TiffPixelScale.Stored, IProgress<double>? progress = null,
+        CancellationToken cancellationToken = default) where T : unmanaged, INumber<T>
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(channel);
+        return Task.Run(() =>
+        {
+            ThrowIfUnsupported();
+            ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(channel, Channels);
+            return ReadArray<T>(Region(0, 0, Width, Height, channel, TiffPixelOrder.Interleaved, scale), raw: false, cancellationToken, progress);
+        }, cancellationToken);
     }
 
     private PixelRequest Whole(TiffPixelOrder order, TiffPixelScale scale) => new(0, 0, Width, Height, null, order, scale);
@@ -200,7 +280,8 @@ public sealed partial class TiffImage
         return new PixelRequest(x, y, width, height, channel, order, scale);
     }
 
-    private T[] ReadArray<T>(PixelRequest request, bool raw, CancellationToken cancellationToken) where T : unmanaged, INumber<T>
+    private T[] ReadArray<T>(PixelRequest request, bool raw, CancellationToken cancellationToken, IProgress<double>? progress = null)
+        where T : unmanaged, INumber<T>
     {
         long count = Prepare<T>(request, raw);
         var budget = Budget(cancellationToken);
@@ -210,11 +291,13 @@ public sealed partial class TiffImage
         budget.ReservePixels(count > long.MaxValue / Unsafe.SizeOf<T>() ? long.MaxValue : count * Unsafe.SizeOf<T>(), "the pixels");
         ThrowIfLargerThanAnArray(count);
         var plan = PixelPlan.Create(Descriptor, budget, request, SampleConversion.SizeOf(SampleType), parallel: true);
+        plan.Progress = progress is null ? null : ProgressCounter.Of(progress, plan.Units().LongCount());
 
         // Not cleared: every sample of a request is written by the read (EverySampleWrittenTests checks it on every image of the
         // corpora), and a read that fails returns no array.
         var result = GC.AllocateUninitializedArray<T>((int)count);
         Dispatch(plan, result, result, budget);
+        plan.Progress?.Done();
         return result;
     }
 

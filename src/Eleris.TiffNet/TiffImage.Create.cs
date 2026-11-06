@@ -44,7 +44,10 @@ public sealed partial class TiffImage
     /// <param name="colorModel">What the colour channels are; required with 3 channels or more.</param>
     /// <param name="order">How <paramref name="pixels"/> is laid out.</param>
     /// <remarks>
-    /// The metadata and the sub-images are kept; <see cref="Storage"/> still tells how the image was stored in its file. The
+    /// The metadata and the sub-images are kept, except the tags that describe the values of the former pixels
+    /// (<see cref="TiffMetadata.PixelTags"/>); a header written in the description (Astro-TIFF: <c>NAXIS1</c>, <c>BITPIX</c>…)
+    /// describes the pixels it came with and is the application's to update. <see cref="Storage"/> still tells how the image was
+    /// stored in its file. The
     /// extra channels become <see cref="TiffExtraChannelKind.Data"/>; a reason the library could not deliver the former pixels
     /// (<see cref="UnsupportedReason"/>) no longer applies. Like the other changes of an image, it must not run while the image
     /// is read on another thread.
@@ -55,6 +58,12 @@ public sealed partial class TiffImage
         TiffPixelOrder order = TiffPixelOrder.Interleaved) where T : unmanaged, INumber<T>
     {
         var (descriptor, source) = Describe(pixels, width, height, channels, colorModel, order);
+        foreach (int code in TiffMetadata.PixelTags)
+        {
+            // The ranges of the former values describe other pixels.
+            Metadata.Remove(code);
+        }
+
         _descriptor = descriptor.WithSubfileType(_descriptor.SubfileType);
         _pixels = source;
         ExtraChannels = Kinds(_descriptor.ExtraChannels);

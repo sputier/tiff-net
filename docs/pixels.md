@@ -1,7 +1,7 @@
 # Reading pixels
 
 Pixels are delivered **top-down, left to right**, whatever the `Orientation` of the file, interleaved (`[y][x][c]`) or planar
-(`[c][y][x]`, the order of a FITS cube). Palettes are expanded to 16-bit RGB, MinIsWhite is inverted, samples of 1 to 16 bits
+(`[c][y][x]`, the order of a FITS cube). Palettes are expanded to 16-bit RGB (`ReadIndices` gives the indices themselves, for classification maps and label images), MinIsWhite is inverted, samples of 1 to 16 bits
 are unpacked to bytes or 16-bit words with their values unchanged.
 
 | Method | Gives |
@@ -67,6 +67,9 @@ float[] pixels = await image.ReadPixelsAsync<float>(cancellationToken: cancellat
 Console.WriteLine($"{buffer.Length} and {pixels.Length} samples");
 ```
 <!-- /example -->
+
+`ReadPixelsAsync`, `ReadRegionAsync` and `ReadChannelAsync` read on the threads of the pool, can be cancelled between strips or
+tiles, and report their progress (0 to 1, at most once a percent) to an `IProgress<double>`.
 
 An array holds at most 2 147 483 591 elements, and a read is also bounded by `MaxPixelBytes` (2 147 483 591 bytes by
 default, so 536 million `float` samples): raise it for a larger array, or read by region.

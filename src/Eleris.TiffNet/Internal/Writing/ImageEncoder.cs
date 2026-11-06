@@ -217,7 +217,8 @@ internal sealed class ImageEncoder
     /// Encodes the blocks of the image and appends them: band after band of rows, each read once from the image (in parallel),
     /// its blocks encoded in parallel and appended in order (every plane of a band before the next band).
     /// </summary>
-    public void Write(FileWriter writer, long[] offsets, long[] counts, int degree, CancellationToken cancellationToken)
+    public void Write(FileWriter writer, long[] offsets, long[] counts, int degree, CancellationToken cancellationToken,
+        ProgressCounter? progress = null)
     {
         int bandRows = BandRows(degree);
         int pixelBytes = Channels * BytesPerSample;
@@ -266,6 +267,8 @@ internal sealed class ImageEncoder
                         {
                             encoded.Return();
                         }
+
+                        progress?.Add();
                     },
                     encoded => encoded.Return(),
                     cancellationToken);
