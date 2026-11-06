@@ -20,8 +20,8 @@ public static class ReliabilityExamples
     public static void UntrustedFiles()
     {
         #region Example:ReliabilityExamples.UntrustedFiles
-        // On a phone: at most 256 MB for the pixels of an image, two decoding threads.
-        var untrusted = TiffReadOptions.Default with { MaxPixelBytes = 256L << 20, MaxDegreeOfParallelism = 2 };
+        // On a phone, or a server reading files from anywhere: 256 MB for the pixels of an image, two decoding threads.
+        var untrusted = TiffReadOptions.Constrained;
 
         Console.WriteLine($"Pixels: {untrusted.MaxPixelBytes >> 20} MB, threads: {untrusted.MaxDegreeOfParallelism}");
         #endregion

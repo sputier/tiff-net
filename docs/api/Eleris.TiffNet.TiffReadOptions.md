@@ -26,6 +26,7 @@ Change a limit with a `with` expression: `TiffReadOptions.Default with { MaxPixe
 
 | Member | Description |
 | --- | --- |
+| [`Constrained`](#eleris-tiffnet-tiffreadoptions-constrained) | Limits for a phone, or a server reading files that come from anywhere: 256 MB for the pixels of an image and the buffers that decode them, 64 MB of a stream held in memory, two decoding threads; the other limits as by default. |
 | [`Default`](#eleris-tiffnet-tiffreadoptions-default) | The default options: tolerant reading with the default limits. |
 | [`MaxDegreeOfParallelism`](#eleris-tiffnet-tiffreadoptions-maxdegreeofparallelism) | The number of threads that decode strips and tiles at once: -1 (the default) for all the cores, 1 to decode on the calling thread only. |
 | [`MaxDirectories`](#eleris-tiffnet-tiffreadoptions-maxdirectories) | The number of directories read from a file: pages and sub-directories together. 10 000 by default. |
@@ -49,6 +50,15 @@ public TiffReadOptions()
 ```
 
 ## Property details
+
+<a id="eleris-tiffnet-tiffreadoptions-constrained"></a>
+### `Constrained`
+
+Limits for a phone, or a server reading files that come from anywhere: 256 MB for the pixels of an image and the buffers that decode them, 64 MB of a stream held in memory, two decoding threads; the other limits as by default.
+
+```csharp
+public static TiffReadOptions Constrained { get; }
+```
 
 <a id="eleris-tiffnet-tiffreadoptions-default"></a>
 ### `Default`
