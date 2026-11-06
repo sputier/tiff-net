@@ -78,6 +78,12 @@ Every allocation a file asks for (decoded images, decoding buffers, JPEG planes 
 before it is made; each thread holds the buffers of one strip or tile. Reading and writing can be cancelled between strips or
 tiles (`ReadPixelsAsync`, `Save`, `SaveAsync`).
 
+## Saving
+
+A save to a path writes a temporary file next to the target, created on Unix with the permissions of the file it replaces,
+then puts it in place; a stream that cannot seek is written through a temporary file readable by its owner only. Symbolic
+links are followed: a program that saves into a folder other users can write should not trust the path it was given.
+
 ## Threads
 
 An image can be read from several threads at once. Changing an image or the pages of a file must not happen while it is read
