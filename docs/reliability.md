@@ -36,10 +36,13 @@ memory is allocated or the work is done: a hostile file of a few bytes cannot ma
 | `MaxMetadataBytes` | 256 MB | Many tags, or many directories, sharing the same bytes of a small file |
 | `MaxJpegScans` | 100 | Progressive JPEG images made of thousands of cheap scans, which cost minutes to decode |
 
+`TiffReadOptions.Constrained` sets the limits of a phone, or of a server that reads files from anywhere: 256 MB of pixels, 64 MB
+of a stream held in memory, two decoding threads.
+
 <!-- example: ReliabilityExamples.UntrustedFiles -->
 ```csharp
-// On a phone: at most 256 MB for the pixels of an image, two decoding threads.
-var untrusted = TiffReadOptions.Default with { MaxPixelBytes = 256L << 20, MaxDegreeOfParallelism = 2 };
+// On a phone, or a server reading files from anywhere: 256 MB for the pixels of an image, two decoding threads.
+var untrusted = TiffReadOptions.Constrained;
 
 Console.WriteLine($"Pixels: {untrusted.MaxPixelBytes >> 20} MB, threads: {untrusted.MaxDegreeOfParallelism}");
 ```

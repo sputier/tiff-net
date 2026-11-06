@@ -34,6 +34,7 @@ Change an option with a `with` expression: `TiffWriteOptions.Default with { Layo
 | [`MaxDegreeOfParallelism`](#eleris-tiffnet-tiffwriteoptions-maxdegreeofparallelism) | The threads that encode strips or tiles at once: -1 (the default) for every core, 1 to write on the calling thread only. |
 | [`PlanarConfiguration`](#eleris-tiffnet-tiffwriteoptions-planarconfiguration) | The samples of a pixel together ([`TiffPixelOrder.Interleaved`](Eleris.TiffNet.TiffPixelOrder.md#eleris-tiffnet-tiffpixelorder-interleaved), the default) or each channel in its own plane. |
 | [`Predictor`](#eleris-tiffnet-tiffwriteoptions-predictor) | The predictor, with LZW and Deflate: [`TiffPredictor.Auto`](Eleris.TiffNet.TiffPredictor.md#eleris-tiffnet-tiffpredictor-auto) (the default) chooses horizontal differencing for integers of 8 to 32 bits, the floating point predictor for floating point samples, and none for 64-bit integers (where it gains nothing). |
+| [`SkipUnsupportedPages`](#eleris-tiffnet-tiffwriteoptions-skipunsupportedpages) | Whether a save leaves out the pages the library cannot read ([`TiffImage.UnsupportedReason`](Eleris.TiffNet.TiffImage.md#eleris-tiffnet-tiffimage-unsupportedreason): a CMYK thumbnail beside the main image, for example) instead of failing with a [`NotSupportedException`](https://learn.microsoft.com/dotnet/api/system.notsupportedexception); false by default, so that no page is lost without the application asking. |
 | [`TileSize`](#eleris-tiffnet-tiffwriteoptions-tilesize) | The width and height of the tiles, a multiple of 16 (TIFF 6.0): 256 by default. |
 
 ## Methods
@@ -155,6 +156,15 @@ public TiffPredictor Predictor { get; init; }
 **Exceptions**
 
 - [`ArgumentOutOfRangeException`](https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception) — The value is not a predictor of the enumeration.
+
+<a id="eleris-tiffnet-tiffwriteoptions-skipunsupportedpages"></a>
+### `SkipUnsupportedPages`
+
+Whether a save leaves out the pages the library cannot read ([`TiffImage.UnsupportedReason`](Eleris.TiffNet.TiffImage.md#eleris-tiffnet-tiffimage-unsupportedreason): a CMYK thumbnail beside the main image, for example) instead of failing with a [`NotSupportedException`](https://learn.microsoft.com/dotnet/api/system.notsupportedexception); false by default, so that no page is lost without the application asking. It concerns the pages: sub-images are not written in this version.
+
+```csharp
+public bool SkipUnsupportedPages { get; init; }
+```
 
 <a id="eleris-tiffnet-tiffwriteoptions-tilesize"></a>
 ### `TileSize`

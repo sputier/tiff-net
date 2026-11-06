@@ -1,6 +1,6 @@
 # Files and pages
 
-`TiffFile.Open(path)` reads the header and every directory of a file, not its pixels, and keeps the file open until it is
+`TiffFile.Open(path)` (or `OpenAsync`) reads the header and every directory of a file, not its pixels, and keeps the file open until it is
 disposed: the pixels are read on demand, and a region reads only the strips or tiles it covers. `TiffFile.Open(stream)` does
 the same with a stream that seeks (a `FileStream` is read through its handle, from several threads), without copying it.
 `TiffFile.Read(stream)` reads a stream into memory, including one that cannot seek (bounded by `MaxInputBytes`); `ReadAsync`
