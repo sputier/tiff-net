@@ -138,8 +138,10 @@ public sealed partial class TiffImage
             throw new ArgumentException($"These pixels cannot be held: {reason}", nameof(pixels));
         }
 
-        // The one copy: the image does not change when the caller's buffer does.
-        byte[] bytes = MemoryMarshal.AsBytes(pixels).ToArray();
+        // The one copy: the image does not change when the caller's buffer does. The array is filled whole, so not cleared first.
+        var source = MemoryMarshal.AsBytes(pixels);
+        byte[] bytes = GC.AllocateUninitializedArray<byte>(source.Length);
+        source.CopyTo(bytes);
         return (descriptor, TiffSource.FromMemory(bytes, "image"));
     }
 
