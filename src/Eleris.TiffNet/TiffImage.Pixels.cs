@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Eleris.TiffNet.Internal;
 using Eleris.TiffNet.Internal.Pixels;
 
@@ -193,6 +194,32 @@ public sealed partial class TiffImage
     private ResourceBudget Budget(CancellationToken cancellationToken) => _pixels is not null
         ? new(TiffReadOptions.Default, "image", cancellationToken)
         : new(File!.Options, File.Source.Name, cancellationToken);
+
+    /// <summary>
+    /// Reads the raw samples of a region (one channel, or all of them interleaved) into bytes, in the order of the machine: what
+    /// the writer encodes. On the calling thread, within the limits of the file.
+    /// </summary>
+    internal void ReadBlock(int x, int y, int width, int height, int? channel, Span<byte> destination)
+    {
+        ThrowIfUnsupported();
+        var request = new PixelRequest(x, y, width, height, channel, TiffPixelOrder.Interleaved, TiffPixelScale.Stored);
+        var budget = Budget(CancellationToken.None);
+        var plan = PixelPlan.Create(Descriptor, budget, request, SampleConversion.SizeOf(SampleType), parallel: false);
+        switch (SampleType)
+        {
+            case TiffSampleType.UInt8: Dispatch(plan, destination, null, budget); break;
+            case TiffSampleType.Int8: Dispatch(plan, MemoryMarshal.Cast<byte, sbyte>(destination), null, budget); break;
+            case TiffSampleType.UInt16: Dispatch(plan, MemoryMarshal.Cast<byte, ushort>(destination), null, budget); break;
+            case TiffSampleType.Int16: Dispatch(plan, MemoryMarshal.Cast<byte, short>(destination), null, budget); break;
+            case TiffSampleType.UInt32: Dispatch(plan, MemoryMarshal.Cast<byte, uint>(destination), null, budget); break;
+            case TiffSampleType.Int32: Dispatch(plan, MemoryMarshal.Cast<byte, int>(destination), null, budget); break;
+            case TiffSampleType.UInt64: Dispatch(plan, MemoryMarshal.Cast<byte, ulong>(destination), null, budget); break;
+            case TiffSampleType.Int64: Dispatch(plan, MemoryMarshal.Cast<byte, long>(destination), null, budget); break;
+            case TiffSampleType.Float16: Dispatch(plan, MemoryMarshal.Cast<byte, Half>(destination), null, budget); break;
+            case TiffSampleType.Float32: Dispatch(plan, MemoryMarshal.Cast<byte, float>(destination), null, budget); break;
+            default: Dispatch(plan, MemoryMarshal.Cast<byte, double>(destination), null, budget); break;
+        }
+    }
 
     private void Dispatch<T>(PixelPlan plan, Span<T> destination, T[]? array, ResourceBudget budget) where T : unmanaged, INumber<T>
     {
