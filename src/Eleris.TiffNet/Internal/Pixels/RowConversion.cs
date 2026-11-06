@@ -69,7 +69,11 @@ internal static class RowConversion<TD, TOut>
         ref TOut d = ref MemoryMarshal.GetReference(to);
         if (identity)
         {
-            for (int k = 0; k < count; k++)
+            // One channel of interleaved pixels into a plane: shuffles first, the rest one by one.
+            int k = destinationStride == 1
+                ? Writing.Channels.Vectorised(MemoryMarshal.AsBytes(from), sourceStride, 0, Unsafe.SizeOf<TD>(), count, MemoryMarshal.AsBytes(to[..count]))
+                : 0;
+            for (; k < count; k++)
             {
                 TD value = Unsafe.Add(ref s, k * sourceStride);
                 Unsafe.Add(ref d, k * destinationStride) = Unsafe.As<TD, TOut>(ref value);
