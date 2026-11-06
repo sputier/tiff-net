@@ -19,7 +19,9 @@ public sealed partial class TiffFile
     /// <exception cref="InvalidOperationException">The file has no page, or a classic file (<see cref="TiffBigTiff.Never"/>)
     /// would exceed 4 GB.</exception>
     /// <exception cref="NotSupportedException">A page cannot be read (<see cref="TiffImage.UnsupportedReason"/>).</exception>
-    /// <exception cref="TiffException">The pixels of a page read from a file are damaged.</exception>
+    /// <exception cref="TiffException">The pixels of a page read from a file are damaged, or exceed the
+    /// <see cref="TiffReadOptions.MaxPixelBytes"/> it was opened with: saving decodes every pixel, as reading the whole image does
+    /// (<see cref="TiffException.Limit"/> says so).</exception>
     /// <exception cref="IOException">The file cannot be written.</exception>
     /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled; the file is left as it was.</exception>
     /// <param name="cancellationToken">Stops the write between strips or tiles.</param>
@@ -29,7 +31,8 @@ public sealed partial class TiffFile
         Platform.EnsureSupported();
         options ??= TiffWriteOptions.Default;
         TiffImage[] pages = [.. _images];
-        SafeFile.Replace(path, stream => TiffFileWriter.Write(pages, stream, options, cancellationToken));
+        var encoders = TiffFileWriter.Prepare(pages, options, cancellationToken);
+        SafeFile.Replace(path, stream => TiffFileWriter.Write(pages, encoders, stream, options, cancellationToken));
     }
 
     /// <summary>
@@ -40,7 +43,9 @@ public sealed partial class TiffFile
     /// <param name="options">How to write; <see cref="TiffWriteOptions.Default"/> when <see langword="null"/>.</param>
     /// <exception cref="InvalidOperationException">The file has no page, or a classic file would exceed 4 GB.</exception>
     /// <exception cref="NotSupportedException">A page cannot be read.</exception>
-    /// <exception cref="TiffException">The pixels of a page read from a file are damaged.</exception>
+    /// <exception cref="TiffException">The pixels of a page read from a file are damaged, or exceed the
+    /// <see cref="TiffReadOptions.MaxPixelBytes"/> it was opened with: saving decodes every pixel, as reading the whole image does
+    /// (<see cref="TiffException.Limit"/> says so).</exception>
     /// <exception cref="IOException">The stream cannot be written.</exception>
     /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled; what is written of the
     /// stream is incomplete.</exception>
@@ -51,7 +56,8 @@ public sealed partial class TiffFile
         Platform.EnsureSupported();
         options ??= TiffWriteOptions.Default;
         TiffImage[] pages = [.. _images];
-        SafeFile.ToStream(stream, output => TiffFileWriter.Write(pages, output, options, cancellationToken));
+        var encoders = TiffFileWriter.Prepare(pages, options, cancellationToken);
+        SafeFile.ToStream(stream, output => TiffFileWriter.Write(pages, encoders, output, options, cancellationToken));
     }
 
     /// <summary>

@@ -290,7 +290,7 @@ public void Save(Stream stream, TiffWriteOptions? options = null, CancellationTo
 
 - [`InvalidOperationException`](https://learn.microsoft.com/dotnet/api/system.invalidoperationexception) — The file has no page, or a classic file would exceed 4 GB.
 - [`NotSupportedException`](https://learn.microsoft.com/dotnet/api/system.notsupportedexception) — A page cannot be read.
-- [`TiffException`](Eleris.TiffNet.TiffException.md) — The pixels of a page read from a file are damaged.
+- [`TiffException`](Eleris.TiffNet.TiffException.md) — The pixels of a page read from a file are damaged, or exceed the [`TiffReadOptions.MaxPixelBytes`](Eleris.TiffNet.TiffReadOptions.md#eleris-tiffnet-tiffreadoptions-maxpixelbytes) it was opened with: saving decodes every pixel, as reading the whole image does ([`TiffException.Limit`](Eleris.TiffNet.TiffException.md#eleris-tiffnet-tiffexception-limit) says so).
 - [`IOException`](https://learn.microsoft.com/dotnet/api/system.io.ioexception) — The stream cannot be written.
 - [`OperationCanceledException`](https://learn.microsoft.com/dotnet/api/system.operationcanceledexception) — `cancellationToken` was cancelled; what is written of the stream is incomplete.
 
@@ -313,7 +313,7 @@ public void Save(string path, TiffWriteOptions? options = null, CancellationToke
 
 - [`InvalidOperationException`](https://learn.microsoft.com/dotnet/api/system.invalidoperationexception) — The file has no page, or a classic file ([`TiffBigTiff.Never`](Eleris.TiffNet.TiffBigTiff.md#eleris-tiffnet-tiffbigtiff-never)) would exceed 4 GB.
 - [`NotSupportedException`](https://learn.microsoft.com/dotnet/api/system.notsupportedexception) — A page cannot be read ([`TiffImage.UnsupportedReason`](Eleris.TiffNet.TiffImage.md#eleris-tiffnet-tiffimage-unsupportedreason)).
-- [`TiffException`](Eleris.TiffNet.TiffException.md) — The pixels of a page read from a file are damaged.
+- [`TiffException`](Eleris.TiffNet.TiffException.md) — The pixels of a page read from a file are damaged, or exceed the [`TiffReadOptions.MaxPixelBytes`](Eleris.TiffNet.TiffReadOptions.md#eleris-tiffnet-tiffreadoptions-maxpixelbytes) it was opened with: saving decodes every pixel, as reading the whole image does ([`TiffException.Limit`](Eleris.TiffNet.TiffException.md#eleris-tiffnet-tiffexception-limit) says so).
 - [`IOException`](https://learn.microsoft.com/dotnet/api/system.io.ioexception) — The file cannot be written.
 - [`OperationCanceledException`](https://learn.microsoft.com/dotnet/api/system.operationcanceledexception) — `cancellationToken` was cancelled; the file is left as it was.
 

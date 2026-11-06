@@ -136,8 +136,11 @@ internal sealed class StructureReader
 
     private int CountSize => Header.BigTiff ? 8 : 2;
 
-    /// <summary>The memory an entry takes in the table of a directory (its key, its value, the links of the table).</summary>
-    private const int EntryMemory = 48;
+    /// <summary>
+    /// The memory an entry takes in the table of a directory: 48 bytes of entry (key, value, links) and 4 of bucket, for a table
+    /// that grows up to twice its entries.
+    /// </summary>
+    private const int EntryMemory = 104;
 
     private int EntrySize => Header.BigTiff ? 20 : 12;
 
@@ -178,7 +181,7 @@ internal sealed class StructureReader
             throw Budget.Invalid($"the directory at offset {offset} declares {count} entries, more than the file holds.");
         }
 
-        // The bytes of the entries, and the table that holds them once read (an entry of the table takes about 48 bytes).
+        // The bytes of the entries, and the table that holds them once read.
         Budget.ReserveMetadata(entriesLength + OffsetSize + (long)count * EntryMemory, $"the directory at offset {offset}");
         byte[] bytes = new byte[entriesLength + OffsetSize];
         long available = Math.Min(bytes.Length, Source.Length - entriesStart);

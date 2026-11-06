@@ -41,6 +41,27 @@ public class HostileSaveTests
     }
 
     [Fact]
+    public void A_refused_save_creates_nothing_and_says_how_to_save_the_image()
+    {
+        var builder = new TiffBuilder { Data = new byte[200] };
+        builder.AddDirectory().Image(65_536, 2_000_000_000).Remove(279).Add(279, TiffTagType.Long, 200);
+        using var file = TiffFile.Read(new MemoryStream(builder.Build()));
+        string path = SaveTests.Temporary();
+        try
+        {
+            var thrown = Assert.Throws<TiffException>(() => file.Save(path));
+
+            Assert.Equal("MaxPixelBytes", thrown.Limit);
+            Assert.Contains("Open the file with a larger MaxPixelBytes", thrown.Message, StringComparison.Ordinal);
+            Assert.Empty(Directory.GetFiles(Path.GetDirectoryName(path)!));
+        }
+        finally
+        {
+            SaveTests.Delete(path);
+        }
+    }
+
+    [Fact]
     public void An_image_within_the_limits_is_saved_band_by_band()
     {
         // The same file within MaxPixelBytes: saved, every row read back.

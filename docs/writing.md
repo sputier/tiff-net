@@ -9,6 +9,9 @@ accident. `SetPixels` replaces the pixels of an image, `SetExtraChannels` says w
   permissions of a replaced file are kept, and on Unix the temporary file has them from its creation (a private file is never
   readable by others while it is written); the file being read can be the target. A symbolic link is written through: do not
   save into a folder that other users can write.
+- **An image opened from a file** is saved band after band, but its pixels count in the `MaxPixelBytes` the file was opened
+  with, as reading the whole image would: open a file larger than 2 GB of pixels with a larger limit to save it again, or copy
+  it by region into a `TiffImageWriter`.
 - **To a stream**: from its position, left open; a stream that cannot seek is written through a temporary file (readable by
   its owner only on Unix). `SaveAsync` encodes on the threads of the pool.
 

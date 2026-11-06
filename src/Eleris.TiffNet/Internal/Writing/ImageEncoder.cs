@@ -51,8 +51,9 @@ internal sealed class ImageEncoder
         Planes = Planar ? Channels : 1;
         if (across * down * Planes > Array.MaxLength)
         {
-            throw new NotSupportedException(
-                $"The image would have {across * down * Planes} strips or tiles, more than a table holds: use larger tiles.");
+            throw new NotSupportedException(Tiled
+                ? $"The image would have {across * down * Planes} tiles, more than a table holds: use larger tiles."
+                : $"The image would have {across * down * Planes} strips, more than a table holds: write it in tiles.");
         }
 
         Across = (int)across;
@@ -60,7 +61,10 @@ internal sealed class ImageEncoder
         RowBytes = (long)BlockWidth * samples * BytesPerSample;
         if (RowBytes * BlockHeight > Array.MaxLength)
         {
-            throw new ArgumentException($"Blocks of {BlockWidth} x {BlockHeight} pixels are larger than an array: use smaller tiles.");
+            // Tiles too large are a choice of the options; a row larger than an array is the image itself.
+            throw Tiled
+                ? new ArgumentException($"Tiles of {BlockWidth} x {BlockHeight} pixels are larger than an array: use smaller tiles.")
+                : new NotSupportedException($"Rows of {Width} pixels are larger than an array: write the image in tiles.");
         }
     }
 
