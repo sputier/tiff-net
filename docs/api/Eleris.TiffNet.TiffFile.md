@@ -207,7 +207,7 @@ public static TiffFile Open(Stream stream, TiffReadOptions? options = null, bool
 
 - `stream` — The stream; it must seek and be read, and must not be used by the application while the file is open.
 - `options` — The tolerance and the limits of the read; [`TiffReadOptions.Default`](Eleris.TiffNet.TiffReadOptions.md#eleris-tiffnet-tiffreadoptions-default) when `null`.
-- `leaveOpen` — Whether the stream stays open when the file is disposed.
+- `leaveOpen` — Whether the stream stays open when the file is disposed (or when opening it fails).
 
 **Returns**
 

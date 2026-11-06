@@ -49,7 +49,7 @@ internal abstract class TiffSource : IDisposable
     }
 
     /// <summary>The bytes from <paramref name="offset"/> to <paramref name="offset"/> + <paramref name="length"/>, as a stream read in order.</summary>
-    public Stream OpenRange(long offset, long length) => new RangeStream(this, offset, length);
+    public RangeStream OpenRange(long offset, long length) => new(this, offset, length);
 
     /// <summary>Reads exactly <paramref name="destination"/>.Length bytes at <paramref name="offset"/>, which are within bounds.</summary>
     protected abstract void ReadCore(long offset, Span<byte> destination);
@@ -326,10 +326,25 @@ internal sealed class RangeStream(TiffSource source, long offset, long length) :
         set => throw new NotSupportedException();
     }
 
+    /// <summary>
+    /// The failure of the source (the file or the stream of the application) during the last read: kept so that the decoder can
+    /// give it to the caller as it is, not as damaged data.
+    /// </summary>
+    public Exception? Failure { get; private set; }
+
     public override int Read(Span<byte> buffer)
     {
         int count = (int)Math.Min(buffer.Length, length - _position);
-        source.ReadExactly(offset + _position, buffer[..count]);
+        try
+        {
+            source.ReadExactly(offset + _position, buffer[..count]);
+        }
+        catch (Exception ex)
+        {
+            Failure = ex;
+            throw;
+        }
+
         _position += count;
         return count;
     }
