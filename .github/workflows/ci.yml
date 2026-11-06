@@ -52,6 +52,8 @@ jobs:
         run: dotnet build Eleris.TiffNet.slnx -c Release
       - name: Test with the corpus (every test, the interop gate included), with the coverage of the code
         run: dotnet test tests/Eleris.TiffNet.Tests -c Release --no-build --collect "XPlat Code Coverage" --results-directory coverage
+        env:
+          TIFFNET_TIME_FACTOR: "3"   # the instrumentation of the coverage slows the tests with time bounds
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage

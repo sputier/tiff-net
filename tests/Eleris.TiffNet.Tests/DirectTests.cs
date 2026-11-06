@@ -68,7 +68,8 @@ public class DirectTests
     {
         // The bits at the top of the data, then zeros.
         ulong word = size == 0 ? 0 : (ulong)bits << (64 - size);
-        byte[] data = [.. BitConverter.GetBytes(word).Reverse(), 0];
+        byte[] data = new byte[9];
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt64BigEndian(data, word);
         var reader = new JpegBitReader(data, 0);
 
         Assert.Equal(expected, reader.ReadDifference(size));

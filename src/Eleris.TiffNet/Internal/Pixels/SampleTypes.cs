@@ -63,6 +63,6 @@ internal static class SampleTypes
 
     private static class Cache<T> where T : unmanaged
     {
-        public static readonly TiffSampleType? Type = Array.Find(Table, i => i.ClrType == typeof(T)) is { ClrType: not null } info ? info.Type : null;
+        public static readonly TiffSampleType? Type = Array.FindIndex(Table, i => i.ClrType == typeof(T)) is var index and >= 0 ? Table[index].Type : null;
     }
 }

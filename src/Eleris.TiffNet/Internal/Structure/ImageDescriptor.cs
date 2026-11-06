@@ -210,12 +210,7 @@ internal sealed record ImageDescriptor
         IReadOnlyList<TiffExtraChannelKind> extras, bool planar)
     {
         int bytes = Pixels.SampleConversion.SizeOf(type);
-        int format = type switch
-        {
-            TiffSampleType.Float16 or TiffSampleType.Float32 or TiffSampleType.Float64 => 3,
-            TiffSampleType.Int8 or TiffSampleType.Int16 or TiffSampleType.Int32 or TiffSampleType.Int64 => 2,
-            _ => 1,
-        };
+        int format = Pixels.SampleTypes.Of(type).Format;
         long plane = width * height * bytes;
         int planes = planar ? channels : 1;
         var descriptor = new ImageDescriptor
