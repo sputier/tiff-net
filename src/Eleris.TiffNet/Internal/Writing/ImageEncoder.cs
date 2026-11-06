@@ -308,10 +308,7 @@ internal sealed class ImageEncoder
             }
 
             // One channel of interleaved pixels.
-            for (int x = 0; x < width; x++)
-            {
-                source.Slice(x * pixelBytes + plane * BytesPerSample, BytesPerSample).CopyTo(target[(x * BytesPerSample)..]);
-            }
+            Writing.Channels.Extract(source, Channels, plane, BytesPerSample, width, target);
         }
 
         return BlockCodec.Encode(raw, rows, rowBytes, Planar ? 1 : Channels, BytesPerSample, Predictor, Compression, Level);

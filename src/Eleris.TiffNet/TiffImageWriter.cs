@@ -442,10 +442,7 @@ public sealed class TiffImageWriter : IDisposable
             for (int c = 0; c < _channels; c++)
             {
                 byte[] plane = System.Buffers.ArrayPool<byte>.Shared.Rent(rows * width * _bytesPerSample);
-                for (int p = 0; p < rows * width; p++)
-                {
-                    raw.AsSpan(p * pixelBytes + c * _bytesPerSample, _bytesPerSample).CopyTo(plane.AsSpan(p * _bytesPerSample));
-                }
+                Channels.Extract(raw, _channels, c, _bytesPerSample, rows * width, plane);
 
                 Enqueue(c * perPlane + index, plane, rows, width * _bytesPerSample, 1);
             }
