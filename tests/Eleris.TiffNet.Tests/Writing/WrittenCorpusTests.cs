@@ -40,9 +40,40 @@ public class WrittenCorpusTests
         Write<float>("float32", folder, expected);
         Write<double>("float64", folder, expected);
         WriteLarge(folder, expected);
+        WriteAlphaMosaic(folder, expected);
         File.WriteAllText(Path.Combine(folder, "expected.json"), JsonSerializer.Serialize(expected, Indented));
 
         Assert.True(expected.Count > 1800, $"only {expected.Count} files");
+    }
+
+    /// <summary>A mosaic written piece by piece with an unassociated alpha (tools/check_written.py checks its ExtraSamples).</summary>
+    private static void WriteAlphaMosaic(string folder, SortedDictionary<string, string> expected)
+    {
+        byte[] pixels = [.. Enumerable.Range(0, 64 * 48 * 4).Select(i => (byte)(i * 7))];
+        const string name = "writer-rgba-unassociated.tif";
+        using (var writer = TiffImageWriter.Create(Path.Combine(folder, name), 64, 48, TiffSampleType.UInt8, 4, TiffColorModel.Rgb,
+            options: TiffWriteOptions.Default with { Layout = TiffLayout.Tiles, TileSize = 32 }))
+        {
+            writer.SetExtraChannels(TiffExtraChannelKind.UnassociatedAlpha);
+            for (int ty = 0; ty < 2; ty++)
+            {
+                for (int tx = 0; tx < 2; tx++)
+                {
+                    int h = Math.Min(32, 48 - ty * 32);
+                    byte[] tile = new byte[32 * h * 4];
+                    for (int r = 0; r < h; r++)
+                    {
+                        pixels.AsSpan(((ty * 32 + r) * 64 + tx * 32) * 4, 32 * 4).CopyTo(tile.AsSpan(r * 32 * 4));
+                    }
+
+                    writer.WriteTile<byte>(tx, ty, tile);
+                }
+            }
+
+            writer.Complete();
+        }
+
+        expected[name] = Convert.ToHexString(SHA256.HashData(pixels));
     }
 
     /// <summary>Images of many strips and several bands of rows (the blocks small images never reach), each layout and order.</summary>

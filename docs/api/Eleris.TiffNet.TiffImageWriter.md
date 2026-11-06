@@ -31,6 +31,7 @@ The path overload writes a temporary file that replaces the target on [`TiffImag
 | [`Create(Stream, long, long, TiffSampleType, int, TiffColorModel?, TiffMetadata, TiffWriteOptions)`](#eleris-tiffnet-tiffimagewriter-create-system-io-stream-system-int64-system-int64-eleris-tiffnet-tiffsampletype-system-int32-system-nullable-eleris-tiffnet-tiffcolormodel-eleris-tiffnet-tiffmetadata-eleris-tiffnet-tiffwriteoptions) | Starts writing an image into a stream, from its current position; the stream must seek and is left open. |
 | [`Create(string, long, long, TiffSampleType, int, TiffColorModel?, TiffMetadata, TiffWriteOptions)`](#eleris-tiffnet-tiffimagewriter-create-system-string-system-int64-system-int64-eleris-tiffnet-tiffsampletype-system-int32-system-nullable-eleris-tiffnet-tiffcolormodel-eleris-tiffnet-tiffmetadata-eleris-tiffnet-tiffwriteoptions) | Starts writing an image into a file, through a temporary file that replaces it on [`TiffImageWriter.Complete`](#eleris-tiffnet-tiffimagewriter-complete). |
 | [`Dispose()`](#eleris-tiffnet-tiffimagewriter-dispose) | Ends the writer; without [`TiffImageWriter.Complete`](#eleris-tiffnet-tiffimagewriter-complete), the output is abandoned (the temporary file of a path is removed). |
+| [`SetExtraChannels(TiffExtraChannelKind[])`](#eleris-tiffnet-tiffimagewriter-setextrachannels-eleris-tiffnet-tiffextrachannelkind) | Sets what each extra channel holds (the channels after the colour ones): alpha, associated (premultiplied) or not, or other data, as [`TiffImage.SetExtraChannels`](Eleris.TiffNet.TiffImage.md#eleris-tiffnet-tiffimage-setextrachannels-eleris-tiffnet-tiffextrachannelkind) does. |
 | [`WriteRows<T>(ReadOnlySpan<T>, int)`](#eleris-tiffnet-tiffimagewriter-writerows-1-system-readonlyspan-0-system-int32) | Writes the next rows of the image, top to bottom ([`TiffLayout.Strips`](Eleris.TiffNet.TiffLayout.md#eleris-tiffnet-tifflayout-strips)). |
 | [`WriteTile<T>(long, long, ReadOnlySpan<T>)`](#eleris-tiffnet-tiffimagewriter-writetile-1-system-int64-system-int64-system-readonlyspan-0) | Writes a tile ([`TiffLayout.Tiles`](Eleris.TiffNet.TiffLayout.md#eleris-tiffnet-tifflayout-tiles)), in any order, each once. |
 
@@ -134,6 +135,25 @@ Ends the writer; without [`TiffImageWriter.Complete`](#eleris-tiffnet-tiffimagew
 ```csharp
 public void Dispose()
 ```
+
+<a id="eleris-tiffnet-tiffimagewriter-setextrachannels-eleris-tiffnet-tiffextrachannelkind"></a>
+### `SetExtraChannels(TiffExtraChannelKind[])`
+
+Sets what each extra channel holds (the channels after the colour ones): alpha, associated (premultiplied) or not, or other data, as [`TiffImage.SetExtraChannels`](Eleris.TiffNet.TiffImage.md#eleris-tiffnet-tiffimage-setextrachannels-eleris-tiffnet-tiffextrachannelkind) does. They are [`TiffExtraChannelKind.Data`](Eleris.TiffNet.TiffExtraChannelKind.md#eleris-tiffnet-tiffextrachannelkind-data) until set; the directory is written by [`TiffImageWriter.Complete`](#eleris-tiffnet-tiffimagewriter-complete), so they can be set until then.
+
+```csharp
+public void SetExtraChannels(params TiffExtraChannelKind[] kinds)
+```
+
+**Parameters**
+
+- `kinds` — One kind per extra channel, in order.
+
+**Exceptions**
+
+- [`ArgumentException`](https://learn.microsoft.com/dotnet/api/system.argumentexception) — There is not one kind per extra channel.
+- [`ArgumentNullException`](https://learn.microsoft.com/dotnet/api/system.argumentnullexception) — `kinds` is null.
+- [`InvalidOperationException`](https://learn.microsoft.com/dotnet/api/system.invalidoperationexception) — The image is completed.
 
 <a id="eleris-tiffnet-tiffimagewriter-writerows-1-system-readonlyspan-0-system-int32"></a>
 ### `WriteRows<T>(ReadOnlySpan<T>, int)`

@@ -32,6 +32,7 @@ public sealed class TiffImageWriter : IDisposable
     private readonly int _bytesPerSample;
     private readonly TiffSampleType _sampleType;
     private readonly TiffColorModel _colorModel;
+    private TiffExtraChannelKind[] _extraChannels;
     private readonly TiffWriteOptions _options;
     private readonly TiffPredictor _predictor;
     private readonly bool _tiled;
@@ -78,6 +79,8 @@ public sealed class TiffImageWriter : IDisposable
         {
             throw new ArgumentException($"The colour model {_colorModel} does not fit {channels} channels.", nameof(colorModel));
         }
+
+        _extraChannels = [.. Enumerable.Repeat(TiffExtraChannelKind.Data, channels - (_colorModel == TiffColorModel.Rgb ? 3 : 1))];
 
         _options = options ?? TiffWriteOptions.Default;
         _output = output;
@@ -144,6 +147,40 @@ public sealed class TiffImageWriter : IDisposable
 
     /// <summary>The height of the image, in pixels.</summary>
     public long Height { get; }
+
+    /// <summary>
+    /// Sets what each extra channel holds (the channels after the colour ones): alpha, associated (premultiplied) or not, or other
+    /// data, as <see cref="TiffImage.SetExtraChannels"/> does. They are <see cref="TiffExtraChannelKind.Data"/> until set; the
+    /// directory is written by <see cref="Complete"/>, so they can be set until then.
+    /// </summary>
+    /// <param name="kinds">One kind per extra channel, in order.</param>
+    /// <exception cref="ArgumentException">There is not one kind per extra channel.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="kinds"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">The image is completed.</exception>
+    public void SetExtraChannels(params TiffExtraChannelKind[] kinds)
+    {
+        ArgumentNullException.ThrowIfNull(kinds);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_completed)
+        {
+            throw new InvalidOperationException("The image is completed.");
+        }
+
+        if (kinds.Length != _extraChannels.Length)
+        {
+            throw new ArgumentException($"The image has {_extraChannels.Length} extra channels, not {kinds.Length}.", nameof(kinds));
+        }
+
+        foreach (var kind in kinds)
+        {
+            if (!Enum.IsDefined(kind))
+            {
+                throw new ArgumentException($"{kind} is not a kind of extra channel.", nameof(kinds));
+            }
+        }
+
+        _extraChannels = [.. kinds];
+    }
 
     /// <summary>Starts writing an image into a file, through a temporary file that replaces it on <see cref="Complete"/>.</summary>
     /// <param name="path">The path of the file.</param>
@@ -597,8 +634,7 @@ public sealed class TiffImageWriter : IDisposable
 
     private List<DirectoryEntry> Entries()
     {
-        int colours = _colorModel == TiffColorModel.Rgb ? 3 : 1;
-        var shape = new ImageShape(Width, Height, _channels, _sampleType, _colorModel, [.. Enumerable.Repeat(TiffExtraChannelKind.Data, _channels - colours)],
+        var shape = new ImageShape(Width, Height, _channels, _sampleType, _colorModel, _extraChannels,
             0, _tiled, _planar, _blockWidth, _blockHeight, _options.Compression, _predictor);
         return TiffFileWriter.Entries(shape, _metadata, _offsets, _counts, _writer.BigTiff);
     }
