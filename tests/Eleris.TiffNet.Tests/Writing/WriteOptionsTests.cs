@@ -70,9 +70,18 @@ public class WriteOptionsTests
     {
         var storage = new TiffStorage
         {
-            Compression = TiffCompression.Lzw, Predictor = TiffPredictor.Horizontal, Layout = TiffLayout.Tiles, TileWidth = 128, TileHeight = 128,
-            RowsPerStrip = 0, PlanarConfiguration = TiffPixelOrder.Planar, BigEndian = true, BigTiff = true, Orientation = 1,
-            Photometric = TiffPhotometric.Rgb, BitsPerSample = 16,
+            Compression = TiffCompression.Lzw,
+            Predictor = TiffPredictor.Horizontal,
+            Layout = TiffLayout.Tiles,
+            TileWidth = 128,
+            TileHeight = 128,
+            RowsPerStrip = 0,
+            PlanarConfiguration = TiffPixelOrder.Planar,
+            BigEndian = true,
+            BigTiff = true,
+            Orientation = 1,
+            Photometric = TiffPhotometric.Rgb,
+            BitsPerSample = 16,
         };
 
         var options = TiffWriteOptions.From(storage);

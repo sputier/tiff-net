@@ -45,14 +45,11 @@ public class StorageTests
         Assert.Equal((TiffLayout.Strips, 0, 0), (Of("multipage.tif").Layout, Of("multipage.tif").TileWidth, Of("multipage.tif").TileHeight));
     }
 
-    [Fact]
+    [SkippableFact]
+    [Trait("Category", "Interop")]
     public void The_storage_of_every_interop_file_matches_its_name()
     {
-        if (!Directory.Exists(InteropCorpus.Folder))
-        {
-            Assert.True(InteropCorpus.Skipped, $"The interop corpus is not generated; set {InteropCorpus.SkipVariable}=1 to skip.");
-            return;
-        }
+        InteropCorpus.RequireGenerated();
 
         foreach (var f in InteropCorpus.Files)
         {
@@ -60,7 +57,13 @@ public class StorageTests
             var s = file.Primary.Storage!;
             int code = f.Compression switch
             {
-                "none" => 1, "lzw" => 5, "zlib" => 8, "packbits" => 32773, "zstd" => 50000, _ when f.Compression.StartsWith("jpeg", StringComparison.Ordinal) => 7, _ => 34925,
+                "none" => 1,
+                "lzw" => 5,
+                "zlib" => 8,
+                "packbits" => 32773,
+                "zstd" => 50000,
+                _ when f.Compression.StartsWith("jpeg", StringComparison.Ordinal) => 7,
+                _ => 34925,
             };
             string what = f.Name;
             Assert.True((int)s.Compression == code, what);

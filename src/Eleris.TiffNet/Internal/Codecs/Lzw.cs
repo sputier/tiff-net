@@ -83,7 +83,7 @@ internal static class Lzw
         overflow = false;
 
         // Locals are initialised and the loop has no condition so that every rewrite of a mutation tool still compiles.
-        for (;;)
+        for (; ; )
         {
             if (typeof(TOrder) == typeof(MsbFirst) && count <= 56 && position + 8 <= source.Length)
             {

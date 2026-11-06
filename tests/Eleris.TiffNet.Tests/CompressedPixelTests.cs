@@ -113,14 +113,11 @@ public class CompressedPixelTests
         Assert.Equal(100 * 10, strict.Primary.ReadRegion<byte>(0, 0, 100, 10).Length);   // a part of the strip is not checked
     }
 
-    [Fact]
+    [SkippableFact]
+    [Trait("Category", "Interop")]
     public void Tiled_compressed_regions_are_the_same_samples_as_the_whole_image()
     {
-        if (!Directory.Exists(InteropCorpus.Folder))
-        {
-            Assert.True(InteropCorpus.Skipped);
-            return;
-        }
+        InteropCorpus.RequireGenerated();
 
         int checkedFiles = 0;
         foreach (var f in InteropCorpus.Files.Where(f => f.Tiled && f.Compression is "lzw" or "zlib" or "packbits").Take(60))

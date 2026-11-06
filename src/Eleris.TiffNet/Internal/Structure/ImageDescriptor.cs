@@ -155,84 +155,9 @@ internal sealed record ImageDescriptor
 
         // The layout and the tables of strips or tiles, coherent with the geometry and within the file.
         bool tiled = directory.TryGet(TileOffsetsTag, out _) || directory.TryGet(TileWidthTag, out _);
-        long blockWidth = 0, blockHeight = 0, across = 0, down = 0;
-        if (tiled)
-        {
-            blockWidth = Required(reader, directory, TileWidthTag, "TileWidth");
-            blockHeight = Required(reader, directory, TileLengthTag, "TileLength");
-            if (blockWidth <= 0 || blockHeight <= 0 || blockWidth > uint.MaxValue || blockHeight > uint.MaxValue)
-            {
-                throw budget.Invalid($"the tiles are {blockWidth} x {blockHeight} pixels.");
-            }
-
-            if (strict && (blockWidth % 16 != 0 || blockHeight % 16 != 0))
-            {
-                throw budget.Invalid($"the tiles are {blockWidth} x {blockHeight}, not multiples of 16.");
-            }
-
-            across = (width + blockWidth - 1) / blockWidth;
-            down = (height + blockHeight - 1) / blockHeight;
-        }
-        else
-        {
-            long rows = reader.ReadInteger(directory, RowsPerStripTag, uint.MaxValue);
-            blockHeight = rows <= 0 || rows > height ? height : rows;
-            blockWidth = width;
-            across = 1;
-            down = (height + blockHeight - 1) / blockHeight;
-        }
-
-        int planes = planar ? samples : 1;
-        long blocks = 0;
-        try
-        {
-            blocks = checked(across * down * planes);
-        }
-        catch (OverflowException)
-        {
-            throw budget.Invalid($"the image would have more than 2^63 {(tiled ? "tiles" : "strips")}.");
-        }
-
-        ushort offsetsTag = tiled ? TileOffsetsTag : StripOffsetsTag;
-        ushort countsTag = tiled ? TileByteCountsTag : StripByteCountsTag;
-        string unit = tiled ? "tile" : "strip";
-        long[] offsets = Table(reader, directory, offsetsTag, blocks, unit, "offsets");
-        long[] counts = [];
-        if (directory.TryGet(countsTag, out _))
-        {
-            counts = Table(reader, directory, countsTag, blocks, unit, "byte counts");
-        }
-        else if (compression == 1 && !strict)
-        {
-            // Uncompressed data: the size of each block follows from the geometry, as libtiff computes it.
-            long rowBytes = BytesPerRow(blockWidth, planar ? 1 : samples, (int)bits[0]);
-            counts = new long[blocks];
-            for (long i = 0; i < blocks; i++)
-            {
-                long firstRow = tiled ? 0 : i % down * blockHeight;
-                counts[i] = rowBytes * (tiled ? blockHeight : Math.Min(blockHeight, height - firstRow));
-            }
-        }
-        else
-        {
-            throw budget.Invalid($"the {unit} byte counts are missing.");
-        }
-
-        for (int i = 0; i < offsets.Length; i++)
-        {
-            if (offsets[i] < 0 || counts[i] < 0 || offsets[i] > reader.Source.Length)
-            {
-                throw budget.Invalid($"{unit} {i} starts outside the file (offset {offsets[i]}, {counts[i]} bytes).");
-            }
-
-            if (counts[i] > reader.Source.Length - offsets[i])
-            {
-                // A last strip cut by a truncated file: read what there is (the decoder reports what is missing).
-                counts[i] = strict
-                    ? throw budget.Invalid($"{unit} {i} ends beyond the end of the file.")
-                    : reader.Source.Length - offsets[i];
-            }
-        }
+        var blocks = ReadBlocks(reader, directory, tiled, width, height);
+        var (offsets, counts) = ReadTables(reader, directory, blocks, tiled, planar ? samples : 1, planar ? 1 : samples, compression, (int)bits[0], height);
+        long blockWidth = blocks.Width, blockHeight = blocks.Height;
 
         long predictor = reader.ReadInteger(directory, PredictorTag, 1, ushort.MaxValue);
         long fillOrder = reader.ReadInteger(directory, FillOrderTag, 1, ushort.MaxValue);
@@ -285,12 +210,7 @@ internal sealed record ImageDescriptor
         IReadOnlyList<TiffExtraChannelKind> extras, bool planar)
     {
         int bytes = Pixels.SampleConversion.SizeOf(type);
-        int format = type switch
-        {
-            TiffSampleType.Float16 or TiffSampleType.Float32 or TiffSampleType.Float64 => 3,
-            TiffSampleType.Int8 or TiffSampleType.Int16 or TiffSampleType.Int32 or TiffSampleType.Int64 => 2,
-            _ => 1,
-        };
+        int format = Pixels.SampleTypes.Of(type).Format;
         long plane = width * height * bytes;
         int planes = planar ? channels : 1;
         var descriptor = new ImageDescriptor
@@ -316,6 +236,97 @@ internal sealed record ImageDescriptor
         long[] bits = [.. Enumerable.Repeat((long)bytes * 8, channels)];
         long[] formats = [.. Enumerable.Repeat((long)format, channels)];
         return descriptor.WithSupport(bits, formats);
+    }
+
+    /// <summary>The size of the strips or tiles of an image, and how many there are across and down.</summary>
+    private readonly record struct BlockGeometry(long Width, long Height, long Across, long Down);
+
+    /// <summary>The strips (their rows) or the tiles (their size, checked) of an image.</summary>
+    private static BlockGeometry ReadBlocks(StructureReader reader, RawDirectory directory, bool tiled, long width, long height)
+    {
+        var budget = reader.Budget;
+        if (!tiled)
+        {
+            long rows = reader.ReadInteger(directory, RowsPerStripTag, uint.MaxValue);
+            long blockHeight = rows <= 0 || rows > height ? height : rows;
+            return new BlockGeometry(width, blockHeight, 1, (height + blockHeight - 1) / blockHeight);
+        }
+
+        long tileWidth = Required(reader, directory, TileWidthTag, "TileWidth");
+        long tileHeight = Required(reader, directory, TileLengthTag, "TileLength");
+        if (tileWidth <= 0 || tileHeight <= 0 || tileWidth > uint.MaxValue || tileHeight > uint.MaxValue)
+        {
+            throw budget.Invalid($"the tiles are {tileWidth} x {tileHeight} pixels.");
+        }
+
+        if (budget.Options.Strict && (tileWidth % 16 != 0 || tileHeight % 16 != 0))
+        {
+            throw budget.Invalid($"the tiles are {tileWidth} x {tileHeight}, not multiples of 16.");
+        }
+
+        return new BlockGeometry(tileWidth, tileHeight, (width + tileWidth - 1) / tileWidth, (height + tileHeight - 1) / tileHeight);
+    }
+
+    /// <summary>
+    /// The offsets and byte counts of the strips or tiles: as many as the geometry needs, within the file (a block cut by a
+    /// truncated file keeps what there is), the byte counts of uncompressed data computed when they are missing.
+    /// </summary>
+    private static (long[] Offsets, long[] Counts) ReadTables(StructureReader reader, RawDirectory directory, BlockGeometry geometry,
+        bool tiled, int planes, int rowSamples, long compression, int bits, long height)
+    {
+        var budget = reader.Budget;
+        bool strict = budget.Options.Strict;
+        string unit = tiled ? "tile" : "strip";
+        long blocks = 0;
+        try
+        {
+            blocks = checked(geometry.Across * geometry.Down * planes);
+        }
+        catch (OverflowException)
+        {
+            throw budget.Invalid($"the image would have more than 2^63 {unit}s.");
+        }
+
+        long[] offsets = Table(reader, directory, tiled ? TileOffsetsTag : StripOffsetsTag, blocks, unit, "offsets");
+        long[] counts = [];
+        ushort countsTag = tiled ? TileByteCountsTag : StripByteCountsTag;
+        if (directory.TryGet(countsTag, out _))
+        {
+            counts = Table(reader, directory, countsTag, blocks, unit, "byte counts");
+        }
+        else if (compression == 1 && !strict)
+        {
+            // Uncompressed data: the size of each block follows from the geometry, as libtiff computes it.
+            long rowBytes = BytesPerRow(geometry.Width, rowSamples, bits);
+            counts = new long[blocks];
+            for (long i = 0; i < blocks; i++)
+            {
+                long firstRow = tiled ? 0 : i % geometry.Down * geometry.Height;
+                counts[i] = rowBytes * (tiled ? geometry.Height : Math.Min(geometry.Height, height - firstRow));
+            }
+        }
+        else
+        {
+            throw budget.Invalid($"the {unit} byte counts are missing.");
+        }
+
+        for (int i = 0; i < offsets.Length; i++)
+        {
+            if (offsets[i] < 0 || counts[i] < 0 || offsets[i] > reader.Source.Length)
+            {
+                throw budget.Invalid($"{unit} {i} starts outside the file (offset {offsets[i]}, {counts[i]} bytes).");
+            }
+
+            if (counts[i] > reader.Source.Length - offsets[i])
+            {
+                // A last strip cut by a truncated file: read what there is (the decoder reports what is missing).
+                counts[i] = strict
+                    ? throw budget.Invalid($"{unit} {i} ends beyond the end of the file.")
+                    : reader.Source.Length - offsets[i];
+            }
+        }
+
+        return (offsets, counts);
     }
 
     /// <summary>The same image with other kinds of extra channels.</summary>

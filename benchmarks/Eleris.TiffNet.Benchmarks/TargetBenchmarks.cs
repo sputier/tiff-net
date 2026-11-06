@@ -25,7 +25,8 @@ public class TargetBenchmarks
         "u16-none" => TiffWriteOptions.Default with { Compression = TiffCompression.None },
         "f32-rgb-fastest" => TiffWriteOptions.Default with { Level = TiffCompressionLevel.Fastest },
         _ => TiffWriteOptions.Default,
-    } with { MaxDegreeOfParallelism = Threads };
+    } with
+    { MaxDegreeOfParallelism = Threads };
 
     [GlobalSetup]
     public void Setup()

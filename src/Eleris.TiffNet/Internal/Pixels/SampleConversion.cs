@@ -6,29 +6,10 @@ namespace Eleris.TiffNet.Internal.Pixels;
 internal static class SampleConversion
 {
     /// <summary>The .NET type of a sample type.</summary>
-    public static Type ClrType(TiffSampleType type) => type switch
-    {
-        TiffSampleType.UInt8 => typeof(byte),
-        TiffSampleType.Int8 => typeof(sbyte),
-        TiffSampleType.UInt16 => typeof(ushort),
-        TiffSampleType.Int16 => typeof(short),
-        TiffSampleType.UInt32 => typeof(uint),
-        TiffSampleType.Int32 => typeof(int),
-        TiffSampleType.UInt64 => typeof(ulong),
-        TiffSampleType.Int64 => typeof(long),
-        TiffSampleType.Float16 => typeof(Half),
-        TiffSampleType.Float32 => typeof(float),
-        _ => typeof(double),
-    };
+    public static Type ClrType(TiffSampleType type) => SampleTypes.Of(type).ClrType;
 
     /// <summary>The size in bytes of a sample of a type.</summary>
-    public static int SizeOf(TiffSampleType type) => type switch
-    {
-        TiffSampleType.UInt8 or TiffSampleType.Int8 => 1,
-        TiffSampleType.UInt16 or TiffSampleType.Int16 or TiffSampleType.Float16 => 2,
-        TiffSampleType.UInt32 or TiffSampleType.Int32 or TiffSampleType.Float32 => 4,
-        _ => 8,
-    };
+    public static int SizeOf(TiffSampleType type) => SampleTypes.Of(type).Size;
 
     /// <exception cref="InvalidOperationException">The samples cannot be read as <typeparamref name="T"/> that way.</exception>
     public static void Check<T>(TiffSampleType stored, TiffPixelScale scale, bool raw) where T : unmanaged, INumber<T>
