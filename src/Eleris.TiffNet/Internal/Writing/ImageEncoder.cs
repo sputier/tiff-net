@@ -220,6 +220,14 @@ internal sealed class ImageEncoder
     public void Write(FileWriter writer, long[] offsets, long[] counts, int degree, CancellationToken cancellationToken,
         ProgressCounter? progress = null)
     {
+        if (_image.InterleavedPixels is { } pixels)
+        {
+            // Pixels of the application in memory: the whole image is one band, its blocks cut from the pixels (no copy into
+            // bands, no pause between them).
+            EncodeBand(pixels, 0, Down, writer, offsets, counts, degree, progress, cancellationToken);
+            return;
+        }
+
         int bandRows = BandRows(degree);
         int pixelBytes = Channels * BytesPerSample;
         long bandBytes = (long)Math.Min(bandRows, Height) * Width * pixelBytes;
@@ -250,28 +258,7 @@ internal sealed class ImageEncoder
             try
             {
                 _image.ReadBand(bandY, rows, band.AsMemory(0, bytes), degree, scratch, cancellationToken);
-                int firstRow = bandY / BlockHeight;
-                int blockRows = Math.Min(blockRowsPerBand, Down - firstRow);
-                int perPlane = blockRows * Across;
-                BlockPipeline.Run(perPlane * Planes, degree,
-                    j => EncodeFromBand(band, bandY, j / perPlane, firstRow + j % perPlane / Across, j % perPlane % Across),
-                    (j, encoded) =>
-                    {
-                        int block = j / perPlane * Across * Down + (firstRow + j % perPlane / Across) * Across + j % perPlane % Across;
-                        try
-                        {
-                            offsets[block] = writer.Append(encoded.Span);
-                            counts[block] = encoded.Length;
-                        }
-                        finally
-                        {
-                            encoded.Return();
-                        }
-
-                        progress?.Add();
-                    },
-                    encoded => encoded.Return(),
-                    cancellationToken);
+                EncodeBand(band.AsMemory(0, bytes), bandY, blockRowsPerBand, writer, offsets, counts, degree, progress, cancellationToken);
             }
             finally
             {
@@ -283,8 +270,44 @@ internal sealed class ImageEncoder
         }
     }
 
+    /// <summary>
+    /// Encodes the blocks of a band (up to <paramref name="blockRowsPerBand"/> rows of blocks from row <paramref name="bandY"/>) in
+    /// parallel, and appends them in order: every plane of the band before the next band.
+    /// </summary>
+    private void EncodeBand(ReadOnlyMemory<byte> band, int bandY, int blockRowsPerBand, FileWriter writer, long[] offsets, long[] counts, int degree,
+        ProgressCounter? progress, CancellationToken cancellationToken)
+    {
+        int firstRow = bandY / BlockHeight;
+        int blockRows = Math.Min(blockRowsPerBand, Down - firstRow);
+        int perPlane = blockRows * Across;
+        // Strips written as they are cost a slice each: threads would only add their synchronisation.
+        int threads = Borrows ? 1 : degree;
+        BlockPipeline.Run(perPlane * Planes, threads,
+            j => EncodeFromBand(band, bandY, j / perPlane, firstRow + j % perPlane / Across, j % perPlane % Across),
+            (j, encoded) =>
+            {
+                int block = j / perPlane * Across * Down + (firstRow + j % perPlane / Across) * Across + j % perPlane % Across;
+                try
+                {
+                    offsets[block] = writer.Append(encoded.Span);
+                    counts[block] = encoded.Length;
+                }
+                finally
+                {
+                    encoded.Return();
+                }
+
+                progress?.Add();
+            },
+            encoded => encoded.Return(),
+            cancellationToken);
+    }
+
+    /// <summary>Whether the blocks are strips written as they are: their rows, whole and contiguous in a band, are the block.</summary>
+    private bool Borrows => !Tiled && !Planar && Predictor == TiffPredictor.None && Compression == TiffCompression.None;
+
     /// <summary>Cuts block (<paramref name="bx"/>, <paramref name="by"/>) of a plane out of a band, then predicts and compresses it.</summary>
-    private EncodedBlock EncodeFromBand(byte[] band, int bandY, int plane, int by, int bx)
+    private EncodedBlock EncodeFromBand(ReadOnlyMemory<byte> band, int bandY, int plane, int by, int bx)
     {
         int x0 = bx * BlockWidth, y0 = by * BlockHeight;
         int width = Math.Min(BlockWidth, Width - x0), height = Math.Min(BlockHeight, Height - y0);
@@ -294,6 +317,12 @@ internal sealed class ImageEncoder
         int rowBytes = (int)RowBytes;
         int pixelBytes = Channels * BytesPerSample;
         int bandRow = Width * pixelBytes;
+        if (Borrows)
+        {
+            // A strip written as it is: its rows, whole and contiguous in the band, are the block.
+            return new EncodedBlock(null, rowBytes * rows, band.Slice((y0 - bandY) * bandRow, rowBytes * rows));
+        }
+
         byte[] raw = System.Buffers.ArrayPool<byte>.Shared.Rent(rowBytes * rows);
         if (width < BlockWidth || height < rows)
         {
@@ -302,7 +331,7 @@ internal sealed class ImageEncoder
 
         for (int r = 0; r < height; r++)
         {
-            var source = band.AsSpan((y0 - bandY + r) * bandRow + x0 * pixelBytes, width * pixelBytes);
+            var source = band.Span.Slice((y0 - bandY + r) * bandRow + x0 * pixelBytes, width * pixelBytes);
             var target = raw.AsSpan(r * rowBytes, rowBytes);
             if (!Planar)
             {

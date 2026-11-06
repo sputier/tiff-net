@@ -377,6 +377,13 @@ public sealed partial class TiffImage
     }
 
     /// <summary>
+    /// The samples of an image of the application, interleaved, in the order of the machine: what the writer encodes, without
+    /// reading them into bands. Null for an image of a file, or held planar.
+    /// </summary>
+    /// <remarks>Null is given as such: a <c>null</c> in the conditional would become an empty memory (its conversion from an array).</remarks>
+    internal ReadOnlyMemory<byte>? InterleavedPixels => _pixels is { Memory: { } memory } && !Descriptor.Planar ? memory : default(ReadOnlyMemory<byte>?);
+
+    /// <summary>
     /// Reads the raw samples of whole rows, interleaved, into bytes in the order of the machine: what the writer encodes. In
     /// parallel when <paramref name="degree"/> allows, within the limits of the file.
     /// </summary>

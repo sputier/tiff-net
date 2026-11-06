@@ -49,4 +49,72 @@ public class PackBitsTests
         Assert.False(overflow);
         Assert.Equal(0, PackBits.Decode([0xF0], decoded, out _));
     }
+
+    [Fact]
+    public void Rows_encode_as_the_byte_by_byte_encoder_does_and_decode_back()
+    {
+        // Runs found with vectors give the bytes of the encoder byte by byte (kept below as the reference); the decoder, with
+        // its 16-byte copies, gives the row back and writes nothing beyond the destination.
+        var random = new Random(112);
+        foreach (int length in Enumerable.Range(0, 80).Concat([127, 128, 129, 255, 256, 257, 1000, 6001]))
+        {
+            foreach (int kind in new[] { 0, 1, 2, 3 })
+            {
+                byte[] row = [.. Enumerable.Range(0, length).Select(i => kind switch
+                {
+                    0 => (byte)random.Next(256),                         // literals
+                    1 => (byte)(i / 7),                                  // runs of 7
+                    2 => (byte)(i % 40 < 20 ? 5 : random.Next(3)),      // long runs and short ones
+                    _ => (byte)(random.Next(4) == 0 ? random.Next(2) : 9),
+                })];
+                byte[] encoded = new byte[PackBitsEncoder.MaxEncoded(length)];
+                int size = PackBitsEncoder.EncodeRow(row, encoded);
+                byte[] reference = Reference(row);
+
+                Assert.Equal(reference, encoded[..size]);
+                byte[] decoded = new byte[length + 32];
+                Array.Fill(decoded, (byte)0xEE);
+                Assert.Equal(length, PackBits.Decode(encoded.AsSpan(0, size), decoded.AsSpan(0, length), out bool overflow));
+                Assert.False(overflow);
+                Assert.Equal(row, decoded[..length]);
+                Assert.All(decoded[length..], b => Assert.Equal(0xEE, b));
+            }
+        }
+    }
+
+    /// <summary>The encoder as it was, byte by byte.</summary>
+    private static byte[] Reference(byte[] row)
+    {
+        var output = new List<byte>();
+        int i = 0, n = row.Length;
+        while (i < n)
+        {
+            byte value = row[i];
+            int run = 1;
+            while (i + run < n && run < 128 && row[i + run] == value)
+            {
+                run++;
+            }
+
+            if (run >= 3)
+            {
+                output.Add((byte)(1 - run));
+                output.Add(value);
+                i += run;
+                continue;
+            }
+
+            int j = i;
+            while (j < n && j - i < 128 && !(j + 2 < n && row[j] == row[j + 1] && row[j] == row[j + 2]))
+            {
+                j++;
+            }
+
+            output.Add((byte)(j - i - 1));
+            output.AddRange(row[i..j]);
+            i = j;
+        }
+
+        return [.. output];
+    }
 }

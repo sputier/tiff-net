@@ -3,12 +3,21 @@ using Eleris.TiffNet.Internal.Codecs;
 
 namespace Eleris.TiffNet.Internal.Writing;
 
-/// <summary>An encoded block in a buffer rented from the shared pool: <see cref="Return"/> it once written.</summary>
-internal readonly record struct EncodedBlock(byte[] Buffer, int Length)
+/// <summary>
+/// An encoded block in a buffer rented from the shared pool (<see cref="Return"/> it once written), or bytes of the source
+/// written as they are (<paramref name="Borrowed"/>, alive as long as the source, nothing to return).
+/// </summary>
+internal readonly record struct EncodedBlock(byte[]? Buffer, int Length, ReadOnlyMemory<byte> Borrowed = default)
 {
-    public ReadOnlySpan<byte> Span => Buffer.AsSpan(0, Length);
+    public ReadOnlySpan<byte> Span => Buffer is null ? Borrowed.Span[..Length] : Buffer.AsSpan(0, Length);
 
-    public void Return() => ArrayPool<byte>.Shared.Return(Buffer);
+    public void Return()
+    {
+        if (Buffer is not null)
+        {
+            ArrayPool<byte>.Shared.Return(Buffer);
+        }
+    }
 }
 
 /// <summary>Predicts and compresses one block (a strip or a tile) of raw samples, for both writers, in pooled buffers.</summary>
@@ -81,7 +90,7 @@ internal static class BlockCodec
                 default:
                 {
                     byte[] output = ArrayPool<byte>.Shared.Rent((int)DeflateEncoder.MaxEncoded(length));
-                    return new EncodedBlock(output, DeflateEncoder.Encode(source, output, level));
+                    return new EncodedBlock(output, DeflateEncoder.Encode(source, output, level, predictor));
                 }
             }
         }

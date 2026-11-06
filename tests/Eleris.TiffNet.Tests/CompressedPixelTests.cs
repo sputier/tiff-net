@@ -78,6 +78,12 @@ public class CompressedPixelTests
 
         Assert.Contains("decodes to", Assert.Throws<TiffException>(() => file.Primary.ReadPixels<byte>()).Message, StringComparison.Ordinal);
         Assert.Equal(100 * 70, file.Primary.ReadRegion<byte>(0, 0, 100, 70).Length);   // the rows that are there can be read
+
+        // Decoded in its place in the destination: the read fails, and nothing is written beyond the rows of the strip.
+        byte[] guarded = new byte[100 * 71 + 64];
+        Array.Fill(guarded, (byte)0xEE);
+        Assert.Throws<TiffException>(() => file.Primary.ReadPixels(guarded.AsMemory(32, 100 * 71)));
+        Assert.All(guarded[..32].Concat(guarded[^32..]), b => Assert.Equal(0xEE, b));
     }
 
     [Fact]
@@ -111,6 +117,36 @@ public class CompressedPixelTests
         using var strict = Open(builder, TiffReadOptions.Default with { Strict = true });
         Assert.Contains("more data", Assert.Throws<TiffException>(() => strict.Primary.ReadRawPixels<byte>()).Message, StringComparison.Ordinal);
         Assert.Equal(100 * 10, strict.Primary.ReadRegion<byte>(0, 0, 100, 10).Length);   // a part of the strip is not checked
+    }
+
+    [Theory]
+    [InlineData(TiffCompression.Lzw, TiffPredictor.Horizontal)]
+    [InlineData(TiffCompression.Deflate, TiffPredictor.Horizontal)]
+    [InlineData(TiffCompression.Deflate, TiffPredictor.FloatingPoint)]
+    [InlineData(TiffCompression.PackBits, TiffPredictor.None)]
+    public void Blocks_decoded_in_their_place_write_only_their_rows(TiffCompression compression, TiffPredictor predictor)
+    {
+        // Strips delivered as they are decode straight into the destination: a destination inside a larger array, guarded on both
+        // sides, gets every sample and nothing beyond, on one thread and on every core; a region (units that do not start their
+        // strip) gives the same samples.
+        const int width = 600, height = 300;   // 2 MB: several strips
+        var random = new Random(109);
+        float[] samples = [.. Enumerable.Range(0, width * height * 3).Select(i => (float)Math.Round(Math.Sin(i / 300.0) * 100 + random.Next(3)))];
+        using var stream = new MemoryStream();
+        new TiffFile().Add(TiffImage.Create<float>(samples, width, height, 3, TiffColorModel.Rgb))
+            .Save(stream, TiffWriteOptions.Default with { Compression = compression, Predictor = predictor });
+        foreach (int threads in new[] { 1, -1 })
+        {
+            using var file = TiffFile.Read(new MemoryStream(stream.ToArray()), TiffReadOptions.Default with { MaxDegreeOfParallelism = threads });
+            float[] guarded = new float[samples.Length + 64];
+            Array.Fill(guarded, -7f);
+
+            file.Primary.ReadPixels(guarded.AsMemory(32, samples.Length));
+
+            Assert.Equal(samples, guarded[32..^32]);
+            Assert.All(guarded[..32].Concat(guarded[^32..]), v => Assert.Equal(-7f, v));
+            Assert.Equal(samples.Skip((10 * width + 0) * 3).Take(width * 20 * 3), file.Primary.ReadRegion<float>(0, 10, width, 20));
+        }
     }
 
     [SkippableFact]
