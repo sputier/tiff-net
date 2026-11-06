@@ -312,14 +312,18 @@ internal static class PixelReader
 
         try
         {
-            Parallel.ForEach(plan.Units(), new ParallelOptions { MaxDegreeOfParallelism = plan.Workers }, () => new Scratch<TD>(plan),
+            // Parallel.ForEach starts new tasks as it goes, each with its own local state: the buffers are taken from a pool of
+            // the read and put back, so that there are never more than one per worker running at once (as reserved by the plan).
+            var buffers = new System.Collections.Concurrent.ConcurrentBag<Scratch<TD>>();
+            Parallel.ForEach(plan.Units(), new ParallelOptions { MaxDegreeOfParallelism = plan.Workers },
+                () => buffers.TryTake(out var reused) ? reused : new Scratch<TD>(plan),
                 (unit, _, scratch) =>
                 {
                     budget.ThrowIfCancelled();
                     context.Process(unit, array.Span, scratch);
                     return scratch;
                 },
-                _ => { });
+                buffers.Add);
         }
         catch (AggregateException ex) when (ex.InnerExceptions.Count > 0)
         {
