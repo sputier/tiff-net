@@ -1,6 +1,8 @@
 using System.IO.Compression;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics;
 
 namespace Eleris.TiffNet.Internal.Codecs;
 
@@ -16,11 +18,13 @@ internal static class PackBitsEncoder
         int i = 0, o = 0, n = row.Length;
         while (i < n)
         {
+            // The run: the bytes equal to the first, up to 128 (searched with vectors).
             byte value = row[i];
-            int run = 1;
-            while (i + run < n && run < 128 && row[i + run] == value)
+            var reach = row.Slice(i, Math.Min(128, n - i));
+            int run = reach.IndexOfAnyExcept(value);
+            if (run < 0)
             {
-                run++;
+                run = reach.Length;
             }
 
             if (run >= 3)
@@ -31,8 +35,9 @@ internal static class PackBitsEncoder
                 continue;
             }
 
-            // Literal bytes until a run of 3 begins (or 128 bytes).
-            int j = i;
+            // Literal bytes until a run of 3 begins (or 128 bytes): 16 places at a time while no run begins in them, then the
+            // loop from the first place that may begin one.
+            int j = SkipLiterals(row, i, Math.Min(i + 128, n - 2));
             while (j < n && j - i < 128 && !(j + 2 < n && row[j] == row[j + 1] && row[j] == row[j + 2]))
             {
                 j++;
@@ -45,6 +50,33 @@ internal static class PackBitsEncoder
         }
 
         return o;
+    }
+
+    /// <summary>
+    /// The first place from <paramref name="start"/> where three equal bytes may begin, looked for 16 places at a time while the
+    /// 18 bytes they need are below <paramref name="limit"/> + 2: a place before it begins none.
+    /// </summary>
+    private static int SkipLiterals(ReadOnlySpan<byte> row, int start, int limit)
+    {
+        int j = start;
+        if (!Vector128.IsHardwareAccelerated)
+        {
+            return j;
+        }
+
+        for (; j + 16 <= limit; j += 16)
+        {
+            var a = Vector128.Create<byte>(row[j..]);
+            var b = Vector128.Create<byte>(row[(j + 1)..]);
+            var c = Vector128.Create<byte>(row[(j + 2)..]);
+            uint begins = (Vector128.Equals(a, b) & Vector128.Equals(a, c)).ExtractMostSignificantBits();
+            if (begins != 0)
+            {
+                return j + BitOperations.TrailingZeroCount(begins);
+            }
+        }
+
+        return j;
     }
 }
 
@@ -162,7 +194,12 @@ internal static class LzwEncoder
     }
 }
 
-/// <summary>The Deflate encoder: a zlib stream written by System.IO.Compression, at the level the options ask for.</summary>
+/// <summary>
+/// The Deflate encoder: a zlib stream written by System.IO.Compression, at the level the options ask for. At the level
+/// <see cref="TiffCompressionLevel.Fastest"/>, data through the floating-point predictor is compressed with the run-length
+/// strategy of zlib (matches of one byte back only): faster than level 1 and smaller on noisy data, whose byte planes of
+/// mantissa hold no longer matches (benchmarks/results, issue #108). The stream is plain Deflate either way.
+/// </summary>
 internal static class DeflateEncoder
 {
     /// <summary>
@@ -172,10 +209,10 @@ internal static class DeflateEncoder
     public static long MaxEncoded(long length) => length + length / 8 + 1024;
 
     /// <summary>Compresses a strip or tile into <paramref name="destination"/> (at least <see cref="MaxEncoded"/>); returns its length.</summary>
-    public static int Encode(ReadOnlySpan<byte> source, byte[] destination, TiffCompressionLevel level)
+    public static int Encode(ReadOnlySpan<byte> source, byte[] destination, TiffCompressionLevel level, TiffPredictor predictor = TiffPredictor.None)
     {
         using var output = new MemoryStream(destination, 0, destination.Length, writable: true);
-        using (var zlib = new ZLibStream(output, Options(level), leaveOpen: true))
+        using (var zlib = new ZLibStream(output, Options(level, predictor), leaveOpen: true))
         {
             zlib.Write(source);
         }
@@ -184,14 +221,17 @@ internal static class DeflateEncoder
     }
 
     /// <summary>Compresses into a new array (the tests).</summary>
-    public static byte[] Encode(ReadOnlySpan<byte> source, TiffCompressionLevel level)
+    public static byte[] Encode(ReadOnlySpan<byte> source, TiffCompressionLevel level, TiffPredictor predictor = TiffPredictor.None)
     {
         byte[] destination = new byte[MaxEncoded(source.Length)];
-        return destination[..Encode(source, destination, level)];
+        return destination[..Encode(source, destination, level, predictor)];
     }
 
-    /// <summary>zlib levels 1 (fastest), 6 (the default of zlib and libtiff) and 9 (smallest).</summary>
-    private static ZLibCompressionOptions Options(TiffCompressionLevel level) => new()
+    /// <summary>
+    /// zlib levels 1 (fastest), 6 (the default of zlib and libtiff) and 9 (smallest); the run-length strategy for the floating-point
+    /// predictor at level 1.
+    /// </summary>
+    private static ZLibCompressionOptions Options(TiffCompressionLevel level, TiffPredictor predictor) => new()
     {
         CompressionLevel = level switch
         {
@@ -199,5 +239,8 @@ internal static class DeflateEncoder
             TiffCompressionLevel.SmallestSize => 9,
             _ => 6,
         },
+        CompressionStrategy = level == TiffCompressionLevel.Fastest && predictor == TiffPredictor.FloatingPoint
+            ? ZLibCompressionStrategy.RunLengthEncoding
+            : ZLibCompressionStrategy.Default,
     };
 }
