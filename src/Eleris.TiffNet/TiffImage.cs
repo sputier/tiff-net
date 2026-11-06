@@ -85,6 +85,20 @@ public sealed partial class TiffImage
     /// <summary>Whether the pixels are those the application gave (in memory), not those of a file.</summary>
     internal bool InMemory => _pixels is not null;
 
+    /// <summary>
+    /// Where the pixels are read from, resolved once: the pixels of the application (in the order of the machine, the default
+    /// limits), or the file of the image (its byte order, the limits it was opened with).
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The image has neither (an image of a file whose file is not attached yet).</exception>
+    private PixelOrigin Origin => _pixels is { } pixels
+        ? new PixelOrigin(pixels, BitConverter.IsLittleEndian, TiffReadOptions.Default, "image")
+        : File is { } file && Storage is { } storage
+            ? new PixelOrigin(file.Source, !storage.BigEndian, file.Options, file.Source.Name)
+            : throw new InvalidOperationException("The image has no pixels to read.");
+
+    /// <summary>The source of the pixels of an image, the byte order of its samples and the limits of its reads.</summary>
+    private readonly record struct PixelOrigin(Internal.TiffSource Source, bool LittleEndian, TiffReadOptions Options, string Name);
+
     internal bool IsFullResolution => !_descriptor.IsReducedResolution && !_descriptor.IsMask;
 
     /// <summary>Whether the orientation swaps rows and columns (Orientation 5 to 8).</summary>
