@@ -43,6 +43,11 @@ def main() -> int:
         if sha(array) != digest:
             problems.append(f"{name}: tifffile reads other samples")
             continue
+        if name.startswith("writer-rgba-unassociated"):
+            with tifffile.TiffFile(path) as tif:
+                extras = tuple(int(e) for e in tif.pages[0].extrasamples)
+            if extras != (2,):
+                problems.append(f"{name}: tifffile reads ExtraSamples {extras}, not (2,) (unassociated alpha)")
         if pillow_supports(name):
             with Image.open(path) as im:
                 read = np.asarray(im)

@@ -250,7 +250,7 @@ public static class ThreadExamples
     {
         #region Example:ThreadExamples.Limits
         // Reading: two decoding threads, at most 256 MB for the pixels of an image.
-        var read = TiffReadOptions.Default with { MaxDegreeOfParallelism = 2, MaxPixelBytes = 256L << 20 };
+        var read = TiffReadOptions.Constrained;   // or Default with { MaxDegreeOfParallelism = 2, MaxPixelBytes = 256L << 20 }
 
         // Writing on the calling thread only.
         var write = TiffWriteOptions.Default with { MaxDegreeOfParallelism = 1 };
