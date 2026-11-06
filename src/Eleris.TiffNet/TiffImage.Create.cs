@@ -144,19 +144,5 @@ public sealed partial class TiffImage
     }
 
     /// <summary>The sample type of <typeparamref name="T"/> (a constant for each instantiation, without reflection).</summary>
-    private static TiffSampleType SampleTypeOf<T>() where T : unmanaged, INumber<T>
-    {
-        if (typeof(T) == typeof(byte)) return TiffSampleType.UInt8;
-        if (typeof(T) == typeof(sbyte)) return TiffSampleType.Int8;
-        if (typeof(T) == typeof(ushort)) return TiffSampleType.UInt16;
-        if (typeof(T) == typeof(short)) return TiffSampleType.Int16;
-        if (typeof(T) == typeof(uint)) return TiffSampleType.UInt32;
-        if (typeof(T) == typeof(int)) return TiffSampleType.Int32;
-        if (typeof(T) == typeof(ulong)) return TiffSampleType.UInt64;
-        if (typeof(T) == typeof(long)) return TiffSampleType.Int64;
-        if (typeof(T) == typeof(Half)) return TiffSampleType.Float16;
-        if (typeof(T) == typeof(float)) return TiffSampleType.Float32;
-        if (typeof(T) == typeof(double)) return TiffSampleType.Float64;
-        throw new ArgumentException($"{typeof(T).Name} is not a sample type of TIFF: use byte, sbyte, ushort, short, uint, int, ulong, long, Half, float or double.");
-    }
+    private static TiffSampleType SampleTypeOf<T>() where T : unmanaged, INumber<T> => SampleTypes.Of<T>() ?? throw new ArgumentException($"{typeof(T).Name} is not a sample type of TIFF: use byte, sbyte, ushort, short, uint, int, ulong, long, Half, float or double.");
 }
