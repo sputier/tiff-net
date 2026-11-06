@@ -37,21 +37,22 @@ internal static class HostileAssert
     public static void OpensOrFailsWithinBounds(HostileCase hostile, Action read) =>
         FailsWithinBounds(read, hostile.Outcome, hostile.MaxTime, hostile.MaxAllocatedBytes, hostile.ToString(), successAllowed: true);
 
-    /// <summary>
-    /// The time bounds scale with TIFFNET_TIME_FACTOR (1 by default; a slow or shared runner can set more). A read over its time
-    /// is measured once more: the first run of a path after a build pays for compiling it, which is not what the bound is about.
-    /// </summary>
+    /// <summary>The time bounds scale with TIFFNET_TIME_FACTOR (1 by default; a slow or shared runner can set more).</summary>
     private static readonly double TimeFactor =
         double.TryParse(Environment.GetEnvironmentVariable("TIFFNET_TIME_FACTOR"), System.Globalization.CultureInfo.InvariantCulture, out double f) && f > 0 ? f : 1;
 
     public static void FailsWithinBounds(Action read, string outcome, TimeSpan maxTime, long maxAllocatedBytes, string what,
         bool successAllowed = false)
     {
+        // A read over its time, with the expected outcome, is measured once more: the first run of a path after a build pays for
+        // compiling it, which is not what the bound is about. Its outcome and its allocations (the larger) stand.
         maxTime *= TimeFactor;
         var (thrown, elapsed, allocated) = Measure(read);
-        if (elapsed > maxTime)
+        if (elapsed > maxTime && (thrown is null ? successAllowed : outcome.Split('|').Any(expected => Matches(expected, thrown))))
         {
-            (thrown, elapsed, allocated) = Measure(read);
+            long first = allocated;
+            (_, elapsed, allocated) = Measure(read);
+            allocated = Math.Max(first, allocated);
         }
 
         if (thrown is null && !successAllowed)

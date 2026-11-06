@@ -2,6 +2,7 @@ bin/
 obj/
 BenchmarkDotNet.Artifacts/
 TestResults/
+coverage/
 *.user
 .vs/
 site/
