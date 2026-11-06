@@ -34,7 +34,10 @@ public sealed partial class TiffImage
         where T : unmanaged, INumber<T> =>
         ReadArray<T>(Whole(order, scale), raw: false, CancellationToken.None);
 
-    /// <summary>Reads the samples into a buffer of the caller, on the calling thread, without allocating an array for them.</summary>
+    /// <summary>
+    /// Reads the samples into a buffer of the caller, on the calling thread, without allocating an array for them; the
+    /// <see cref="Memory{T}"/> overload decodes on every core.
+    /// </summary>
     /// <typeparam name="T">As for <see cref="ReadPixels{T}(TiffPixelScale, TiffPixelOrder)"/>.</typeparam>
     /// <param name="destination">Exactly <c>Width × Height × Channels</c> samples.</param>
     /// <param name="scale">The stored values, or values normalised to [0, 1].</param>
@@ -56,6 +59,31 @@ public sealed partial class TiffImage
 
         var budget = Budget(CancellationToken.None);
         Dispatch(PixelPlan.Create(Descriptor, budget, request, SampleConversion.SizeOf(SampleType), parallel: false), destination, null, budget);
+    }
+
+    /// <summary>Reads the samples into a buffer of the caller, decoding on every core, without allocating an array for them.</summary>
+    /// <typeparam name="T">As for <see cref="ReadPixels{T}(TiffPixelScale, TiffPixelOrder)"/>.</typeparam>
+    /// <param name="destination">Exactly <c>Width × Height × Channels</c> samples; not used by the caller until the method returns.</param>
+    /// <param name="scale">The stored values, or values normalised to [0, 1].</param>
+    /// <param name="order">Interleaved or planar.</param>
+    /// <exception cref="ArgumentException"><paramref name="destination"/> is not of the size of the image.</exception>
+    /// <exception cref="InvalidOperationException">The conversion could lose values.</exception>
+    /// <exception cref="NotSupportedException">The library does not handle the format of the image.</exception>
+    /// <exception cref="TiffException">The pixel data is damaged, or the decoding buffers exceed <see cref="TiffReadOptions.MaxPixelBytes"/>.</exception>
+    /// <exception cref="ObjectDisposedException">The file is disposed.</exception>
+    public void ReadPixels<T>(Memory<T> destination, TiffPixelScale scale = TiffPixelScale.Stored, TiffPixelOrder order = TiffPixelOrder.Interleaved)
+        where T : unmanaged, INumber<T>
+    {
+        var request = Whole(order, scale);
+        long count = Prepare<T>(request, raw: false);
+        if (destination.Length != count)
+        {
+            throw new ArgumentException($"The image has {count} samples, the destination {destination.Length}.", nameof(destination));
+        }
+
+        var budget = Budget(CancellationToken.None);
+        var plan = PixelPlan.Create(Descriptor, budget, request, SampleConversion.SizeOf(SampleType), parallel: true);
+        Dispatch(plan, destination.Span, destination, budget);
     }
 
     /// <summary>The samples of a region of the image (in the delivered orientation), converted as by <see cref="ReadPixels{T}(TiffPixelScale, TiffPixelOrder)"/>.</summary>
@@ -158,7 +186,10 @@ public sealed partial class TiffImage
         budget.ReservePixels(count > long.MaxValue / Unsafe.SizeOf<T>() ? long.MaxValue : count * Unsafe.SizeOf<T>(), "the pixels");
         ThrowIfLargerThanAnArray(count);
         var plan = PixelPlan.Create(Descriptor, budget, request, SampleConversion.SizeOf(SampleType), parallel: true);
-        var result = new T[count];
+
+        // Not cleared: every sample of a request is written by the read (EverySampleWrittenTests checks it on every image of the
+        // corpora), and a read that fails returns no array.
+        var result = GC.AllocateUninitializedArray<T>((int)count);
         Dispatch(plan, result, result, budget);
         return result;
     }
