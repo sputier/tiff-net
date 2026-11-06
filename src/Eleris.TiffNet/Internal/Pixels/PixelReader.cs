@@ -134,8 +134,12 @@ internal sealed class PixelPlan
 
         long rowBytes = ImageDescriptor.BytesPerRow(d.BlockWidth, SampleUnpacker.StoredSamples(d), d.BitsPerSample);
         bool compressed = d.Compression != TiffCompression.None;
-        int rowsPerUnit = compressed ? (int)d.BlockHeight : (int)Math.Clamp(ChunkBytes / Math.Max(1, rowBytes), 1, d.BlockHeight);
-        var plan = new PixelPlan(d, request, StoredRect.Of(d, request), rowBytes, rowsPerUnit);
+        // Uncompressed strips are read by chunks of rows, which can span strips that follow each other in the file, within the
+        // rows the request covers.
+        var stored = StoredRect.Of(d, request);
+        long rowsLimit = d.Layout == TiffLayout.Strips ? stored.Y1 - stored.Y0 : d.BlockHeight;
+        int rowsPerUnit = compressed ? (int)d.BlockHeight : (int)Math.Clamp(ChunkBytes / Math.Max(1, rowBytes), 1, Math.Max(1, rowsLimit));
+        var plan = new PixelPlan(d, request, stored, rowBytes, rowsPerUnit);
         string kind = d.Layout == TiffLayout.Tiles ? "tile" : "strip";
 
         long units = 0, largestCompressed = 0, largestDecoded = 0;
@@ -224,15 +228,45 @@ internal sealed class PixelPlan
     };
 
     /// <summary>The units of work covering the stored rectangle, block after block (plane by plane for planar images).</summary>
+    /// <remarks>
+    /// Uncompressed strips that follow each other in the file are read together, up to a chunk: a file of many small strips (the
+    /// 8 KB of libtiff) costs one read a megabyte, not one a strip.
+    /// </remarks>
     public IEnumerable<PixelUnit> Units()
     {
+        bool merge = !Compressed && Descriptor.Layout == TiffLayout.Strips;
+        PixelUnit? open = null;
+        long openEnd = 0;   // the offset in the file after the rows of the open unit
         foreach (var (block, plane, blockY, first, end) in Blocks())
         {
             long x0 = block % Across * Descriptor.BlockWidth;
-            for (long row = first; row < end; row += RowsPerUnit)
+            for (long row = first; row < end;)
             {
-                yield return new PixelUnit(block, plane, x0, blockY + row, (int)row, (int)Math.Min(RowsPerUnit, end - row));
+                if (merge && open is { } u && u.Plane == plane && u.Y0 + u.Rows == blockY + row && u.Rows < RowsPerUnit
+                    && openEnd == Descriptor.Offsets[block] + row * RowBytes)
+                {
+                    int more = (int)Math.Min(RowsPerUnit - u.Rows, end - row);
+                    open = u with { Rows = u.Rows + more };
+                    openEnd += more * RowBytes;
+                    row += more;
+                    continue;
+                }
+
+                if (open is { } done)
+                {
+                    yield return done;
+                }
+
+                int rows = (int)Math.Min(RowsPerUnit, end - row);
+                open = new PixelUnit(block, plane, x0, blockY + row, (int)row, rows);
+                openEnd = Descriptor.Offsets[block] + (row + rows) * RowBytes;
+                row += rows;
             }
+        }
+
+        if (open is { } last)
+        {
+            yield return last;
         }
     }
 
