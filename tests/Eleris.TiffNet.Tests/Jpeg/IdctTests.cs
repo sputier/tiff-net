@@ -2,7 +2,7 @@ using Eleris.TiffNet.Internal.Jpeg;
 
 namespace Eleris.TiffNet.Tests.Jpeg;
 
-/// <summary>The scalar and vectorised inverse DCTs give the same samples, so that the pixels of a JPEG do not depend on the machine.</summary>
+/// <summary>The scalar and vectorised (AVX2, 128-bit) inverse DCTs give the same samples, so that the pixels of a JPEG do not depend on the machine.</summary>
 public class IdctTests
 {
     [Theory]
@@ -52,7 +52,7 @@ public class IdctTests
 
     private static void Compare(int stride, int blocks, Func<Random, int, int, (short Coefficient, ushort Step)> make)
     {
-        if (!JpegIdctAvx2.IsSupported)
+        if (!JpegIdctAvx2.IsSupported && !JpegIdctVector128.IsSupported)
         {
             return;   // only the scalar transform runs on this machine
         }
@@ -70,10 +70,19 @@ public class IdctTests
             }
 
             JpegIdct.TransformScalar(block, quantization, scalar, stride);
-            JpegIdctAvx2.Transform(block, quantization, vector, stride);
+            if (JpegIdctAvx2.IsSupported)
+            {
+                JpegIdctAvx2.Transform(block, quantization, vector, stride);
+                if (!scalar.AsSpan().SequenceEqual(vector))
+                {
+                    Assert.Fail($"block {n} differs with AVX2");
+                }
+            }
+
+            JpegIdctVector128.Transform(block, quantization, vector, stride);
             if (!scalar.AsSpan().SequenceEqual(vector))
             {
-                Assert.Fail($"block {n} differs");
+                Assert.Fail($"block {n} differs with 128-bit vectors");
             }
         }
     }

@@ -41,6 +41,13 @@ internal static class JpegIdct
             return;
         }
 
+        if (JpegIdctVector128.IsSupported)
+        {
+            // Processors without AVX2: ARM (Android, Apple Silicon), older x64.
+            JpegIdctVector128.TransformChecked(coefficients, quantization, output, stride);
+            return;
+        }
+
         Scalar(coefficients, quantization, output, stride);
     }
 
