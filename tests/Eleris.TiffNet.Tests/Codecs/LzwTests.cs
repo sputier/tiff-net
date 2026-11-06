@@ -220,6 +220,30 @@ public class LzwTests
     }
 
     [Fact]
+    public void Short_strings_are_decoded_at_every_place_of_the_output()
+    {
+        // Short strings (copied 16 bytes at a time when the output has room) and runs being defined, ending at every distance
+        // from the end of the output, and cut by it: the bytes are those encoded, and nothing is written beyond the destination.
+        var random = new Random(105);
+        foreach (var (length, oldStyle) in Enumerable.Range(1, 90).Concat([255, 256, 257, 1000, 4097]).SelectMany(l => new[] { (l, false), (l, true) }))
+        {
+            byte[] data = [.. Enumerable.Range(0, length).Select(i => i % 37 < 20 ? (byte)random.Next(3) : (byte)(i % 5))];
+            byte[] encoded = Encode(data, oldStyle);
+            foreach (int size in new[] { length, length - 1, length - 15, length - 16, length - 17, length / 2 }.Where(s => s > 0).Distinct())
+            {
+                byte[] guarded = new byte[size + 32];
+                Array.Fill(guarded, (byte)0xEE);
+                int written = Lzw.Decode(encoded, guarded.AsSpan(0, size), out bool overflow);
+
+                Assert.Equal(size, written);
+                Assert.Equal(size < length, overflow);
+                Assert.Equal(data[..size], guarded[..size]);
+                Assert.All(guarded[size..], b => Assert.Equal(0xEE, b));
+            }
+        }
+    }
+
+    [Fact]
     public void Long_runs_and_strings_cut_by_the_destination_are_decoded()
     {
         // A run of one value gives strings of growing length, each defined by the code being read (the "KwKwK" case).

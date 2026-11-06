@@ -7,6 +7,33 @@ namespace Eleris.TiffNet.Tests;
 
 public class PixelTests
 {
+    [Fact]
+    public void A_floating_point_image_normalised_to_its_own_type_is_given_as_it_is()
+    {
+        // Every maximum of floating-point samples is 1: float and double samples are given unchanged, every bit (a signalling NaN keeps its
+        // payload), uncompressed and compressed, whole and in a region.
+        float[] floats = [.. Enumerable.Range(0, 300).Select(i => i * 0.37f - 40), float.NaN, -0f, float.Epsilon, float.MaxValue,
+            BitConverter.Int32BitsToSingle(0x7F80_0001), float.NegativeInfinity];
+        double[] doubles = [.. floats.Select(v => (double)v), BitConverter.Int64BitsToDouble(0x7FF0_0000_0000_0001)];
+        foreach (var compression in new[] { TiffCompression.None, TiffCompression.Deflate })
+        {
+            Same(floats, compression);
+            Same(doubles, compression);
+        }
+
+        static void Same<T>(T[] samples, TiffCompression compression) where T : unmanaged, System.Numerics.INumber<T>
+        {
+            using var stream = new MemoryStream();
+            new TiffFile().Add(TiffImage.Create<T>(samples, samples.Length, 1)).Save(stream, TiffWriteOptions.Default with { Compression = compression });
+            using var file = TiffFile.Read(new MemoryStream(stream.ToArray()));
+
+            Assert.True(MemoryMarshal.AsBytes(samples.AsSpan()).SequenceEqual(MemoryMarshal.AsBytes(file.Primary.ReadPixels<T>(TiffPixelScale.Normalized).AsSpan())),
+                $"{typeof(T).Name} {compression}");
+            Assert.True(MemoryMarshal.AsBytes(samples.AsSpan(5, 7)).SequenceEqual(MemoryMarshal.AsBytes(file.Primary.ReadRegion<T>(5, 0, 7, 1, TiffPixelScale.Normalized).AsSpan())),
+                $"{typeof(T).Name} {compression}, region");
+        }
+    }
+
     /// <summary>The raw samples of an image, as little-endian bytes, whatever their type.</summary>
     internal static byte[] RawBytes(TiffImage image, TiffPixelOrder order = TiffPixelOrder.Interleaved) => image.SampleType switch
     {

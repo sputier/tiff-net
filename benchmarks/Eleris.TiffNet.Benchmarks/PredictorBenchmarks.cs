@@ -13,13 +13,15 @@ public class PredictorBenchmarks
     private byte[] _row = [];
     private byte[] _scratch = [];
 
-    /// <summary>The samples: u16 grey or RGB (horizontal), f32 grey or RGB (floating point).</summary>
-    [Params("u16-grey", "u16-rgb", "f32-grey", "f32-rgb")]
+    /// <summary>The samples: u16 grey or RGB (horizontal), f16, f32 and f64 grey, f32 RGB (floating point).</summary>
+    [Params("u16-grey", "u16-rgb", "f16-grey", "f32-grey", "f32-rgb", "f64-grey")]
     public string Samples { get; set; } = "u16-grey";
 
     private int Channels => Samples.EndsWith("rgb", StringComparison.Ordinal) ? 3 : 1;
 
-    private int Bytes => Samples.StartsWith("u16", StringComparison.Ordinal) ? 2 : 4;
+    private int Bytes => Samples[1..3] switch { "16" => 2, "32" => 4, _ => 8 };
+
+    private bool Floating => Samples[0] == 'f';
 
     [GlobalSetup]
     public void Setup()
@@ -34,13 +36,13 @@ public class PredictorBenchmarks
     {
         for (int r = 0; r < Rows; r++)
         {
-            if (Bytes == 2)
+            if (!Floating)
             {
                 Predictors.UndoHorizontal(_row, 2, Channels, littleEndian: true);
             }
             else
             {
-                Predictors.UndoFloatingPoint(_row, _scratch, 4, Channels, littleEndian: true);
+                Predictors.UndoFloatingPoint(_row, _scratch, Bytes, Channels, littleEndian: true);
             }
         }
 
