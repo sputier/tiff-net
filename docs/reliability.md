@@ -60,5 +60,24 @@ only up to the compressed bytes its rows can need, whatever byte count it declar
 more than their pixels. An LZW stream that goes on once its table is full, without a clear code, is decoded with the table as
 it is, where libtiff refuses it: the codes stay defined, and the decoding stays bounded.
 
-This page grows with the library: the memory used by reads and writes, and the rules for threads, are described with the
-features that bring them.
+## Bounds of time and memory
+
+What a file can make the library spend is bounded by the file itself or by the options, never by what the file declares:
+
+| A file that… | Costs at most |
+| --- | --- |
+| declares millions of strips, tiles, directories or tags | the tables it really holds, within `MaxDirectories`, `MaxTagsPerDirectory`, `MaxTagBytes` and `MaxMetadataBytes` |
+| declares a huge image in a few bytes | a refusal before the pixels are allocated: the strips must hold their rows (uncompressed), or could decode to them (a fixed ratio per codec) |
+| holds a decompression bomb | the rows its image declares, within `MaxPixelBytes` |
+| shares one stream between thousands of strips or tiles | the compressed bytes each one can need, not the file each time |
+| holds a progressive JPEG of thousands of scans | `MaxJpegScans`; a scan that refines no coefficient is refused |
+| ends early (truncated) | what is there: the rest of a JPEG scan is grey, as libjpeg gives it; other codecs report the missing rows |
+
+Every allocation a file asks for (decoded images, decoding buffers, JPEG planes and coefficients) is counted in `MaxPixelBytes`
+before it is made; each thread holds the buffers of one strip or tile. Reading and writing can be cancelled between strips or
+tiles (`ReadPixelsAsync`, `SaveAsync`).
+
+## Threads
+
+An image can be read from several threads at once. Changing an image or the pages of a file must not happen while it is read
+or saved; a `TiffImageWriter` is used from one thread. The results of reads and writes do not depend on the number of threads.
