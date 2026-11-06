@@ -32,8 +32,9 @@ internal static class TiffFileWriter
 
     /// <summary>Writes the images, planned by <see cref="Prepare"/>, as one file into a stream that seeks.</summary>
     public static void Write(IReadOnlyList<TiffImage> images, List<ImageEncoder> encoders, Stream output, TiffWriteOptions options,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, IProgress<double>? progress = null)
     {
+        var counter = ProgressCounter.Of(progress, encoders.Sum(e => (long)e.Blocks));
         bool bigTiff = options.BigTiff switch
         {
             TiffBigTiff.Always => true,
@@ -46,7 +47,7 @@ internal static class TiffFileWriter
         {
             var encoder = encoders[i];
             long[] offsets = new long[encoder.Blocks], counts = new long[encoder.Blocks];
-            encoder.Write(writer, offsets, counts, options.Degree, cancellationToken);
+            encoder.Write(writer, offsets, counts, options.Degree, cancellationToken, counter);
             writer.WriteDirectory(Entries(encoder.Shape(images[i]), images[i].Metadata, offsets, counts, bigTiff));
         }
     }

@@ -69,6 +69,19 @@ public sealed partial class TiffFile : IReadOnlyList<TiffImage>, IDisposable
         return Load(source, options);
     }
 
+    /// <summary>Opens a file on a thread of the pool, as <see cref="Open(string, TiffReadOptions?)"/>.</summary>
+    /// <param name="path">The path of the file.</param>
+    /// <param name="options">The tolerance and the limits of the read; <see cref="TiffReadOptions.Default"/> when <see langword="null"/>.</param>
+    /// <param name="cancellationToken">Stops the reading of the directories.</param>
+    /// <returns>The file, to dispose when its pixels are no longer needed; every failure but of the arguments is reported by the task.</returns>
+    public static Task<TiffFile> OpenAsync(string path, TiffReadOptions? options = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(path);
+        Platform.EnsureSupported();
+        options ??= TiffReadOptions.Default;
+        return Task.Run(() => Load(TiffSource.Open(path), options, cancellationToken), cancellationToken);
+    }
+
     /// <summary>
     /// Opens a TIFF stream that seeks, from its current position, and reads its directories; the pixels are read from the stream
     /// on demand, until the file is disposed, without copying the stream into memory (a <see cref="FileStream"/> is read through
