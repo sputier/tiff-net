@@ -72,10 +72,11 @@ What a file can make the library spend is bounded by the file itself or by the o
 | shares one stream between thousands of strips or tiles | the compressed bytes each one can need, not the file each time |
 | holds a progressive JPEG of thousands of scans | `MaxJpegScans`; a scan that refines no coefficient is refused |
 | ends early (truncated) | what is there: the rest of a JPEG scan is grey, as libjpeg gives it; other codecs report the missing rows |
+| is opened, then saved again (a service converting what it receives) | what reading its pixels would: they count in `MaxPixelBytes` although they are decoded band after band, and the file must hold them, checked before anything is allocated |
 
 Every allocation a file asks for (decoded images, decoding buffers, JPEG planes and coefficients) is counted in `MaxPixelBytes`
 before it is made; each thread holds the buffers of one strip or tile. Reading and writing can be cancelled between strips or
-tiles (`ReadPixelsAsync`, `SaveAsync`).
+tiles (`ReadPixelsAsync`, `Save`, `SaveAsync`).
 
 ## Threads
 

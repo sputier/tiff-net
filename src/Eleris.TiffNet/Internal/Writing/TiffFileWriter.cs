@@ -19,6 +19,7 @@ internal static class TiffFileWriter
             throw new InvalidOperationException("A TIFF file needs at least one image.");
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         var encoders = images.Select(i => new ImageEncoder(i, options)).ToList();
         bool bigTiff = options.BigTiff switch
         {

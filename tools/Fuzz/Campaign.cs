@@ -10,14 +10,16 @@ internal static class Targets
 {
     /// <summary>
     /// The targets by name. "none" only exercises the harness (mutations, timing, saving); "open" reads the structure of a file
-    /// from memory and every property of its pages and sub-images; "read" also reads their pixels; "jpeg" decodes a JPEG stream
-    /// (its seeds are the *.jpg files of the corpus, mutated byte by byte).
+    /// from memory and every property of its pages and sub-images; "read" also reads their pixels; "save" writes the readable pages
+    /// again (in strips, then in planar tiles) and opens what it wrote; "jpeg" decodes a JPEG stream (its seeds are the *.jpg files
+    /// of the corpus, mutated byte by byte).
     /// </summary>
     public static readonly IReadOnlyDictionary<string, Action<byte[]>> All = new Dictionary<string, Action<byte[]>>
     {
         ["none"] = static _ => { },
         ["open"] = Open,
         ["read"] = Read,
+        ["save"] = Save,
         ["jpeg"] = Jpeg,
     };
 
@@ -69,6 +71,34 @@ internal static class Targets
             {
                 pending.Push(sub);
             }
+        }
+    }
+
+    /// <summary>Opens the file and saves its readable pages twice, as an application converting files it receives would.</summary>
+    private static void Save(byte[] input)
+    {
+        using var file = TiffFile.Read(new MemoryStream(input, writable: false), Options);
+        var pages = new TiffFile();
+        foreach (var image in file.Where(i => i.UnsupportedReason is null))
+        {
+            pages.Add(image);
+        }
+
+        if (pages.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var options in new[]
+        {
+            TiffWriteOptions.Default with { MaxDegreeOfParallelism = 2 },
+            TiffWriteOptions.Default with { Layout = TiffLayout.Tiles, PlanarConfiguration = TiffPixelOrder.Planar, Compression = TiffCompression.Lzw },
+        })
+        {
+            using var output = new MemoryStream();
+            pages.Save(output, options);
+            using var back = TiffFile.Read(new MemoryStream(output.ToArray(), writable: false));
+            _ = back.Primary;
         }
     }
 
