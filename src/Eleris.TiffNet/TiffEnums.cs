@@ -162,7 +162,11 @@ public enum TiffCompressionLevel
     /// <summary>The balance of zlib and libtiff (level 6).</summary>
     Optimal = 2,
 
-    /// <summary>The smallest files (zlib level 9), slower to write; reading is as fast.</summary>
+    /// <summary>
+    /// zlib level 9: 1.5 to 4 times slower to write than <see cref="Optimal"/>, reading as fast. With the zlib-ng of .NET the
+    /// files are rarely smaller than at the level of <see cref="Optimal"/>, and predicted 16-bit images can even be slightly
+    /// larger (measured in benchmarks/results/2026-11-06.md).
+    /// </summary>
     SmallestSize = 3,
 }
 
