@@ -76,7 +76,7 @@ public sealed partial class TiffFile : IReadOnlyList<TiffImage>, IDisposable
     /// </summary>
     /// <param name="stream">The stream; it must seek and be read, and must not be used by the application while the file is open.</param>
     /// <param name="options">The tolerance and the limits of the read; <see cref="TiffReadOptions.Default"/> when <see langword="null"/>.</param>
-    /// <param name="leaveOpen">Whether the stream stays open when the file is disposed.</param>
+    /// <param name="leaveOpen">Whether the stream stays open when the file is disposed (or when opening it fails).</param>
     /// <returns>The file, to dispose when its pixels are no longer needed.</returns>
     /// <exception cref="ArgumentException">The stream cannot seek or be read.</exception>
     /// <exception cref="TiffException">The data is not TIFF, is damaged, or exceeds a limit of <paramref name="options"/>.</exception>
