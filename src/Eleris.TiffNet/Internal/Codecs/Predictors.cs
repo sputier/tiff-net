@@ -63,15 +63,18 @@ internal static class Predictors
     /// <param name="littleEndian">Whether the file is little endian: the samples are written in that order.</param>
     public static void UndoFloatingPoint(Span<byte> row, Span<byte> scratch, int bytesPerSample, int stride, bool littleEndian)
     {
+        // Summed in place, then copied: measured faster than summing into the scratch (issue #106).
         Accumulate(row, stride);
         row.CopyTo(scratch);
+
         int count = row.Length / bytesPerSample;
         ref byte planes = ref MemoryMarshal.GetReference(scratch);
         ref byte output = ref MemoryMarshal.GetReference(row);
+        bool vectors = littleEndian && BitConverter.IsLittleEndian;
         switch (bytesPerSample)
         {
             case 2:
-                for (int i = 0; i < count; i++)
+                for (int i = vectors ? Interleave2(scratch, row, count) : 0; i < count; i++)
                 {
                     ushort v = (ushort)(Unsafe.Add(ref planes, i) << 8 | Unsafe.Add(ref planes, count + i));
                     Unsafe.WriteUnaligned(ref Unsafe.Add(ref output, i * 2), littleEndian ? v : BinaryPrimitives.ReverseEndianness(v));
@@ -79,7 +82,7 @@ internal static class Predictors
 
                 break;
             case 4:
-                for (int i = littleEndian && BitConverter.IsLittleEndian ? Interleave4(scratch, row, count) : 0; i < count; i++)
+                for (int i = vectors ? Interleave4(scratch, row, count) : 0; i < count; i++)
                 {
                     uint v = (uint)Unsafe.Add(ref planes, i) << 24 | (uint)Unsafe.Add(ref planes, count + i) << 16
                         | (uint)Unsafe.Add(ref planes, 2 * count + i) << 8 | Unsafe.Add(ref planes, 3 * count + i);
@@ -88,7 +91,7 @@ internal static class Predictors
 
                 break;
             default:
-                for (int i = 0; i < count; i++)
+                for (int i = vectors ? Interleave8(scratch, row, count) : 0; i < count; i++)
                 {
                     ulong v = 0;
                     for (int b = 0; b < 8; b++)
@@ -107,6 +110,81 @@ internal static class Predictors
             // The values were written for a little-endian machine.
             Swap(row, bytesPerSample);
         }
+    }
+
+    /// <summary>
+    /// Puts the two byte planes of 16-bit samples (most significant first) back together as little-endian samples, 16 samples at
+    /// once (SSE2 or AdvSimd); returns the number done.
+    /// </summary>
+    private static int Interleave2(ReadOnlySpan<byte> planes, Span<byte> output, int count)
+    {
+        if (!Sse2.IsSupported && !AdvSimd.Arm64.IsSupported)
+        {
+            return 0;
+        }
+
+        int i = 0;
+        for (; i + 16 <= count; i += 16)
+        {
+            var p0 = Vector128.Create<byte>(planes[i..]);
+            var p1 = Vector128.Create<byte>(planes[(count + i)..]);
+            var target = output[(i * 2)..];
+            ZipLow(p1, p0).CopyTo(target);
+            ZipHigh(p1, p0).CopyTo(target[16..]);
+        }
+
+        return i;
+    }
+
+    /// <summary>
+    /// Puts the eight byte planes of 64-bit samples (most significant first) back together as little-endian samples, 16 samples
+    /// at once (SSE2 or AdvSimd): pairs of bytes, then of words, then of double words; returns the number done.
+    /// </summary>
+    private static int Interleave8(ReadOnlySpan<byte> planes, Span<byte> output, int count)
+    {
+        if (!Sse2.IsSupported && !AdvSimd.Arm64.IsSupported)
+        {
+            return 0;
+        }
+
+        Span<Vector128<uint>> high = stackalloc Vector128<uint>[4];
+        Span<Vector128<uint>> low = stackalloc Vector128<uint>[4];
+        int i = 0;
+        for (; i + 16 <= count; i += 16)
+        {
+            // Little endian: the least significant byte (plane 7) first. Bytes 7 to 4 of each sample, then 3 to 0.
+            Halves(planes, count, i, 7, high);
+            Halves(planes, count, i, 3, low);
+            var target = output[(i * 8)..];
+            for (int j = 0; j < 4; j++)
+            {
+                ZipLow(high[j], low[j]).AsByte().CopyTo(target[(32 * j)..]);
+                ZipHigh(high[j], low[j]).AsByte().CopyTo(target[(32 * j + 16)..]);
+            }
+        }
+
+        return i;
+    }
+
+    /// <summary>
+    /// Bytes <paramref name="first"/> to <paramref name="first"/> − 3 of 16 samples from <paramref name="at"/>, as double words of
+    /// four samples each (in <paramref name="quarters"/>, in the order of the samples).
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void Halves(ReadOnlySpan<byte> planes, int count, int at, int first, Span<Vector128<uint>> quarters)
+    {
+        var a = Vector128.Create<byte>(planes[(first * count + at)..]);
+        var b = Vector128.Create<byte>(planes[((first - 1) * count + at)..]);
+        var c = Vector128.Create<byte>(planes[((first - 2) * count + at)..]);
+        var d = Vector128.Create<byte>(planes[((first - 3) * count + at)..]);
+        var abLow = ZipLow(a, b).AsUInt16();
+        var abHigh = ZipHigh(a, b).AsUInt16();
+        var cdLow = ZipLow(c, d).AsUInt16();
+        var cdHigh = ZipHigh(c, d).AsUInt16();
+        quarters[0] = ZipLow(abLow, cdLow).AsUInt32();
+        quarters[1] = ZipHigh(abLow, cdLow).AsUInt32();
+        quarters[2] = ZipLow(abHigh, cdHigh).AsUInt32();
+        quarters[3] = ZipHigh(abHigh, cdHigh).AsUInt32();
     }
 
     /// <summary>
@@ -153,6 +231,12 @@ internal static class Predictors
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector128<ushort> ZipHigh(Vector128<ushort> a, Vector128<ushort> b) => Sse2.IsSupported ? Sse2.UnpackHigh(a, b) : AdvSimd.Arm64.ZipHigh(a, b);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector128<uint> ZipLow(Vector128<uint> a, Vector128<uint> b) => Sse2.IsSupported ? Sse2.UnpackLow(a, b) : AdvSimd.Arm64.ZipLow(a, b);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector128<uint> ZipHigh(Vector128<uint> a, Vector128<uint> b) => Sse2.IsSupported ? Sse2.UnpackHigh(a, b) : AdvSimd.Arm64.ZipHigh(a, b);
 
     /// <summary>The samples of the row in the order of the machine (swapped in place when needed).</summary>
     private static Span<T> Native<T>(Span<byte> row, bool swap) where T : unmanaged
