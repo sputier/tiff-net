@@ -12,24 +12,9 @@ internal static class SafeFile
     /// </summary>
     public static void Replace(string path, Action<Stream> write)
     {
-        string full = Path.GetFullPath(path);
-        string folder = Path.GetDirectoryName(full) ?? ".";
-        string temporary = Path.Combine(folder, $".{Path.GetFileName(full)}.{Guid.NewGuid():N}.tmp");
-        try
-        {
-            using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, 1 << 16))
-            {
-                write(stream);
-                stream.Flush(flushToDisk: true);
-            }
-
-            Move(temporary, full);
-        }
-        catch
-        {
-            TryDelete(temporary);
-            throw;
-        }
+        using var file = TemporaryFile.Next(path);
+        write(file.Stream);
+        file.Commit();
     }
 
     /// <summary>
@@ -37,7 +22,7 @@ internal static class SafeFile
     /// rights (Windows, through File.Replace) to the new one. A target this process holds open (the file being saved over) is
     /// first moved aside, which Windows allows for a file opened with FileShare.Delete, then removed.
     /// </summary>
-    private static void Move(string temporary, string target)
+    internal static void Move(string temporary, string target)
     {
         if (!File.Exists(target))
         {
@@ -56,14 +41,37 @@ internal static class SafeFile
         {
             File.Replace(temporary, target, destinationBackupFileName: null, ignoreMetadataErrors: true);
         }
-        catch (IOException)
+        catch (IOException ex) when (IsSharingViolation(ex))
         {
-            // The target is open (FileShare.Delete): move it aside, put the new file in place, remove the old one.
+            // The target is open (FileShare.Delete): move it aside, put the new file in place, remove the old one. If the new
+            // file cannot be put in place, the old one goes back: the target is never lost.
             string aside = $"{temporary}.old";
             File.Move(target, aside);
-            File.Move(temporary, target);
+            try
+            {
+                File.Move(temporary, target);
+            }
+            catch
+            {
+                File.Move(aside, target);
+                throw;
+            }
+
             TryDelete(aside);
         }
+    }
+
+    /// <summary>A file open elsewhere (Windows ERROR_SHARING_VIOLATION or ERROR_LOCK_VIOLATION), not another failure.</summary>
+    private static bool IsSharingViolation(IOException ex) => (ex.HResult & 0xFFFF) is 32 or 33;
+
+    /// <summary>The file a path designates: the end of its symbolic links, so that a link is written through, not replaced.</summary>
+    internal static string Resolve(string path)
+    {
+        string full = Path.GetFullPath(path);
+        var info = new FileInfo(full);
+        return info.Exists && info.LinkTarget is not null && info.ResolveLinkTarget(returnFinalTarget: true) is { } target
+            ? target.FullName
+            : full;
     }
 
     /// <summary>Writes into a stream: straight when it seeks, otherwise through a temporary file copied in a bounded buffer.</summary>
@@ -81,16 +89,47 @@ internal static class SafeFile
             return;
         }
 
-        string temporary = Path.Combine(Path.GetTempPath(), $"eleris-tiff-{Guid.NewGuid():N}.tmp");
-        using var buffer = new FileStream(temporary, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, 1 << 16,
-            FileOptions.DeleteOnClose);
+        using var buffer = Buffer();
         write(buffer);
         buffer.Position = 0;
         buffer.CopyTo(stream, CopyBuffer);
         stream.Flush();
     }
 
-    private static void TryDelete(string path)
+    /// <summary>As <see cref="ToStream"/>, the copy of a stream that cannot seek done asynchronously (a response body of a web server).</summary>
+    /// <exception cref="ArgumentException">The stream cannot be written (thrown, not reported by the task).</exception>
+    public static Task ToStreamAsync(Stream stream, Action<Stream> write, CancellationToken cancellationToken)
+    {
+        if (!stream.CanWrite)
+        {
+            throw new ArgumentException("The stream cannot be written.", nameof(stream));
+        }
+
+        return WriteAsync(stream, write, cancellationToken);
+    }
+
+    private static async Task WriteAsync(Stream stream, Action<Stream> write, CancellationToken cancellationToken)
+    {
+        if (stream.CanSeek)
+        {
+            // Encoding is the work; the writes go to a stream that seeks, which does not block for long.
+            await Task.Run(() => write(stream), cancellationToken).ConfigureAwait(false);
+            await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        await using var buffer = Buffer();
+        await Task.Run(() => write(buffer), cancellationToken).ConfigureAwait(false);
+        buffer.Position = 0;
+        await buffer.CopyToAsync(stream, CopyBuffer, cancellationToken).ConfigureAwait(false);
+        await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>The temporary file of a stream that cannot seek, removed when it is closed.</summary>
+    private static FileStream Buffer() => new(Path.Combine(Path.GetTempPath(), $"eleris-tiff-{Guid.NewGuid():N}.tmp"),
+        FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, 1 << 16, FileOptions.DeleteOnClose);
+
+    internal static void TryDelete(string path)
     {
         try
         {
@@ -102,6 +141,46 @@ internal static class SafeFile
         }
         catch (UnauthorizedAccessException)
         {
+        }
+    }
+}
+
+/// <summary>A temporary file next to a target, which replaces it on <see cref="Commit"/> and is removed otherwise.</summary>
+internal sealed class TemporaryFile : IDisposable
+{
+    private readonly string _target;
+    private readonly string _path;
+    private bool _committed;
+
+    private TemporaryFile(string target)
+    {
+        _target = SafeFile.Resolve(target);
+        string folder = Path.GetDirectoryName(_target) ?? ".";
+        _path = Path.Combine(folder, $".tiff-{Guid.NewGuid():N}.tmp");   // short: the name of the target may be long
+        Stream = new FileStream(_path, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, 1 << 16);
+    }
+
+    public FileStream Stream { get; }
+
+    /// <summary>Creates the temporary file of a target.</summary>
+    public static TemporaryFile Next(string target) => new(target);
+
+    /// <summary>Flushes the file to the disk and puts it in place of the target.</summary>
+    public void Commit()
+    {
+        Stream.Flush(flushToDisk: true);
+        Stream.Dispose();
+        SafeFile.Move(_path, _target);
+        _committed = true;
+    }
+
+    /// <summary>Removes the temporary file unless it was committed; a failure to remove it hides nothing.</summary>
+    public void Dispose()
+    {
+        if (!_committed)
+        {
+            Stream.Dispose();
+            SafeFile.TryDelete(_path);
         }
     }
 }

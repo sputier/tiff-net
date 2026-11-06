@@ -5,7 +5,15 @@ namespace Eleris.TiffNet.Tests.Writing;
 
 public class SaveTests
 {
-    private static string Temporary() => Path.Combine(Path.GetTempPath(), $"tiffnet-{Guid.NewGuid():N}.tif");
+    /// <summary>A path in a folder of its own, where the temporary file of a save is made: other tests save at the same time.</summary>
+    internal static string Temporary()
+    {
+        string folder = Path.Combine(Path.GetTempPath(), $"tiffnet-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(folder);
+        return Path.Combine(folder, "image.tif");
+    }
+
+    internal static void Delete(string path) => Directory.Delete(Path.GetDirectoryName(path)!, recursive: true);
 
     private static byte[] SaveToBytes(TiffFile file, TiffWriteOptions? options = null)
     {
@@ -54,11 +62,11 @@ public class SaveTests
             using var back = TiffFile.Open(path);
             Assert.Equal(TiffCompression.Lzw, back.Primary.Storage!.Compression);
             Assert.Equal(expected, back.Primary.ReadRawPixels<ushort>());
-            Assert.Empty(Directory.GetFiles(Path.GetDirectoryName(path)!, $".{Path.GetFileName(path)}.*"));
+            Assert.Empty(Directory.GetFiles(Path.GetDirectoryName(path)!, ".tiff-*.tmp*"));
         }
         finally
         {
-            File.Delete(path);
+            Delete(path);
         }
     }
 
@@ -75,11 +83,11 @@ public class SaveTests
 
             Assert.Throws<NotSupportedException>(() => file.Save(path));
             Assert.Equal(new byte[] { 1, 2, 3 }, File.ReadAllBytes(path));
-            Assert.Empty(Directory.GetFiles(Path.GetDirectoryName(path)!, $".{Path.GetFileName(path)}.*"));
+            Assert.Empty(Directory.GetFiles(Path.GetDirectoryName(path)!, ".tiff-*.tmp*"));
         }
         finally
         {
-            File.Delete(path);
+            Delete(path);
         }
     }
 
