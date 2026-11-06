@@ -11,8 +11,8 @@ checked.
 | .NET MAUI, Android | `samples/Eleris.TiffNet.MauiSample` is built for Android on every change (job `maui`); it is run on an emulator by hand (below) |
 
 The library is trimmable and AOT-compatible (`IsTrimmable`, `IsAotCompatible`): reflection is not used, and the analyzers
-of trimming and AOT run on every build. On processors without AVX2 (ARM included), the JPEG decoder uses its scalar inverse
-DCT, which gives the same samples bit for bit.
+of trimming and AOT run on every build. On processors without AVX2 (ARM included), the JPEG decoder uses its inverse DCT on
+128-bit vectors (SSE2 or AdvSimd), which gives the same samples bit for bit.
 
 ## Android, by hand
 
