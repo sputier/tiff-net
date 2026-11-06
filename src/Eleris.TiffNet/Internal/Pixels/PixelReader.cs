@@ -38,6 +38,9 @@ internal sealed class PixelPlan
     /// <summary>Whether the rows of a block that a read needs are inflated as a stream (Deflate only: its decoder resumes).</summary>
     internal static bool Streamed(ImageDescriptor d, long needed) => d.Compression == TiffCompression.Deflate && needed > StreamBytes;
 
+    /// <summary>The memory of a streamed block besides its rows: the buffer of its read and the state of zlib.</summary>
+    private const int StreamState = 128 * 1024;
+
     /// <summary>The rows inflated at once by a streamed block.</summary>
     internal static int StreamRows(long rowBytes) => (int)Math.Max(1, ChunkBytes / Math.Max(1, rowBytes));
 
@@ -142,7 +145,7 @@ internal sealed class PixelPlan
         var plan = new PixelPlan(d, request, stored, rowBytes, rowsPerUnit);
         string kind = d.Layout == TiffLayout.Tiles ? "tile" : "strip";
 
-        long units = 0, largestCompressed = 0, largestDecoded = 0;
+        long units = 0, rowsRead = 0, largestCompressed = 0, largestDecoded = 0;
         foreach (var (block, _, blockY, first, end) in plan.Blocks())
         {
             // A JPEG stream is decoded whole: its rows are all decoded, whatever the read needs.
@@ -166,8 +169,9 @@ internal sealed class PixelPlan
 
                 if (Streamed(d, needed))
                 {
-                    // Read through a stream and inflated a few rows at a time: no buffer of the block.
-                    largestDecoded = Math.Max(largestDecoded, StreamRows(rowBytes) * rowBytes);
+                    // Read through a stream and inflated a few rows at a time: no buffer of the block, but the buffer of the read
+                    // and the state of zlib (about 128 KB, counted with the rows).
+                    largestDecoded = Math.Max(largestDecoded, StreamRows(rowBytes) * rowBytes + StreamState);
                 }
                 else
                 {
@@ -181,12 +185,19 @@ internal sealed class PixelPlan
             }
 
             units += (end - first + rowsPerUnit - 1) / rowsPerUnit;
+            rowsRead += end - first;
         }
 
         if (largestCompressed > Array.MaxLength || largestDecoded > Array.MaxLength)
         {
             throw new NotSupportedException(
                 $"{budget.SourceName}: compressed {kind}s of more than {Array.MaxLength} bytes are not supported; read the image by region.");
+        }
+
+        if (!compressed && d.Layout == TiffLayout.Strips)
+        {
+            // Strips that follow each other are read together (Units): about one unit a chunk of rows, not one a strip.
+            units = Math.Min(units, (rowsRead + rowsPerUnit - 1) / rowsPerUnit);
         }
 
         // The scratch buffers of the workers are counted, so that a huge row or tile cannot make them allocate more than allowed.
@@ -557,9 +568,10 @@ internal static class PixelReader
             string kind = _d.Layout == TiffLayout.Tiles ? "tile" : "strip";
             int chunkRows = PixelPlan.StreamRows(_rowBytes);
             Span<byte> chunk = scratch.Decoded.AsSpan(0, (int)(chunkRows * _rowBytes));
+            var range = _source.OpenRange(_d.Offsets[block], count);
             try
             {
-                using var zlib = new ZLibStream(new BufferedStream(_source.OpenRange(_d.Offsets[block], count), 1 << 16), CompressionMode.Decompress);
+                using var zlib = new ZLibStream(new BufferedStream(range, 1 << 16), CompressionMode.Decompress);
                 for (long row = 0; row < last; row += chunkRows)
                 {
                     _budget.ThrowIfCancelled();
@@ -594,7 +606,13 @@ internal static class PixelReader
             }
             catch (IOException ex) when (ex is not EndOfStreamException)
             {
-                // zlib reports damaged streams as an InvalidDataException or a ZLibException (an IOException).
+                // A failure of the file or the stream of the application is its own, given as it is; zlib reports damaged data as
+                // an InvalidDataException or a ZLibException (an IOException).
+                if (range.Failure is { } failure)
+                {
+                    System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(failure);
+                }
+
                 throw _budget.Invalid($"{kind} {block} cannot be decoded ({_d.Compression}): {ex.Message}");
             }
             catch (InvalidDataException ex)

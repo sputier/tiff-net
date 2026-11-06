@@ -65,6 +65,20 @@ public class StreamedStripTests
     }
 
     [Fact]
+    public void A_failure_of_the_stream_of_the_application_is_its_own_not_a_damaged_file()
+    {
+        byte[] data = new byte[Width * Height * 6];
+        new Random(85).NextBytes(data);
+        byte[] tiff = Build(Compress(data), 1);
+        var stream = new FailingStream(tiff, failAfter: tiff.Length / 2);
+        using var file = TiffFile.Open(stream);
+        stream.Armed = true;   // once the directories are read: the disk goes away while the strip is inflated
+
+        var thrown = Assert.Throws<IOException>(() => file.Primary.ReadRawPixels<ushort>());
+        Assert.Equal("disk gone", thrown.Message);
+    }
+
+    [Fact]
     public void A_single_strip_costs_about_its_pixels()
     {
         var (file, _) = SingleStrip(2);
@@ -145,5 +159,15 @@ public class StreamedStripTests
         }
 
         return output.ToArray();
+    }
+
+    /// <summary>A stream over bytes whose reads beyond a position fail, as a disk that goes away.</summary>
+    private sealed class FailingStream(byte[] data, long failAfter) : MemoryStream(data, writable: false)
+    {
+        public bool Armed { get; set; }
+
+        // A stream derived from MemoryStream reads spans through this method.
+        public override int Read(byte[] buffer, int offset, int count) =>
+            Armed && Position + count > failAfter ? throw new IOException("disk gone") : base.Read(buffer, offset, count);
     }
 }
