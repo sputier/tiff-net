@@ -21,7 +21,11 @@ internal sealed class JpegComponent
     public required int Height { get; init; }
 
     /// <summary>The samples, row after row; the plane covers whole MCUs, beyond <see cref="Width"/> x <see cref="Height"/>.</summary>
-    public required byte[] Plane { get; init; }
+    /// <remarks>Allocated with the frame for a sequential image, after the last scan for a progressive one.</remarks>
+    public byte[] Plane { get; internal set; } = [];
+
+    /// <summary>The rows of <see cref="Plane"/> (whole MCUs).</summary>
+    internal int PlaneRows { get; init; }
 
     /// <summary>The bytes of a row of <see cref="Plane"/>.</summary>
     public required int Stride { get; init; }
@@ -33,6 +37,18 @@ internal sealed class JpegComponent
     internal int Prediction { get; set; }
 
     internal bool Scanned { get; set; }
+
+    /// <summary>The blocks of a row of <see cref="Plane"/> (whole MCUs).</summary>
+    internal int BlocksAcross => Stride / 8;
+
+    /// <summary>A progressive image: the coefficients of every block, 64 per block, refined scan after scan.</summary>
+    internal short[]? Coefficients { get; init; }
+
+    /// <summary>A progressive image: the bit of each coefficient known so far (-1: none), to tell scans that refine nothing.</summary>
+    internal int[]? KnownBits { get; init; }
+
+    /// <summary>The quantization table, latched at the first scan of the component (as libjpeg does).</summary>
+    internal ushort[]? Quantization { get; set; }
 }
 
 /// <summary>A decoded JPEG frame: its size, its components (before any colour conversion), and what its markers say about colour.</summary>
@@ -44,6 +60,9 @@ internal sealed class JpegFrame
 
     public required JpegComponent[] Components { get; init; }
 
+    /// <summary>Whether the frame is progressive (SOF2): its coefficients are transformed once its last scan is read.</summary>
+    public bool Progressive { get; init; }
+
     /// <summary>The colour transform of an Adobe APP14 marker (0: none, 1: YCbCr), or null without that marker.</summary>
     public int? AdobeTransform { get; set; }
 
@@ -52,18 +71,35 @@ internal sealed class JpegFrame
 }
 
 /// <summary>
-/// A decoder of JPEG streams (ITU-T T.81), sequential with Huffman coding (SOF0 and SOF1), 8-bit samples, 1 to 3 components with
-/// sampling factors up to 4, restart intervals; the tables of an abbreviated stream (TIFF's <c>JPEGTables</c>) are read first.
-/// Anything else (progressive, lossless, hierarchical, arithmetic coding, 12-bit, 4 components, DNL) is refused as not supported.
+/// A decoder of JPEG streams (ITU-T T.81), sequential (SOF0, SOF1) and progressive (SOF2) with Huffman coding, 8-bit samples,
+/// 1 to 3 components with sampling factors up to 4, restart intervals; the tables of an abbreviated stream (TIFF's
+/// <c>JPEGTables</c>) are read first. Anything else (lossless, hierarchical, arithmetic coding, 12-bit, 4 components, DNL) is
+/// refused as not supported.
 /// </summary>
 /// <remarks>
 /// Defects of the data are <see cref="InvalidDataException"/>; what it decodes to is counted in the budget before it is allocated.
 /// The decoding of a scan is bounded by its frame: every block is decoded at most once. As libjpeg does, the MCU in which the data
 /// of a scan runs out ends with zeros, and the blocks after it (until a restart marker) are not decoded but grey (128), which
-/// costs a fill, not a decoding; a component that no scan holds is grey too.
+/// costs a fill, not a decoding; a component that no scan holds is grey too. A progressive image keeps its coefficients (counted
+/// in the budget before they are allocated) until its last scan; its scans are limited by MaxJpegScans, each costs at most one
+/// pass over the blocks of its components, and a scan that refines no coefficient is refused.
 /// </remarks>
-internal sealed class JpegDecoder(ResourceBudget budget)
+internal sealed class JpegDecoder(ResourceBudget budget, int maxWidth = ushort.MaxValue, int maxHeight = ushort.MaxValue)
 {
+    /// <summary>A decoder that starts from tables read once (TIFF's JPEGTables), shared with the decoders of the other blocks.</summary>
+    /// <remarks>A table the stream redefines replaces the shared one in this decoder only: the shared tables are never changed.</remarks>
+    public JpegDecoder(JpegTables tables, ResourceBudget budget, int maxWidth, int maxHeight)
+        : this(budget, maxWidth, maxHeight)
+    {
+        Array.Copy(tables.Quantization, _quantization, 4);
+        Array.Copy(tables.Dc, _dc, 4);
+        Array.Copy(tables.Ac, _ac, 4);
+        _shared = [.. tables.Dc, .. tables.Ac];
+    }
+
+    /// <summary>The Huffman tables shared with other decoders (not to be redefined in place).</summary>
+    private readonly HuffmanTable?[] _shared = [];
+
     /// <summary>The natural (row by row) index of the k-th coefficient in zig-zag order, with 16 more entries that absorb a run
     /// past the end of a damaged block, as in libjpeg.</summary>
     private static ReadOnlySpan<byte> Natural =>
@@ -81,6 +117,15 @@ internal sealed class JpegDecoder(ResourceBudget budget)
     private JpegFrame? _frame;
     private int? _adobeTransform;
     private bool _jfif;
+    private int _endOfBands;
+    private long _reserved;
+
+    /// <summary>Gives back to the budget what the frame counted, once its samples are no longer needed.</summary>
+    public void Release()
+    {
+        budget.ReleasePixels(_reserved);
+        _reserved = 0;
+    }
 
     /// <summary>Reads the tables of an abbreviated table-specification stream (SOI, DQT and DHT, EOI), as TIFF's JPEGTables holds.</summary>
     /// <exception cref="InvalidDataException">The stream is damaged.</exception>
@@ -110,6 +155,12 @@ internal sealed class JpegDecoder(ResourceBudget budget)
         while (true)
         {
             int marker = NextMarker(data, ref position);
+            if (_scans > 0 && marker is not (-1 or 0xD9 or (>= 0xD0 and <= 0xD7) or 0x01) && !Fits(data, position))
+            {
+                // A stream cut in a marker segment after its first scans: what is decoded is the image, as libjpeg gives it.
+                return End(tablesOnly);
+            }
+
             switch (marker)
             {
                 case -1:
@@ -118,15 +169,14 @@ internal sealed class JpegDecoder(ResourceBudget budget)
                     return End(tablesOnly);
                 case 0xC0:
                 case 0xC1:
+                case 0xC2:
                     if (tablesOnly)
                     {
                         throw new InvalidDataException("the JPEG tables hold a frame.");
                     }
 
-                    ReadFrame(Segment(data, ref position));
+                    ReadFrame(Segment(data, ref position), progressive: marker == 0xC2);
                     break;
-                case 0xC2:
-                    throw new NotSupportedException("progressive JPEG is not implemented yet.");
                 case 0xC3 or 0xC5 or 0xC6 or 0xC7 or 0xC9 or 0xCA or 0xCB or 0xCD or 0xCE or 0xCF:
                     throw new NotSupportedException($"the JPEG process of marker SOF{marker - 0xC0} (lossless, hierarchical or arithmetic) is not supported.");
                 case 0xCC:
@@ -186,7 +236,37 @@ internal sealed class JpegDecoder(ResourceBudget budget)
 
         foreach (var c in _frame.Components)
         {
-            if (!c.Scanned)
+            if (_frame.Progressive)
+            {
+                // Counted with the frame: allocated only now, so that a stream refused in its scans never costs its planes.
+                c.Plane = new byte[c.Stride * c.PlaneRows];
+            }
+
+            if (_frame.Progressive && c.Quantization is { } quantization)
+            {
+                // The coefficients are complete: each block is transformed once.
+                var coefficients = c.Coefficients!;
+                int across = c.BlocksAcross, down = c.PlaneRows / 8;
+                for (int by = 0; by < down; by++)
+                {
+                    budget.ThrowIfCancelled();
+                    for (int bx = 0; bx < across; bx++)
+                    {
+                        var block = coefficients.AsSpan((by * across + bx) * 64, 64);
+                        var output = c.Plane.AsSpan(by * 8 * c.Stride + bx * 8);
+                        if (block[1..].IndexOfAnyExcept((short)0) < 0)
+                        {
+                            // DC only (all the blocks of a stream that ends early, most of a smooth image): a fill.
+                            JpegIdct.TransformDcOnly(block[0] * quantization[0], output, c.Stride);
+                        }
+                        else
+                        {
+                            JpegIdct.Transform(block, quantization, output, c.Stride);
+                        }
+                    }
+                }
+            }
+            else if (!c.Scanned)
             {
                 // libjpeg's coefficients of a component without data are 0, which the IDCT turns into 128.
                 c.Plane.AsSpan().Fill(128);
@@ -214,6 +294,10 @@ internal sealed class JpegDecoder(ResourceBudget budget)
         position = data.Length;
         return -1;
     }
+
+    /// <summary>Whether the segment at <paramref name="position"/> lies within the data.</summary>
+    private static bool Fits(ReadOnlySpan<byte> data, int position) =>
+        position + 2 <= data.Length && position + BinaryPrimitives.ReadUInt16BigEndian(data[position..]) <= data.Length;
 
     /// <summary>The payload of the segment at <paramref name="position"/> (after its 2-byte length), which is then skipped.</summary>
     private static ReadOnlySpan<byte> Segment(ReadOnlySpan<byte> data, ref int position)
@@ -283,8 +367,14 @@ internal sealed class JpegDecoder(ResourceBudget budget)
                 throw new InvalidDataException("a JPEG Huffman table is cut.");
             }
 
-            var table = HuffmanTable.Create(counts, s.Slice(17, total), dc: kind == 0);
-            (kind == 0 ? _dc : _ac)[id] = table;
+            // Defined into the table of that slot (built when a scan uses it): redefinitions cost their bytes only.
+            var tables = kind == 0 ? _dc : _ac;
+            if (tables[id] is null || Array.IndexOf(_shared, tables[id]) >= 0)
+            {
+                tables[id] = new HuffmanTable();
+            }
+
+            tables[id]!.Define(counts, s.Slice(17, total), dc: kind == 0);
             s = s[(17 + total)..];
         }
     }
@@ -307,7 +397,7 @@ internal sealed class JpegDecoder(ResourceBudget budget)
         }
     }
 
-    private void ReadFrame(ReadOnlySpan<byte> s)
+    private void ReadFrame(ReadOnlySpan<byte> s, bool progressive)
     {
         if (_frame is not null)
         {
@@ -334,6 +424,12 @@ internal sealed class JpegDecoder(ResourceBudget budget)
         if (width == 0)
         {
             throw new InvalidDataException("a JPEG frame has a width of 0.");
+        }
+
+        if (width > maxWidth || height > maxHeight)
+        {
+            // Checked before anything is allocated: a stream cannot declare more than its strip or tile holds.
+            throw new InvalidDataException($"a JPEG frame of {width} x {height} exceeds its strip or tile of {maxWidth} x {maxHeight}.");
         }
 
         if (count is 0 or > 4 || s.Length < 6 + 3 * count)
@@ -370,15 +466,17 @@ internal sealed class JpegDecoder(ResourceBudget budget)
             vMax = Math.Max(vMax, v);
         }
 
-        // The planes cover whole MCUs; they are counted before they are allocated.
+        // The planes cover whole MCUs; they (and the coefficients of a progressive image, 2 bytes each) are counted before they
+        // are allocated.
         long mcusAcross = (width + 8L * hMax - 1) / (8 * hMax), mcusDown = (height + 8L * vMax - 1) / (8 * vMax);
         long bytes = 0;
         foreach (var p in parts)
         {
-            bytes += mcusAcross * p.H * 8 * mcusDown * p.V * 8;
+            bytes += mcusAcross * p.H * 8 * mcusDown * p.V * 8 * (progressive ? 3 : 1);
         }
 
-        budget.ReservePixels(bytes, "the JPEG planes");
+        budget.ReservePixels(bytes, progressive ? "the JPEG planes and coefficients" : "the JPEG planes");
+        _reserved += bytes;
         foreach (var p in parts)
         {
             if (mcusAcross * p.H * 8 * mcusDown * p.V * 8 > Array.MaxLength)
@@ -400,12 +498,15 @@ internal sealed class JpegDecoder(ResourceBudget budget)
                 QuantizationTable = p.Tq,
                 Width = (int)((width * (long)p.H + hMax - 1) / hMax),
                 Height = (int)((height * (long)p.V + vMax - 1) / vMax),
-                Plane = new byte[(int)(stride * mcusDown * p.V * 8)],
+                Plane = progressive ? [] : new byte[(int)(stride * mcusDown * p.V * 8)],
+                PlaneRows = (int)(mcusDown * p.V * 8),
                 Stride = stride,
+                Coefficients = progressive ? new short[(int)(stride * mcusDown * p.V * 8)] : null,
+                KnownBits = progressive ? Unknown() : null,
             };
         }
 
-        _frame = new JpegFrame { Width = width, Height = height, Components = components };
+        _frame = new JpegFrame { Width = width, Height = height, Components = components, Progressive = progressive };
     }
 
     /// <summary>Decodes a scan whose header is <paramref name="header"/>; its data starts at <paramref name="start"/>. Returns where it ends.</summary>
@@ -425,9 +526,9 @@ internal sealed class JpegDecoder(ResourceBudget budget)
             int id = header[1 + 2 * i], tables = header[2 + 2 * i];
             var component = Array.Find(frame.Components, c => c.Id == id)
                 ?? throw new InvalidDataException($"a JPEG scan refers to the component {id}, which the frame does not have.");
-            if (component.Scanned || Array.IndexOf(scan, component, 0, i) >= 0)
+            if (Array.IndexOf(scan, component, 0, i) >= 0 || (component.Scanned && !frame.Progressive))
             {
-                throw new InvalidDataException($"the JPEG component {id} is in two scans of a sequential image.");
+                throw new InvalidDataException($"the JPEG component {id} is twice in a scan, or in two scans of a sequential image.");
             }
 
             component.DcTable = tables >> 4;
@@ -443,11 +544,22 @@ internal sealed class JpegDecoder(ResourceBudget budget)
             }
 
             // A stream without Huffman tables (motion JPEG) uses those of annex K, as libjpeg-turbo does.
-            _dc[component.DcTable] ??= HuffmanTable.Standard(dc: true, luminance: component.DcTable == 0);
-            _ac[component.AcTable] ??= HuffmanTable.Standard(dc: false, luminance: component.AcTable == 0);
+            (_dc[component.DcTable] ??= HuffmanTable.Standard(dc: true, luminance: component.DcTable == 0)).Build();
+            (_ac[component.AcTable] ??= HuffmanTable.Standard(dc: false, luminance: component.AcTable == 0)).Build();
             component.Scanned = true;
             component.Prediction = 0;
+            if (frame.Progressive)
+            {
+                // Latched at the first scan of the component: a progressive image is transformed after its last scan.
+                component.Quantization ??= (ushort[])_quantization[component.QuantizationTable]!.Clone();
+            }
             scan[i] = component;
+        }
+
+        if (frame.Progressive)
+        {
+            int at = 1 + 2 * count;
+            return ReadProgressiveScan(data, start, frame, scan, header[at], header[at + 1], header[at + 2] >> 4, header[at + 2] & 15);
         }
 
         // Ss, Se, Ah and Al of a sequential scan are 0, 63, 0, 0; libjpeg decodes other values as sequential, with a warning.
@@ -518,6 +630,7 @@ internal sealed class JpegDecoder(ResourceBudget budget)
         if (_restartInterval > 0 && mcu > 0 && mcu % _restartInterval == 0)
         {
             reader.Restart();
+            _endOfBands = 0;
             foreach (var c in scan)
             {
                 c.Prediction = 0;
@@ -546,10 +659,35 @@ internal sealed class JpegDecoder(ResourceBudget budget)
         c.Prediction += reader.ReadDifference(size);
         block[0] = (short)c.Prediction;
 
+        // AC: one lookup gives most coefficients whole; otherwise the code, then the bits of its value.
         ReadOnlySpan<byte> natural = Natural;
-        for (int k = 1; k < 64; k++)
+        ReadOnlySpan<ushort> lookup = ac.Lookup;
+        ReadOnlySpan<int> fast = ac.FastAc;
+        int k = 1;
+        for (; k < 64; k++)
         {
-            int rs = ac.Decode(reader.Peek16(), out length);
+            int next = reader.Peek16();
+            int whole = fast[next >> (16 - HuffmanTable.LookupBits)];
+            if (whole != 0)
+            {
+                k += (whole >> 4) & 15;
+                block[natural[k]] = (short)(whole >> 16);
+                reader.Skip(whole & 15);
+                continue;
+            }
+
+            int entry = lookup[next >> (16 - HuffmanTable.LookupBits)];
+            int rs;
+            if (entry != 0)
+            {
+                length = entry >> 8;
+                rs = entry & 0xFF;
+            }
+            else
+            {
+                rs = ac.DecodeLong(next, out length);
+            }
+
             reader.Skip(length);
             int run = rs >> 4, bits = rs & 15;
             if (bits != 0)
@@ -567,6 +705,269 @@ internal sealed class JpegDecoder(ResourceBudget budget)
             }
         }
 
-        JpegIdct.Transform(block, _quantization[c.QuantizationTable], c.Plane.AsSpan(by * 8 * c.Stride + bx * 8), c.Stride);
+        var quantization = _quantization[c.QuantizationTable]!;
+        var output = c.Plane.AsSpan(by * 8 * c.Stride + bx * 8);
+        if (k == 1 && block[1] == 0)
+        {
+            // The first AC code was the end of the block: only DC (a flat block, common in smooth areas).
+            JpegIdct.TransformDcOnly(block[0] * quantization[0], output, c.Stride);
+            return;
+        }
+
+        JpegIdct.Transform(block, quantization, output, c.Stride);
+    }
+
+    /// <summary>
+    /// Decodes a scan of a progressive image (G.1.2): the first bits of the DC coefficients (possibly interleaved) or of a band of
+    /// AC coefficients of one component, or one more bit of them. Returns where the scan ends.
+    /// </summary>
+    private int ReadProgressiveScan(ReadOnlySpan<byte> data, int start, JpegFrame frame, JpegComponent[] scan, int ss, int se, int ah, int al)
+    {
+        // The parameters libjpeg refuses (G.1.1.1.1).
+        bool dc = ss == 0;
+        if ((dc ? se != 0 : se < ss || se > 63 || scan.Length != 1) || (ah != 0 && al != ah - 1) || al > 13)
+        {
+            throw new InvalidDataException($"a progressive JPEG scan has the parameters Ss={ss}, Se={se}, Ah={ah}, Al={al}.");
+        }
+
+        // A scan must add bits to some coefficient: one that repeats what is known only costs time (a scan amplification).
+        bool progress = false;
+        foreach (var c in scan)
+        {
+            var known = c.KnownBits!;
+            for (int k = ss; k <= se; k++)
+            {
+                progress |= ah == 0 ? known[k] < 0 : known[k] == ah;
+                known[k] = al;
+            }
+        }
+
+        if (!progress)
+        {
+            throw new InvalidDataException($"a progressive JPEG scan (Ss={ss}, Se={se}, Ah={ah}, Al={al}) refines no coefficient.");
+        }
+
+        var reader = new JpegBitReader(data, start);
+        _endOfBands = 0;
+        int mcu = 0;
+        if (scan.Length == 1)
+        {
+            var c = scan[0];
+            int across = (c.Width + 7) / 8, down = (c.Height + 7) / 8;
+            for (int by = 0; by < down; by++)
+            {
+                budget.ThrowIfCancelled();
+                for (int bx = 0; bx < across; bx++)
+                {
+                    RestartIfDue(ref reader, scan, mcu++);
+                    if (!reader.Insufficient)
+                    {
+                        RefineBlock(ref reader, c, c.Coefficients.AsSpan((by * c.BlocksAcross + bx) * 64, 64), ss, se, ah, al);
+                    }
+                }
+            }
+        }
+        else
+        {
+            int hMax = frame.Components.Max(c => c.H), vMax = frame.Components.Max(c => c.V);
+            int across = (frame.Width + 8 * hMax - 1) / (8 * hMax), down = (frame.Height + 8 * vMax - 1) / (8 * vMax);
+            for (int my = 0; my < down; my++)
+            {
+                budget.ThrowIfCancelled();
+                for (int mx = 0; mx < across; mx++)
+                {
+                    RestartIfDue(ref reader, scan, mcu++);
+                    if (reader.Insufficient)
+                    {
+                        continue;
+                    }
+
+                    foreach (var c in scan)
+                    {
+                        for (int v = 0; v < c.V; v++)
+                        {
+                            for (int h = 0; h < c.H; h++)
+                            {
+                                int block = (my * c.V + v) * c.BlocksAcross + mx * c.H + h;
+                                RefineBlock(ref reader, c, c.Coefficients.AsSpan(block * 64, 64), ss, se, ah, al);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        frame.AdobeTransform = _adobeTransform;
+        frame.Jfif = _jfif;
+        return reader.Position;
+    }
+
+    /// <summary>Decodes the part of a scan that belongs to one block (libjpeg's jdphuff.c, the four kinds of scan).</summary>
+    private void RefineBlock(ref JpegBitReader reader, JpegComponent c, Span<short> block, int ss, int se, int ah, int al)
+    {
+        ReadOnlySpan<byte> natural = Natural;
+        if (ss == 0)
+        {
+            if (ah == 0)
+            {
+                // DC, first bits: a difference from the prediction, scaled by 2^Al.
+                int size = _dc[c.DcTable]!.Decode(reader.Peek16(), out int length);
+                reader.Skip(length);
+                c.Prediction += reader.ReadDifference(size);
+                block[0] = (short)(c.Prediction << al);
+            }
+            else if (reader.Read(1) != 0)
+            {
+                // DC, one more bit.
+                block[0] |= (short)(1 << al);
+            }
+
+            return;
+        }
+
+        var ac = _ac[c.AcTable]!;
+        if (ah == 0)
+        {
+            // AC, first bits of the band: runs of zeros and values, or a run of whole bands that end here (EOBRUN).
+            if (_endOfBands > 0)
+            {
+                _endOfBands--;
+                return;
+            }
+
+            for (int k = ss; k <= se; k++)
+            {
+                int rs = ac.Decode(reader.Peek16(), out int length);
+                reader.Skip(length);
+                int run = rs >> 4, bits = rs & 15;
+                if (bits != 0)
+                {
+                    k += run;
+                    block[natural[k]] = (short)(reader.ReadDifference(bits) << al);
+                }
+                else if (run == 15)
+                {
+                    k += 15;
+                }
+                else
+                {
+                    _endOfBands = (1 << run) - 1 + (run > 0 ? reader.Read(run) : 0);
+                    break;
+                }
+            }
+
+            return;
+        }
+
+        // AC, one more bit: of the coefficients already non-zero (a correction bit each), and new ones of value +-2^Al.
+        int plus = 1 << al, minus = -1 << al;
+        int position = ss;
+        if (_endOfBands == 0)
+        {
+            for (; position <= se; position++)
+            {
+                int rs = ac.Decode(reader.Peek16(), out int length);
+                reader.Skip(length);
+                int run = rs >> 4, bits = rs & 15;
+                int value = 0;
+                if (bits != 0)
+                {
+                    // The size of a new coefficient is 1 (libjpeg decodes another size the same way, with a warning).
+                    value = reader.Read(1) != 0 ? plus : minus;
+                }
+                else if (run != 15)
+                {
+                    _endOfBands = (1 << run) + (run > 0 ? reader.Read(run) : 0);
+                    break;
+                }
+
+                // Skip `run` zero coefficients, correcting the non-zero ones on the way; the new value goes after them.
+                do
+                {
+                    ref short coefficient = ref block[natural[position]];
+                    if (coefficient != 0)
+                    {
+                        Correct(ref reader, ref coefficient, plus, minus);
+                    }
+                    else if (--run < 0)
+                    {
+                        break;
+                    }
+
+                    position++;
+                }
+                while (position <= se);
+
+                if (value != 0)
+                {
+                    block[natural[position]] = (short)value;
+                }
+            }
+        }
+
+        if (_endOfBands > 0)
+        {
+            // The band ends in this block: only correction bits for the non-zero coefficients left.
+            for (; position <= se; position++)
+            {
+                ref short coefficient = ref block[natural[position]];
+                if (coefficient != 0)
+                {
+                    Correct(ref reader, ref coefficient, plus, minus);
+                }
+            }
+
+            _endOfBands--;
+        }
+    }
+
+    /// <summary>One correction bit of a non-zero coefficient: adds 2^Al away from zero when the bit is set and not there yet.</summary>
+    private static void Correct(ref JpegBitReader reader, ref short coefficient, int plus, int minus)
+    {
+        if (reader.Read(1) != 0 && (coefficient & plus) == 0)
+        {
+            coefficient += (short)(coefficient >= 0 ? plus : minus);
+        }
+    }
+
+    /// <summary>The known bits of the 64 coefficients of a progressive component before its first scan: none.</summary>
+    private static int[] Unknown()
+    {
+        var known = new int[64];
+        Array.Fill(known, -1);
+        return known;
+    }
+
+    /// <summary>The tables of the decoder, to share with the decoders of other blocks (see <see cref="JpegTables"/>).</summary>
+    internal JpegTables Tables()
+    {
+        foreach (var table in _dc.Concat(_ac))
+        {
+            table?.Build();
+        }
+
+        return new JpegTables([.. _quantization], [.. _dc], [.. _ac]);
+    }
+}
+
+/// <summary>
+/// The tables of TIFF's JPEGTables, read and built once per read and shared by the decoders of its strips or tiles (which never
+/// change them): a JPEGTables tag costs its parsing once, not once per tile.
+/// </summary>
+internal sealed class JpegTables(ushort[]?[] quantization, HuffmanTable?[] dc, HuffmanTable?[] ac)
+{
+    public ushort[]?[] Quantization { get; } = quantization;
+
+    public HuffmanTable?[] Dc { get; } = dc;
+
+    public HuffmanTable?[] Ac { get; } = ac;
+
+    /// <summary>Reads an abbreviated table-specification stream.</summary>
+    /// <exception cref="InvalidDataException">The stream is damaged, or holds more than tables.</exception>
+    public static JpegTables Read(ReadOnlySpan<byte> stream, ResourceBudget budget)
+    {
+        var decoder = new JpegDecoder(budget);
+        decoder.ReadTables(stream);
+        return decoder.Tables();
     }
 }

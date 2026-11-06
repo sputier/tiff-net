@@ -27,9 +27,10 @@ public class PixelTests
 
     internal static string Sha(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes));
 
-    /// <summary>Whether the codecs the library has so far decode the image (JPEG comes later).</summary>
+    /// <summary>Whether the library decodes the compression of the image (every compression it supports).</summary>
     internal static bool Decodable(TiffStorage storage) =>
-        storage.Compression is TiffCompression.None or TiffCompression.Lzw or TiffCompression.Deflate or TiffCompression.PackBits;
+        storage.Compression is TiffCompression.None or TiffCompression.Lzw or TiffCompression.Deflate or TiffCompression.PackBits
+            or TiffCompression.Jpeg;
 
     [Fact]
     public void Every_decodable_page_of_the_domain_fixtures_gives_the_expected_samples()
