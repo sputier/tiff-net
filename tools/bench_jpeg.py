@@ -1,7 +1,9 @@
 """Writes the JPEG inputs of the decoder benchmarks (benchmarks/data, not committed) and times libjpeg-turbo on them.
 
 The images are 4000 x 3000 (12 MP), quality 90, of a smooth picture with noise: grey, YCbCr 4:4:4 and 4:2:0, sequential and
-progressive. libjpeg-turbo is timed through Pillow, on one thread, decoding to the components (draft) and to RGB:
+progressive. libjpeg-turbo is timed through Pillow, on one thread, decoding to the components (draft) and to RGB. It also
+writes the same pictures as TIFF files of 256 x 256 JPEG tiles (grey and YCbCr 4:2:0, through tifffile), each tile a stream with
+its own tables, for the read benchmarks of JPEG in TIFF:
 
     python -I tools/bench_jpeg.py
     dotnet run -c Release --project benchmarks/Eleris.TiffNet.Benchmarks -- --filter "*Jpeg*"
@@ -62,6 +64,14 @@ def main() -> None:
             Image.open(io.BytesIO(data)).load()
 
         print(f"  {name:8} {len(data) / 1e6:5.1f} MB   components {best(components):7.1f}   image {best(rgb):7.1f}")
+
+    import tifffile
+
+    for name, channels in (("tiles-grey", 1), ("tiles-ycc420", 3)):
+        pixels = np.asarray(picture(channels))
+        options = {"photometric": "ycbcr", "subsampling": (2, 2)} if channels == 3 else {"photometric": "minisblack"}
+        tifffile.imwrite(FOLDER / f"{name}.tif", pixels, tile=(256, 256), compression="jpeg", compressionargs={"level": 90}, **options)
+        print(f"  {name:12} {(FOLDER / f'{name}.tif').stat().st_size / 1e6:5.1f} MB")
 
 
 if __name__ == "__main__":
