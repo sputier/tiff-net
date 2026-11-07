@@ -1,4 +1,6 @@
 using System.Buffers.Binary;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace Eleris.TiffNet.Internal.Jpeg;
 
@@ -155,24 +157,28 @@ internal sealed partial class JpegDecoder
         c.Prediction += reader.ReadDifference(size);
         block[0] = (short)c.Prediction;
 
-        // AC: one lookup gives most coefficients whole; otherwise the code, then the bits of its value.
-        ReadOnlySpan<byte> natural = Natural;
-        ReadOnlySpan<ushort> lookup = ac.Lookup;
-        ReadOnlySpan<int> fast = ac.FastAc;
+        // AC: one lookup gives most coefficients whole; otherwise the code, then the bits of its value. Through references, each
+        // index in range by construction: a lookup index is 16 bits shifted to LookupBits (the tables hold 2^LookupBits entries),
+        // k is at most 63 + 15 (Natural holds 80 entries), and Natural gives indices below 64 (the block holds 64).
+        _ = block[63];
+        ref short coefficients = ref MemoryMarshal.GetReference(block);
+        ref byte natural = ref MemoryMarshal.GetReference(Natural);
+        ref ushort lookup = ref MemoryMarshal.GetReference(ac.Lookup);
+        ref int fast = ref MemoryMarshal.GetReference(ac.FastAc);
         int k = 1;
         for (; k < 64; k++)
         {
             int next = reader.Peek16();
-            int whole = fast[next >> (16 - HuffmanTable.LookupBits)];
+            int whole = Unsafe.Add(ref fast, next >> (16 - HuffmanTable.LookupBits));
             if (whole != 0)
             {
                 k += (whole >> 4) & 15;
-                block[natural[k]] = (short)(whole >> 16);
+                Unsafe.Add(ref coefficients, Unsafe.Add(ref natural, k)) = (short)(whole >> 16);
                 reader.Skip(whole & 15);
                 continue;
             }
 
-            int entry = lookup[next >> (16 - HuffmanTable.LookupBits)];
+            int entry = Unsafe.Add(ref lookup, next >> (16 - HuffmanTable.LookupBits));
             int rs;
             if (entry != 0)
             {
@@ -189,7 +195,7 @@ internal sealed partial class JpegDecoder
             if (bits != 0)
             {
                 k += run;
-                block[natural[k]] = (short)reader.ReadDifference(bits);
+                Unsafe.Add(ref coefficients, Unsafe.Add(ref natural, k)) = (short)reader.ReadDifference(bits);
             }
             else if (run == 15)
             {

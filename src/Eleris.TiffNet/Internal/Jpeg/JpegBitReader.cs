@@ -15,7 +15,6 @@ internal ref struct JpegBitReader
     private ulong _bits;
     private int _count;
     private bool _ended;
-    private bool _insufficient;
 
     public JpegBitReader(ReadOnlySpan<byte> data, int position)
     {
@@ -30,7 +29,11 @@ internal ref struct JpegBitReader
     /// Whether bits beyond the data were consumed (libjpeg's <c>insufficient_data</c>): the data of the scan is exhausted until
     /// the next restart marker.
     /// </summary>
-    public readonly bool Insufficient => _insufficient;
+    /// <remarks>
+    /// The count of bits goes below zero only once the data has ended (until then a refill keeps 56 bits or more ahead), and stays
+    /// there: no test on each consumption, the count tells.
+    /// </remarks>
+    public readonly bool Insufficient => _count < 0;
 
     /// <summary>The next 16 bits, without consuming them.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -49,10 +52,6 @@ internal ref struct JpegBitReader
     {
         _bits <<= bits;
         _count -= bits;
-        if (_count < 0)
-        {
-            _insufficient = true;
-        }
     }
 
     /// <summary>The next <paramref name="bits"/> bits (1 to 16) as an unsigned value.</summary>
@@ -91,6 +90,8 @@ internal ref struct JpegBitReader
     /// </summary>
     public void Restart()
     {
+        // Without a restart marker the scan stays as it was: exhausted if it was.
+        bool insufficient = Insufficient;
         _bits = 0;
         _count = 0;
         if (!_ended)
@@ -107,11 +108,11 @@ internal ref struct JpegBitReader
             // The data goes on: decoding resumes, even after an exhausted interval.
             _position += 2;
             _ended = false;
-            _insufficient = false;
             return;
         }
 
         _ended = true;
+        _count = insufficient ? -1 : 0;
     }
 
     private void Fill()
