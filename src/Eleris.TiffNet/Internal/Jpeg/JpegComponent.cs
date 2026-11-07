@@ -21,7 +21,10 @@ internal sealed class JpegComponent
     public required int Height { get; init; }
 
     /// <summary>The samples, row after row; the plane covers whole MCUs, beyond <see cref="Width"/> x <see cref="Height"/>.</summary>
-    /// <remarks>Allocated with the frame for a sequential image, after the last scan for a progressive one.</remarks>
+    /// <remarks>
+    /// Allocated with the frame for a sequential image, after the last scan for a progressive one. The array may be longer than
+    /// the plane (<see cref="Stride"/> × <see cref="PlaneRows"/> bytes): taken from a pool, or the output rows of the block.
+    /// </remarks>
     public byte[] Plane { get; internal set; } = [];
 
     /// <summary>The rows of <see cref="Plane"/> (whole MCUs).</summary>

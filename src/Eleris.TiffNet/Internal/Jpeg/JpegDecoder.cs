@@ -26,11 +26,39 @@ internal sealed partial class JpegDecoder(ResourceBudget budget, int maxWidth = 
         Array.Copy(tables.Quantization, _quantization, 4);
         Array.Copy(tables.Dc, _dc, 4);
         Array.Copy(tables.Ac, _ac, 4);
-        _shared = [.. tables.Dc, .. tables.Ac];
+        foreach (var table in tables.Dc.Concat(tables.Ac))
+        {
+            if (table is not null)
+            {
+                _shared.Add(table);
+            }
+        }
     }
 
-    /// <summary>The Huffman tables shared with other decoders (not to be redefined in place).</summary>
-    private readonly HuffmanTable?[] _shared = [];
+    /// <summary>
+    /// The Huffman tables shared with other decoders (not to be redefined in place): those of JPEGTables and of the cache, at
+    /// most 8 + <see cref="HuffmanCache.Capacity"/> whatever the number of DHT segments.
+    /// </summary>
+    private readonly HashSet<HuffmanTable> _shared = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>The tables built for the other blocks of the read, shared by its decoders (null: none).</summary>
+    public HuffmanCache? Cache { get; init; }
+
+    /// <summary>
+    /// Where the rows of a grey sequential frame go (the rows of the block, <see cref="GreyStride"/> bytes each): the plane itself
+    /// when its rows have that stride and the buffer holds its padded rows, so that its blocks are transformed in place. The
+    /// buffer is asked for only then, once the frame is read.
+    /// </summary>
+    public IOutputBuffer? GreyOutput { get; init; }
+
+    /// <summary>The bytes of a row of <see cref="GreyOutput"/>.</summary>
+    public int GreyStride { get; init; }
+
+    /// <summary>The largest plane taken from the pool: the planes of strips and tiles, decoded block after block.</summary>
+    private const int MaxRented = 1 << 20;
+
+    /// <summary>The planes rented from the shared pool, given back by <see cref="Release"/>.</summary>
+    private readonly List<byte[]> _rented = [];
 
     /// <summary>The natural (row by row) index of the k-th coefficient in zig-zag order, with 16 more entries that absorb a run
     /// past the end of a damaged block, as in libjpeg.</summary>
@@ -57,6 +85,35 @@ internal sealed partial class JpegDecoder(ResourceBudget budget, int maxWidth = 
     {
         budget.ReleasePixels(_reserved);
         _reserved = 0;
+        foreach (byte[] plane in _rented)
+        {
+            System.Buffers.ArrayPool<byte>.Shared.Return(plane);
+        }
+
+        _rented.Clear();
+    }
+
+    /// <summary>
+    /// A plane of <paramref name="bytes"/> bytes, from the shared pool up to <see cref="MaxRented"/> bytes (a block of a large
+    /// image would otherwise allocate its planes on the large object heap, block after block), cleared when <paramref name="clear"/>: a plane whose every block is decoded,
+    /// filled or transformed needs no clearing.
+    /// </summary>
+    private byte[] RentPlane(int bytes, bool clear)
+    {
+        if (bytes > MaxRented)
+        {
+            // A plane of a whole large image: allocated as it is (the pool would round it up and keep it after the read).
+            return new byte[bytes];
+        }
+
+        byte[] plane = System.Buffers.ArrayPool<byte>.Shared.Rent(bytes);
+        _rented.Add(plane);
+        if (clear)
+        {
+            plane.AsSpan(0, bytes).Clear();
+        }
+
+        return plane;
     }
 
     /// <summary>Reads the tables of an abbreviated table-specification stream (SOI, DQT and DHT, EOI), as TIFF's JPEGTables holds.</summary>
@@ -170,8 +227,9 @@ internal sealed partial class JpegDecoder(ResourceBudget budget, int maxWidth = 
         {
             if (_frame.Progressive)
             {
-                // Counted with the frame: allocated only now, so that a stream refused in its scans never costs its planes.
-                c.Plane = new byte[c.Stride * c.PlaneRows];
+                // Counted with the frame: allocated only now, so that a stream refused in its scans never costs its planes. Every
+                // block of it is transformed or filled below.
+                c.Plane = RentPlane(c.Stride * c.PlaneRows, clear: false);
             }
 
             if (_frame.Progressive && c.Quantization is { } quantization)
@@ -201,7 +259,7 @@ internal sealed partial class JpegDecoder(ResourceBudget budget, int maxWidth = 
             else if (!c.Scanned)
             {
                 // libjpeg's coefficients of a component without data are 0, which the IDCT turns into 128.
-                c.Plane.AsSpan().Fill(128);
+                c.Plane.AsSpan(0, c.Stride * c.PlaneRows).Fill(128);
             }
         }
 
