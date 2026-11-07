@@ -54,9 +54,18 @@ internal sealed partial class JpegDecoder
                 throw new InvalidDataException("a JPEG Huffman table is cut.");
             }
 
-            // Defined into the table of that slot (built when a scan uses it): redefinitions cost their bytes only.
+            // A table the other blocks of the read defined already is taken built, shared (never redefined in place).
             var tables = kind == 0 ? _dc : _ac;
-            if (tables[id] is null || Array.IndexOf(_shared, tables[id]) >= 0)
+            if (Cache?.Find(s[..(17 + total)]) is { } built)
+            {
+                tables[id] = built;
+                _shared.Add(built);
+                s = s[(17 + total)..];
+                continue;
+            }
+
+            // Defined into the table of that slot (built when a scan uses it): redefinitions cost their bytes only.
+            if (tables[id] is not { } current || _shared.Contains(current))
             {
                 tables[id] = new HuffmanTable();
             }
@@ -185,7 +194,7 @@ internal sealed partial class JpegDecoder
                 QuantizationTable = p.Tq,
                 Width = (int)((width * (long)p.H + hMax - 1) / hMax),
                 Height = (int)((height * (long)p.V + vMax - 1) / vMax),
-                Plane = progressive ? [] : new byte[(int)(stride * mcusDown * p.V * 8)],
+                Plane = progressive ? [] : SequentialPlane(count, stride, (int)(mcusDown * p.V * 8)),
                 PlaneRows = (int)(mcusDown * p.V * 8),
                 Stride = stride,
                 Coefficients = progressive ? new short[(int)(stride * mcusDown * p.V * 8)] : null,
@@ -194,5 +203,20 @@ internal sealed partial class JpegDecoder
         }
 
         _frame = new JpegFrame { Width = width, Height = height, Components = components, Progressive = progressive };
+    }
+
+    /// <summary>
+    /// The plane of a component of a sequential frame: the rows of the output for a grey frame that fits them, otherwise a plane
+    /// from the pool. A grey plane is covered by the blocks of its scan (or filled when no scan holds it); the planes of several
+    /// components are cleared, since a scan of one of them alone covers its blocks, not the padding of the MCUs.
+    /// </summary>
+    private byte[] SequentialPlane(int components, int stride, int rows)
+    {
+        if (components == 1 && GreyOutput is { } output && stride == GreyStride && output.Bytes >= (long)stride * rows)
+        {
+            return output.Buffer;
+        }
+
+        return RentPlane(stride * rows, clear: components > 1);
     }
 }

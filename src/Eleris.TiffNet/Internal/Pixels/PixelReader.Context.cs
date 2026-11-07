@@ -36,6 +36,7 @@ internal static partial class PixelReader
         private readonly bool _inPlace;
         private readonly bool _inPlaceSwap;
         private readonly bool _decodeInto;
+        private readonly HuffmanCache _huffman = new();
 
         public Context(PixelPlan plan, TiffSource source, ResourceBudget budget, int channels, bool littleEndian)
         {
@@ -344,9 +345,10 @@ internal static partial class PixelReader
         {
             // The last strip may be higher than its rows (as libtiff accepts): its planes are still counted in the budget.
             int maxHeight = lastStrip ? ushort.MaxValue : blockRows;
+            // A grey frame is transformed into the rows of the block when they fit its plane; tables are built once for the read.
             var decoder = _jpegTables is { } tables
-                ? new JpegDecoder(tables, _budget, (int)_d.BlockWidth, maxHeight)
-                : new JpegDecoder(_budget, (int)_d.BlockWidth, maxHeight);
+                ? new JpegDecoder(tables, _budget, (int)_d.BlockWidth, maxHeight) { Cache = _huffman, GreyOutput = scratch, GreyStride = (int)_rowBytes }
+                : new JpegDecoder(_budget, (int)_d.BlockWidth, maxHeight) { Cache = _huffman, GreyOutput = scratch, GreyStride = (int)_rowBytes };
             try
             {
                 var frame = decoder.Decode(stream);
