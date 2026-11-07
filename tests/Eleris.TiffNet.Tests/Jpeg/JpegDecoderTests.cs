@@ -138,7 +138,8 @@ public class JpegDecoderTests
         var frame = JpegFixtures.Decode(cut);
 
         Assert.True(clock.ElapsedMilliseconds < 1000, $"{clock.ElapsedMilliseconds} ms");
-        Assert.Equal(128, frame.Components[0].Plane[^1]);
+        var grey = frame.Components[0];
+        Assert.Equal(128, grey.Plane[grey.Stride * grey.PlaneRows - 1]);
     }
 
     [Fact]

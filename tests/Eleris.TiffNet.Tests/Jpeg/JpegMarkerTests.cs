@@ -137,7 +137,7 @@ public class JpegMarkerTests
 
         var frame = JpegFixtures.Decode(single);
 
-        Assert.All(frame.Components.Skip(1), c => Assert.All(c.Plane, b => Assert.Equal(128, b)));
+        Assert.All(frame.Components.Skip(1), c => Assert.All(c.Plane[..(c.Stride * c.PlaneRows)], b => Assert.Equal(128, b)));
     }
 
     [Fact]

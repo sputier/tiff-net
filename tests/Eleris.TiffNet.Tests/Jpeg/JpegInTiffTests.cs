@@ -154,6 +154,26 @@ public class JpegInTiffTests
     }
 
     [Fact]
+    public void A_cut_grey_tile_decoded_in_the_rows_of_the_one_before_gives_its_own_samples()
+    {
+        // Grey tiles are transformed into the rows of the worker, one after the other: a cut stream after a whole one leaves
+        // nothing of the samples before (its missing blocks are grey), on one thread.
+        byte[] whole = JpegFixtures.Bytes("grey_q100_64x64.jpg");
+        byte[] cut = JpegFixtures.Bytes("grey_q100_64x64_cut.jpg");
+        var builder = new TiffBuilder { Data = [.. whole, .. cut] };
+        builder.AddDirectory().Image(128, 64).Remove(259).Add(259, TiffTagType.Short, 7).Remove(273).Remove(278).Remove(279)
+            .Add(322, TiffTagType.Short, 64).Add(323, TiffTagType.Short, 64)
+            .Add(324, TiffTagType.Long, builder.DataOffset, builder.DataOffset + whole.Length)
+            .Add(325, TiffTagType.Long, whole.Length, cut.Length).Sorted();
+        using var file = TiffFile.Read(new MemoryStream(builder.Build()), TiffReadOptions.Default with { MaxDegreeOfParallelism = 1 });
+
+        byte[] pixels = file.Primary.ReadRawPixels<byte>();
+
+        Assert.Equal(Decoded("grey_q100_64x64.jpg", 64), Enumerable.Range(0, 64).SelectMany(y => pixels.AsSpan(y * 128, 64).ToArray()));
+        Assert.Equal(Decoded("grey_q100_64x64_cut.jpg", 64), Enumerable.Range(0, 64).SelectMany(y => pixels.AsSpan(y * 128 + 64, 64).ToArray()));
+    }
+
+    [Fact]
     public void The_buffers_of_each_tile_are_given_back_to_the_budget()
     {
         // 64 tiles, a budget for the image and the buffers of a few tiles at a time: a tile that kept its reservation would
