@@ -123,9 +123,21 @@ internal sealed partial class JpegDecoder
                 return;
             }
 
+            ReadOnlySpan<int> fast = ac.FastAc;
             for (int k = ss; k <= se; k++)
             {
-                int rs = ac.Decode(reader.Peek16(), out int length);
+                // One lookup gives most coefficients whole, as in a sequential scan; their value is then scaled by 2^Al.
+                int next = reader.Peek16();
+                int whole = fast[next >> (16 - HuffmanTable.LookupBits)];
+                if (whole != 0)
+                {
+                    k += (whole >> 4) & 15;
+                    block[natural[k]] = (short)((whole >> 16) << al);
+                    reader.Skip(whole & 15);
+                    continue;
+                }
+
+                int rs = ac.Decode(next, out int length);
                 reader.Skip(length);
                 int run = rs >> 4, bits = rs & 15;
                 if (bits != 0)
