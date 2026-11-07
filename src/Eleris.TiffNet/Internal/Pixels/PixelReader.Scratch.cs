@@ -15,7 +15,7 @@ internal static partial class PixelReader
     /// The buffers of one worker, allocated when first needed, of the sizes the plan reserved, and reused for every unit the worker
     /// decodes. Their contents are never read before they are written.
     /// </summary>
-    private sealed class Scratch<TD> where TD : unmanaged
+    private sealed class Scratch<TD> : Jpeg.IOutputBuffer where TD : unmanaged
     {
         private PixelPlan _plan;
         private byte[]? _read;
@@ -28,6 +28,12 @@ internal static partial class PixelReader
         public byte[] Read => _read = Fit(_read, _plan.ReadBytes);
 
         public byte[] Decoded => _decoded = Fit(_decoded, _plan.DecodedBytes);
+
+        /// <summary>The bytes <see cref="Decoded"/> gives, known without allocating it.</summary>
+        long Jpeg.IOutputBuffer.Bytes => _plan.DecodedBytes;
+
+        /// <summary><see cref="Decoded"/>, where a grey JPEG frame is transformed.</summary>
+        byte[] Jpeg.IOutputBuffer.Buffer => Decoded;
 
         public TD[] Row => _row is { } row && row.Length >= _plan.RowSamples ? row : _row = GC.AllocateUninitializedArray<TD>((int)_plan.RowSamples);
 
