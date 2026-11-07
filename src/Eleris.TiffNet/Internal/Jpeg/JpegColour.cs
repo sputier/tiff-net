@@ -55,6 +55,12 @@ internal static class JpegColour
         if (frame.Components.Length == 1)
         {
             var grey = frame.Components[0];
+            if (grey.Stride == stride && output.Overlaps(grey.Plane, out int offset) && offset == 0)
+            {
+                // The blocks were transformed into the output rows themselves (see JpegDecoder.GreyOutput).
+                return;
+            }
+
             for (int y = 0; y < height; y++)
             {
                 grey.Plane.AsSpan(y * grey.Stride, width).CopyTo(output.Slice(y * stride, width));

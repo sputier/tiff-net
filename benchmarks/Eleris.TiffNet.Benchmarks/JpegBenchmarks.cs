@@ -46,7 +46,7 @@ public class JpegBenchmarks
 
     private static ResourceBudget Budget() => new(TiffReadOptions.Default, "bench.jpg");
 
-    private static string Folder()
+    internal static string Folder()
     {
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
         {
