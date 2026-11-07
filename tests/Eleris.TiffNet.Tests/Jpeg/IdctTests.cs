@@ -33,6 +33,22 @@ public class IdctTests
         });
     }
 
+    [SkippableTheory]
+    [InlineData(8)]
+    [InlineData(40)]
+    public void Blocks_at_the_edge_of_16_bits_give_the_samples_of_the_scalar_transform(int stride)
+    {
+        // Dequantized coefficients around the limit of 16 bits, dense: outputs of pass 1 around it too (where a 16-bit transform,
+        // as libjpeg-turbo's, would saturate).
+        Compare(stride, 200_000, (random, k, density) =>
+        {
+            ushort q = (ushort)random.Next(1, random.Next(4) == 0 ? 32768 : 256);
+            int limit = random.Next(3) == 0 ? 40_000 / q : 32767 / q;
+            short c = k == 0 || random.Next(64) < density ? (short)Math.Clamp(random.Next(-limit, limit + 1), short.MinValue, short.MaxValue) : (short)0;
+            return (c, q);
+        });
+    }
+
     [Fact]
     public void A_block_of_DC_only_gives_what_the_whole_transform_gives()
     {
