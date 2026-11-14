@@ -180,12 +180,14 @@ public sealed class SourceTests : IDisposable
     [Fact]
     public async Task An_asynchronous_read_is_cancelled_even_if_the_stream_ignores_the_token()
     {
-        using var later = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
-        var endless = new EndlessStream();
+        // The stream cancels the token itself on its third read (a timer would race against the limit of MaxInputBytes, which an
+        // endless stream reaches in a few tens of milliseconds), then goes on giving bytes as a stream that ignores the token does.
+        using var cancel = new CancellationTokenSource();
+        var endless = new EndlessStream(cancel, cancelOnRead: 3);
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-            TiffSource.FromStreamAsync(endless, TiffReadOptions.Default, cancellationToken: later.Token));
-        Assert.True(endless.Given < Array.MaxLength, "the endless stream was read to the limit");
+            TiffSource.FromStreamAsync(endless, TiffReadOptions.Default, cancellationToken: cancel.Token));
+        Assert.True(endless.Given <= 4 * 64 * 1024, $"the read went on after the cancellation: {endless.Given} bytes read");
     }
 
     [Fact]
@@ -238,8 +240,10 @@ public sealed class SourceTests : IDisposable
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
-    private sealed class EndlessStream : Stream
+    private sealed class EndlessStream(CancellationTokenSource? cancel = null, int cancelOnRead = 0) : Stream
     {
+        private int _reads;
+
         public long Given { get; private set; }
         public override bool CanRead => true;
         public override bool CanSeek => false;
@@ -250,6 +254,11 @@ public sealed class SourceTests : IDisposable
         public override int Read(byte[] buffer, int offset, int count)
         {
             Given += count;
+            if (cancel is not null && ++_reads == cancelOnRead)
+            {
+                cancel.Cancel();
+            }
+
             return count;
         }
 
