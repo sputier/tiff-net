@@ -1,31 +1,15 @@
 # Changelog
 
-## Unreleased
-
-### Added
-
-- `TiffFile.OpenAsync`, `TiffFile.Open(Stream)` (read on demand, without a copy), `TiffFile.Read(ReadOnlyMemory<byte>)`.
-- `ReadPixels(T[])` and `ReadPixels(Memory<T>)` decode on every core into a buffer of the application; `ReadRegionAsync`,
-  `ReadChannelAsync`, `SaveAsync(path)`; progress (`IProgress<double>`) on the asynchronous reads and saves.
-- `TiffImage.ReadIndices` (palette indices), `TiffImageWriter.SetExtraChannels`, `TiffMetadata.PixelTags` and `CopyFrom`,
-  `TiffReadOptions.Constrained`, `TiffWriteOptions.SkipUnsupportedPages`.
-
-### Changed
-
-- `SaveAsync(Stream, options, progress, cancellationToken)` and `ReadPixelsAsync(scale, order, progress, cancellationToken)`: a
-  progress parameter comes before the token (a token passed by position must now be named).
-- `SetPixels` removes the tags of the ranges of the former values; MinIsWhite, palette and YCbCr images are read without them.
-- Faster: planar and FITS-cube reads, normalised and converted reads, 12 and 14-bit samples, big-endian files, predictors,
-  LZW, files of many small strips, single-strip Deflate images (in bounded memory), JPEG without AVX2.
-- Faster again: 4:2:0 JPEG colour conversion (15 % on a 12 MP image), files of small Deflate strips (about 45 %), planar files
-  read interleaved (12 to 22 %), whole-image reads of a file that is not in the system cache (1.3 to 2.2 times, the handle
-  no longer has the `RandomAccess` hint); LZW and PackBits strips of more than 4 MB (19 MB for LZW) are decoded as a stream.
-
 ## 0.1.0
 
 The first version, written from scratch after an audit of a first implementation.
 
 ### Reading
+
+- `TiffFile.Open` from a path, `OpenAsync`, `Open(Stream)` (read on demand, without a copy) and `Read(ReadOnlyMemory<byte>)`.
+- `ReadPixels(T[])` and `ReadPixels(Memory<T>)` decode on every core into a buffer of the application; `ReadRegionAsync` and
+  `ReadChannelAsync`; progress (`IProgress<double>`) on the asynchronous reads and saves.
+- `TiffImage.ReadIndices` (palette indices) and `TiffReadOptions.Constrained` (options for a small device).
 
 - Classic TIFF and BigTIFF, both byte orders, multi-page files, `SubIFDs`, EXIF and GPS sub-directories (read only).
 - Grey, RGB, `MinIsWhite`, palette; unsigned samples of 1 to 16, 32 and 64 bits, signed ones of 8 to 64 bits, floating point
@@ -50,8 +34,20 @@ The first version, written from scratch after an audit of a first implementation
 - Saving an image opened from a file costs what reading it would: its pixels count in `MaxPixelBytes`, and a file that does
   not hold the pixels it declares is refused before anything is allocated; `Save` can be cancelled.
 - `TiffImageWriter` writes images larger than an array, rows in order or tiles in any order, with bounded memory.
-- Metadata: the common tags as properties, any other tag by its code, Astro-TIFF headers kept byte for byte.
+- `SaveAsync` also to a path; `TiffImageWriter.SetExtraChannels`; `TiffWriteOptions.SkipUnsupportedPages` to save the pages
+  the library can write from a file that has others.
+- Metadata: the common tags as properties, any other tag by its code, Astro-TIFF headers kept byte for byte;
+  `TiffMetadata.PixelTags` and `CopyFrom`. `SetPixels` removes the tags that described the former values (their ranges);
+  MinIsWhite, palette and YCbCr images are read without them.
 - Every written combination is read back with the same samples by tifffile, and by Pillow for the types it supports.
+
+### Performance
+
+- Reads and writes use every core; the figures, per scenario and with how to tune them, are in `docs/performance.md`.
+- Tuned decoders: planar and FITS-cube reads, normalised and converted reads, 12 and 14-bit samples, big-endian files,
+  predictors, LZW, files of many small strips, JPEG (4:2:0 colour conversion with vectors, and without AVX2).
+- Large strips (more than 4 MB, 19 MB for LZW) are decoded as a stream in bounded memory, and a file is opened without the
+  `RandomAccess` hint, which made a whole-image read of a file outside the system cache 1.3 to 2.2 times slower.
 
 ### Platforms
 
