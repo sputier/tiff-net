@@ -69,6 +69,14 @@ internal abstract class TiffSource : IDisposable
     {
     }
 
+    /// <summary>
+    /// The access hint of the handle of a file: none, so that the system keeps its own read-ahead. <c>RandomAccess</c> switches the
+    /// read-ahead off, which made a whole-image read on a cold cache 1.3 to 2.2 times slower (Windows, 144 MB uncompressed and 72 MB
+    /// Deflate files, one thread and all cores; see docs/performance.md); <c>SequentialScan</c> gains a little more on all cores
+    /// but is wrong for the reads of a region and of the directories, and the hint is fixed before the caller chooses.
+    /// </summary>
+    internal const FileOptions ReadHint = FileOptions.None;
+
     /// <summary>Opens a file for reading at explicit offsets.</summary>
     /// <remarks>
     /// The file is shared for reading, writing and deletion, so that an application can save over a file it has open (the save
@@ -77,7 +85,7 @@ internal abstract class TiffSource : IDisposable
     public static TiffSource Open(string path)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
-        var handle = File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, FileOptions.RandomAccess);
+        var handle = File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, ReadHint);
         try
         {
             return new FileSource(handle, path, RandomAccess.GetLength(handle));
