@@ -8,6 +8,10 @@
     <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
     <OutputType>Exe</OutputType>
     <UseMaui>true</UseMaui>
+    <!-- The MAUI SDK adds its NuGet packages (Microsoft.Maui.Controls...) at the version of the installed workload, and turns
+         that off under central package management, which the repository uses (Directory.Packages.props): without this line the
+         types of MAUI are not found. -->
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
     <SingleProject>true</SingleProject>
     <IsPackable>false</IsPackable>
     <ApplicationTitle>TiffNet sample</ApplicationTitle>
