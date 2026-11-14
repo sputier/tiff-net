@@ -18,17 +18,42 @@ internal sealed class PixelPlan
     /// <summary>The bytes of stored rows read at once from an uncompressed strip or tile.</summary>
     private const int ChunkBytes = 1 << 20;
 
+    /// <summary>The most compressed bytes of strips read in one call (a <see cref="PixelUnit.Group"/>).</summary>
+    internal const int GroupBytes = 256 * 1024;
+
+    /// <summary>The largest compressed strip read with others: small strips only, where the cost of a read weighs.</summary>
+    private const int SmallStrip = 64 * 1024;
+
+    /// <summary>The stored bytes of every plane of a band of a planar image read interleaved (see <see cref="Blocks"/>).</summary>
+    private const int BandBytes = 256 * 1024;
+
     /// <summary>
-    /// The decoded bytes beyond which a Deflate block is inflated as a stream, rows by rows, straight to the destination, instead of
-    /// whole into a buffer: an image of one large strip costs its pixels and about a megabyte, not twice its pixels.
+    /// The decoded bytes beyond which a Deflate or PackBits block is decoded as a stream, rows by rows, straight to the
+    /// destination, instead of whole into a buffer: an image of one large strip costs its pixels and about a megabyte, not twice
+    /// its pixels. An LZW block from <see cref="LzwStreamBytes"/>: its stream keeps the output of a generation of its table.
     /// </summary>
     internal const long StreamBytes = 4 << 20;
 
-    /// <summary>Whether the rows of a block that a read needs are inflated as a stream (Deflate only: its decoder resumes).</summary>
-    internal static bool Streamed(ImageDescriptor d, long needed) => d.Compression == TiffCompression.Deflate && needed > StreamBytes;
+    /// <summary>The decoded bytes beyond which an LZW block is decoded as a stream: twice the most its stream holds, always a gain.</summary>
+    internal const long LzwStreamBytes = 2L * Codecs.LzwStream.Memory;
 
-    /// <summary>The memory of a streamed block besides its rows: the buffer of its read and the state of zlib.</summary>
-    private const int StreamState = 128 * 1024;
+    /// <summary>Whether the rows of a block that a read needs are decoded as a stream (the decoders of these codecs resume).</summary>
+    internal static bool Streamed(ImageDescriptor d, long needed) => d.Compression switch
+    {
+        TiffCompression.Deflate or TiffCompression.PackBits => needed > StreamBytes,
+        TiffCompression.Lzw => needed > LzwStreamBytes,
+        _ => false,
+    };
+
+    /// <summary>The memory of a streamed block in the decoded buffer of a worker besides its rows: the buffer of its read.</summary>
+    private const long StreamState = 128 * 1024;
+
+    /// <summary>
+    /// What a worker allocates besides its scratch buffers to decode an LZW block as a stream: the table, the input and the
+    /// output of a generation (<see cref="Codecs.LzwStream.Memory"/>). It is allocated by the stream, not taken from the scratch
+    /// buffers, so it is counted apart (once: not in <see cref="DecodedBytes"/>) before the read.
+    /// </summary>
+    public long StreamExtraBytes { get; private set; }
 
     /// <summary>The rows inflated at once by a streamed block.</summary>
     internal static int StreamRows(long rowBytes) => (int)Math.Max(1, ChunkBytes / Math.Max(1, rowBytes));
@@ -134,10 +159,16 @@ internal sealed class PixelPlan
         var stored = StoredRect.Of(d, request);
         long rowsLimit = d.Layout == TiffLayout.Strips ? stored.Y1 - stored.Y0 : d.BlockHeight;
         int rowsPerUnit = compressed ? (int)d.BlockHeight : (int)Math.Clamp(ChunkBytes / Math.Max(1, rowBytes), 1, Math.Max(1, rowsLimit));
+        if (!compressed && d.Planar && request.Channel is null && request.Order == TiffPixelOrder.Interleaved)
+        {
+            // The planes of a band are placed one after the other (Blocks): a band small enough that its destination stays in the
+            // cache from one plane to the next (its stored samples of every plane within BandBytes).
+            rowsPerUnit = (int)Math.Clamp(BandBytes / Math.Max(1, rowBytes * d.SamplesPerPixel), 1, rowsPerUnit);
+        }
         var plan = new PixelPlan(d, request, stored, rowBytes, rowsPerUnit);
         string kind = d.Layout == TiffLayout.Tiles ? "tile" : "strip";
 
-        long units = 0, rowsRead = 0, largestCompressed = 0, largestDecoded = 0;
+        long units = 0, rowsRead = 0, largestCompressed = 0, largestDecoded = 0, streamExtra = 0;
         foreach (var (block, _, blockY, first, end) in plan.Blocks())
         {
             // A JPEG stream is decoded whole: its rows are all decoded, whatever the read needs.
@@ -162,8 +193,12 @@ internal sealed class PixelPlan
                 if (Streamed(d, needed))
                 {
                     // Read through a stream and inflated a few rows at a time: no buffer of the block, but the buffer of the read
-                    // and the state of zlib (about 128 KB, counted with the rows).
+                    // and the state of its decoder (counted with the rows, and apart for the memory of an LZW stream).
                     largestDecoded = Math.Max(largestDecoded, StreamRows(rowBytes) * rowBytes + StreamState);
+                    if (d.Compression == TiffCompression.Lzw)
+                    {
+                        streamExtra = Codecs.LzwStream.Memory;
+                    }
                 }
                 else
                 {
@@ -197,10 +232,12 @@ internal sealed class PixelPlan
         // They are allocated once per worker, of exactly these sizes (never rounded up by a pool, never kept after the read).
         plan.Workers = parallel ? (int)Math.Max(1, Math.Min(Math.Min(degree, maxWorkers), units)) : 1;
         plan.JpegTables = jpegTables;
-        plan.ReadBytes = compressed ? largestCompressed : rowsPerUnit * rowBytes;
+        // Small compressed strips are read several at once (Units): the buffer of the read holds a group.
+        plan.ReadBytes = compressed ? (plan.Grouped && units > 1 ? Math.Max(largestCompressed, GroupBytes) : largestCompressed) : rowsPerUnit * rowBytes;
         plan.DecodedBytes = largestDecoded;
+        plan.StreamExtraBytes = streamExtra;
         plan.RowSamples = d.BlockWidth * (d.SamplesPerPixel + 2);
-        long scratch = plan.ReadBytes + plan.DecodedBytes + plan.RowSamples * sampleBytes + plan.PredictorBytes;
+        long scratch = plan.ReadBytes + plan.DecodedBytes + plan.StreamExtraBytes + plan.RowSamples * sampleBytes + plan.PredictorBytes;
         budget.ReservePixels(plan.Workers * scratch, "the decoding buffers");
         return plan;
     }
@@ -238,11 +275,23 @@ internal sealed class PixelPlan
     public IEnumerable<PixelUnit> Units()
     {
         bool merge = !Compressed && Descriptor.Layout == TiffLayout.Strips;
+        bool group = Grouped;
         PixelUnit? open = null;
-        long openEnd = 0;   // the offset in the file after the rows of the open unit
+        long openEnd = 0;   // the offset in the file after the rows of the open unit (after its group of compressed strips)
+        long groupBytes = 0;
         foreach (var (block, plane, blockY, first, end) in Blocks())
         {
             long x0 = block % Across * Descriptor.BlockWidth;
+            if (group && open is { } g && g.Plane == plane && g.Block + g.Group == block && openEnd == Descriptor.Offsets[block]
+                && Small(g.Block, g.FirstRow + g.Rows) && Small(block, end) && groupBytes + Descriptor.ByteCounts[block] <= GroupBytes)
+            {
+                // A small compressed strip right after the group in the file: read with it.
+                open = g with { Group = g.Group + 1 };
+                openEnd += Descriptor.ByteCounts[block];
+                groupBytes += Descriptor.ByteCounts[block];
+                continue;
+            }
+
             for (long row = first; row < end;)
             {
                 if (merge && open is { } u && u.Plane == plane && u.Y0 + u.Rows == blockY + row && u.Rows < RowsPerUnit
@@ -262,7 +311,8 @@ internal sealed class PixelPlan
 
                 int rows = (int)Math.Min(RowsPerUnit, end - row);
                 open = new PixelUnit(block, plane, x0, blockY + row, (int)row, rows);
-                openEnd = Descriptor.Offsets[block] + (row + rows) * RowBytes;
+                openEnd = Compressed ? Descriptor.Offsets[block] + Descriptor.ByteCounts[block] : Descriptor.Offsets[block] + (row + rows) * RowBytes;
+                groupBytes = Descriptor.ByteCounts[block];
                 row += rows;
             }
         }
@@ -275,23 +325,44 @@ internal sealed class PixelPlan
 
     private long Across => (Descriptor.Width + Descriptor.BlockWidth - 1) / Descriptor.BlockWidth;
 
-    /// <summary>The blocks under the stored rectangle, with the rows [first, end) the read takes from each.</summary>
+    /// <summary>Whether compressed strips can be grouped: strips of the whole width (consecutive blocks are consecutive rows).</summary>
+    private bool Grouped => Compressed && Descriptor.Layout == TiffLayout.Strips && Across == 1;
+
+    /// <summary>Whether a strip can be read with others: small, and decoded whole (not inflated as a stream).</summary>
+    private bool Small(int block, long end) => Descriptor.ByteCounts[block] <= SmallStrip && !Streamed(Descriptor, end * RowBytes);
+
+    /// <summary>
+    /// The blocks under the stored rectangle, with the rows [first, end) the read takes from each: plane after plane, except for
+    /// the planes of a planar image delivered interleaved, which go band after band of rows (the planes of a band one after the
+    /// other), so that the samples of a band are placed while its destination is in the cache, not over the whole destination
+    /// once per plane. A band is never smaller than a strip or a tile (a block is read whole): with strips taller than the band
+    /// the order is plane after plane again, and the gain is lost. Not measured: compressed planar files, where a band is one
+    /// block of each plane.
+    /// </summary>
     private IEnumerable<(int Block, int Plane, long BlockY, long First, long End)> Blocks()
     {
         var d = Descriptor;
         var r = Stored;
         long across = Across;
         long down = (d.Height + d.BlockHeight - 1) / d.BlockHeight;
-        foreach (int plane in Planes(d, Request.Channel))
+        int[] planes = [.. Planes(d, Request.Channel)];
+        long firstRow = r.Y0 / d.BlockHeight, lastRow = (r.Y1 + d.BlockHeight - 1) / d.BlockHeight;
+        bool bands = planes.Length > 1 && Request.Order == TiffPixelOrder.Interleaved;
+        // A band: the block rows of a unit (whole chunks of an uncompressed read), or all of them plane after plane.
+        long bandRows = bands ? Math.Max(1, (RowsPerUnit + d.BlockHeight - 1) / d.BlockHeight) : lastRow - firstRow;
+        for (long band = firstRow; band < lastRow; band += bandRows)
         {
-            for (long by = r.Y0 / d.BlockHeight; by * d.BlockHeight < r.Y1; by++)
+            foreach (int plane in planes)
             {
-                long blockY = by * d.BlockHeight;
-                long first = Math.Max(r.Y0, blockY) - blockY;
-                long end = Math.Min(Math.Min(r.Y1, blockY + d.BlockHeight), d.Height) - blockY;
-                for (long bx = r.X0 / d.BlockWidth; bx * d.BlockWidth < r.X1; bx++)
+                for (long by = band; by < Math.Min(lastRow, band + bandRows); by++)
                 {
-                    yield return ((int)(plane * across * down + by * across + bx), plane, blockY, first, end);
+                    long blockY = by * d.BlockHeight;
+                    long first = Math.Max(r.Y0, blockY) - blockY;
+                    long end = Math.Min(Math.Min(r.Y1, blockY + d.BlockHeight), d.Height) - blockY;
+                    for (long bx = r.X0 / d.BlockWidth; bx * d.BlockWidth < r.X1; bx++)
+                    {
+                        yield return ((int)(plane * across * down + by * across + bx), plane, blockY, first, end);
+                    }
                 }
             }
         }

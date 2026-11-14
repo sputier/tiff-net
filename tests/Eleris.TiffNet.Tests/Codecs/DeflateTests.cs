@@ -23,7 +23,7 @@ public class DeflateTests
         byte[] compressed = Compress(data);
         byte[] decoded = new byte[data.Length];
 
-        Assert.Equal(data.Length, Deflate.Decode(compressed, compressed.Length, decoded, checkOverflow: true, out bool overflow));
+        Assert.Equal(data.Length, Deflate.Decode(compressed, 0, compressed.Length, decoded, checkOverflow: true, out bool overflow));
         Assert.Equal(data, decoded);
         Assert.False(overflow);
     }
@@ -34,9 +34,9 @@ public class DeflateTests
         byte[] compressed = Compress(new byte[1 << 20]);
         byte[] decoded = new byte[100];
 
-        Assert.Equal(100, Deflate.Decode(compressed, compressed.Length, decoded, checkOverflow: true, out bool overflow));
+        Assert.Equal(100, Deflate.Decode(compressed, 0, compressed.Length, decoded, checkOverflow: true, out bool overflow));
         Assert.True(overflow);
-        Assert.Equal(100, Deflate.Decode(compressed, compressed.Length, decoded, checkOverflow: false, out overflow));
+        Assert.Equal(100, Deflate.Decode(compressed, 0, compressed.Length, decoded, checkOverflow: false, out overflow));
         Assert.False(overflow);
     }
 
@@ -47,7 +47,7 @@ public class DeflateTests
         compressed[10] ^= 0xFF;
         compressed[11] ^= 0x55;
 
-        Assert.Throws<InvalidDataException>(() => Deflate.Decode(compressed, compressed.Length, new byte[50_000], false, out _));
+        Assert.Throws<InvalidDataException>(() => Deflate.Decode(compressed, 0, compressed.Length, new byte[50_000], false, out _));
     }
 
     [Fact]
@@ -56,6 +56,6 @@ public class DeflateTests
         // A header asking for a preset dictionary (FDICT), which TIFF never uses: zlib reports an error, not invalid data.
         byte[] compressed = [0x78, 0xBB, 0, 0, 0, 1, 0x63, 0, 0];
 
-        Assert.Throws<InvalidDataException>(() => Deflate.Decode(compressed, compressed.Length, new byte[100], false, out _));
+        Assert.Throws<InvalidDataException>(() => Deflate.Decode(compressed, 0, compressed.Length, new byte[100], false, out _));
     }
 }

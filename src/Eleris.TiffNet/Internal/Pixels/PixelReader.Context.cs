@@ -75,6 +75,41 @@ internal static partial class PixelReader
 
         public void Process(PixelUnit unit, Span<TOut> destination, Scratch<TD> scratch)
         {
+            if (unit.Group > 1)
+            {
+                ProcessGroup(unit, destination, scratch);
+                return;
+            }
+
+            ProcessOne(unit, destination, scratch, -1);
+        }
+
+        /// <summary>
+        /// Small compressed strips that follow each other in the file: their bytes read in one call, then each decoded from there
+        /// (the rows the read takes from each, as <see cref="PixelPlan.Units"/> gives them for one strip).
+        /// </summary>
+        private void ProcessGroup(PixelUnit unit, Span<TOut> destination, Scratch<TD> scratch)
+        {
+            int last = unit.Block + unit.Group - 1;
+            long start = _d.Offsets[unit.Block];
+            int total = (int)(_d.Offsets[last] + _d.ByteCounts[last] - start);
+            _source.ReadExactly(start, scratch.Read.AsSpan(0, total));
+            long blockY = unit.Y0 - unit.FirstRow;
+            for (int i = 0; i < unit.Group; i++, blockY += _d.BlockHeight)
+            {
+                long first = i == 0 ? unit.FirstRow : 0;
+                long end = Math.Min(Math.Min(_stored.Y1, blockY + _d.BlockHeight), _d.Height) - blockY;
+                var strip = new PixelUnit(unit.Block + i, unit.Plane, unit.X0, blockY + first, (int)first, (int)(end - first));
+                ProcessOne(strip, destination, scratch, (int)(_d.Offsets[strip.Block] - start));
+            }
+        }
+
+        /// <summary>
+        /// One unit; <paramref name="read"/> is where its compressed bytes are in the buffer of the read when its group read them
+        /// (-1: read them).
+        /// </summary>
+        private void ProcessOne(PixelUnit unit, Span<TOut> destination, Scratch<TD> scratch, int read)
+        {
             int deliveredPerPixel = SampleUnpacker.DeliveredChannels(_d, unit.Plane);
             int rowSamples = (int)(_d.BlockWidth * deliveredPerPixel);
             bool straight = Straight(unit);
@@ -111,7 +146,7 @@ internal static partial class PixelReader
             Span<byte> rows;
             if (!into.IsEmpty)
             {
-                Decode(unit, scratch, into);
+                Decode(unit, scratch, into, read);
                 if (_inPlaceSwap)
                 {
                     SampleUnpacker.Swap(into, _d.BitsPerSample / 8);
@@ -122,7 +157,7 @@ internal static partial class PixelReader
 
             if (_compressed)
             {
-                rows = Decode(unit, scratch, default);
+                rows = Decode(unit, scratch, default, read);
             }
             else
             {
@@ -171,8 +206,8 @@ internal static partial class PixelReader
         }
 
         /// <summary>
-        /// A large Deflate block, inflated as a stream read from the file, a few rows at a time: the rows before the unit are
-        /// inflated and dropped, those of the unit delivered as they come (or inflated in their place, <paramref name="into"/>,
+        /// A large Deflate, LZW or PackBits block, decoded as a stream read from the file, a few rows at a time: the rows before
+        /// the unit are decoded and dropped, those of the unit delivered as they come (or decoded in their place, <paramref name="into"/>,
         /// when the unit starts the block and its rows are delivered as they are). Bounded as <see cref="Decode"/> is: the
         /// compressed bytes a read can need, the rows the unit needs.
         /// </summary>
@@ -188,13 +223,19 @@ internal static partial class PixelReader
             var range = _source.OpenRange(_d.Offsets[block], count);
             try
             {
-                using var zlib = new ZLibStream(new BufferedStream(range, 1 << 16), CompressionMode.Decompress);
+                // LzwStream and PackBitsStream read their input by blocks themselves; zlib reads what it wants of it.
+                using Stream decoder = _d.Compression switch
+                {
+                    TiffCompression.Lzw => new LzwStream(range),
+                    TiffCompression.PackBits => new PackBitsStream(range),
+                    _ => new ZLibStream(new BufferedStream(range, 1 << 16), CompressionMode.Decompress),
+                };
                 for (long row = 0; row < last; row += chunkRows)
                 {
                     _budget.ThrowIfCancelled();
                     int n = (int)Math.Min(chunkRows, last - row);
                     Span<byte> part = into.IsEmpty ? chunk[..(int)(n * _rowBytes)] : into.Slice((int)(row * _rowBytes), (int)(n * _rowBytes));
-                    int got = zlib.ReadAtLeast(part, part.Length, throwOnEndOfStream: false);
+                    int got = decoder.ReadAtLeast(part, part.Length, throwOnEndOfStream: false);
                     if (got < part.Length)
                     {
                         throw _budget.Invalid($"{kind} {block} decodes to {row * _rowBytes + got} bytes, {last * _rowBytes} are needed: the file is damaged or truncated.");
@@ -226,7 +267,7 @@ internal static partial class PixelReader
 
                 long blockRows = PixelPlan.BlockRows(_d, unit.Y0 - unit.FirstRow);
                 Span<byte> one = stackalloc byte[1];
-                if (_budget.Options.Strict && last == blockRows && zlib.Read(one) > 0)
+                if (_budget.Options.Strict && last == blockRows && decoder.Read(one) > 0)
                 {
                     throw _budget.Invalid($"{kind} {block} holds more data than its {blockRows} rows of {_rowBytes} bytes.");
                 }
@@ -265,9 +306,10 @@ internal static partial class PixelReader
         /// Decodes a compressed block up to the last row of the unit; returns the rows of the unit. The output is bounded by what
         /// the unit needs: a block that would decode to more stops there, one that decodes to less is damaged. It is the scratch of
         /// the worker, or <paramref name="into"/>: the place of the rows in the destination, for a unit that starts its block
-        /// (never JPEG).
+        /// (never JPEG). The compressed bytes are read into the buffer of the read, unless a group read them there already, from
+        /// <paramref name="read"/>.
         /// </summary>
-        private Span<byte> Decode(PixelUnit unit, Scratch<TD> scratch, Span<byte> into)
+        private Span<byte> Decode(PixelUnit unit, Scratch<TD> scratch, Span<byte> into, int read)
         {
             int block = unit.Block;
             long blockRows = PixelPlan.BlockRows(_d, unit.Y0 - unit.FirstRow);
@@ -276,11 +318,16 @@ internal static partial class PixelReader
             int count = (int)PixelPlan.CompressedToRead(_d.Compression, _d.ByteCounts[block], needed);
             string kind = _d.Layout == TiffLayout.Tiles ? "tile" : "strip";
             byte[] compressed = scratch.Read;
-            _source.ReadExactly(_d.Offsets[block], compressed.AsSpan(0, count));
+            int at = Math.Max(0, read);
+            if (read < 0)
+            {
+                _source.ReadExactly(_d.Offsets[block], compressed.AsSpan(0, count));
+            }
+
             if (jpeg)
             {
                 bool lastStrip = _d.Layout == TiffLayout.Strips && unit.Y0 - unit.FirstRow + blockRows == _d.Height;
-                DecodeJpeg(compressed.AsSpan(0, count), scratch, needed, (int)blockRows, lastStrip, kind, block);
+                DecodeJpeg(compressed.AsSpan(at, count), scratch, needed, (int)blockRows, lastStrip, kind, block);
                 return scratch.Decoded.AsSpan((int)(unit.FirstRow * _rowBytes), (int)(unit.Rows * _rowBytes));
             }
 
@@ -293,9 +340,9 @@ internal static partial class PixelReader
             {
                 written = _d.Compression switch
                 {
-                    TiffCompression.Lzw => Lzw.Decode(compressed.AsSpan(0, count), output, out overflow),
-                    TiffCompression.PackBits => PackBits.Decode(compressed.AsSpan(0, count), output, out overflow),
-                    _ => Deflate.Decode(compressed, count, output, _budget.Options.Strict && whole, out overflow),
+                    TiffCompression.Lzw => Lzw.Decode(compressed.AsSpan(at, count), output, out overflow),
+                    TiffCompression.PackBits => PackBits.Decode(compressed.AsSpan(at, count), output, out overflow),
+                    _ => Deflate.Decode(compressed, at, count, output, _budget.Options.Strict && whole, out overflow),
                 };
             }
             catch (InvalidDataException ex)
