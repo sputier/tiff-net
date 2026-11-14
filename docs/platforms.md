@@ -12,7 +12,9 @@ checked.
 
 The library is trimmable and AOT-compatible (`IsTrimmable`, `IsAotCompatible`): reflection is not used, and the analyzers
 of trimming and AOT run on every build. On processors without AVX2 (ARM included), the JPEG decoder uses its inverse DCT on
-128-bit vectors (SSE2 or AdvSimd), which gives the same samples bit for bit.
+128-bit vectors (SSE2 or AdvSimd), which gives the same samples bit for bit. The colour conversion and the upsampling of
+JPEG use 128-bit shuffles (SSSE3 or AdvSimd) and fall back to scalar code without them; the AdvSimd paths are checked by reading
+only, the tests of this repository run on x64.
 
 ## Android, by hand
 
