@@ -1,0 +1,41 @@
+name: Bug report
+description: The library gives a wrong result, fails on a valid file, or behaves badly on a file
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A file that crashes the library, makes it allocate far more than its limits or run for a long time is a security
+        problem: do not post it here, follow [SECURITY.md](https://github.com/sputier/tiff-net/blob/main/SECURITY.md).
+  - type: input
+    id: version
+    attributes:
+      label: Version of Eleris.TiffNet
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: .NET version and operating system
+      placeholder: ".NET 10.0.x, Windows 11 x64 / Ubuntu 24.04 arm64"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens, and what you expected
+    validations:
+      required: true
+  - type: textarea
+    id: code
+    attributes:
+      label: Smallest code that shows it
+      render: csharp
+    validations:
+      required: true
+  - type: textarea
+    id: file
+    attributes:
+      label: The file
+      description: Attach it (a crop is fine), or say how it was produced (software, options), or the output of `tiffinfo` / `tifffile`. Do not attach a file you are not allowed to share.

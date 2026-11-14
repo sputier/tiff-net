@@ -5,7 +5,7 @@ Status: **validated on 2026-11-05**, signatures updated to the code of version 0
 choices cannot change after 1.0 without breaking callers (review, decision D2). It follows the conventions of Eleris.FitsNet so
 that an application using both libraries reads the same way.
 
-Requirements covered: DOM-01 to DOM-20, SEC-05, SEC-09 to SEC-11, PERF-11, PERF-12 of the [review](../review-2026-11-05.md).
+Requirements covered: DOM-01 to DOM-20, SEC-05, SEC-09 to SEC-11, PERF-11, PERF-12 of the audit of the first implementation (see [backlog](backlog.md)).
 
 ## Principles
 

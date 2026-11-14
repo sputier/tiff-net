@@ -4,7 +4,7 @@
 > GitHub number only.
 
 Derived from the validated [API](api.md), [coverage](../standard-coverage.md) and [architecture](architecture.md), and from the
-[review](../review-2026-11-05.md) whose findings each story closes (column "Closes"). Sizes: S ≤ 1 day, M a few days, L more
+audit of the first implementation (not published) whose findings each story closes (column "Closes"; DOM, SEC, PERF and MAINT are the families of findings of that audit). Sizes: S ≤ 1 day, M a few days, L more
 than a week.
 
 **Definition of done** (every story): automated tests written and passing on ubuntu and windows; public members documented
@@ -23,10 +23,10 @@ unless a dependency is given.
 | [#3](https://github.com/sputier/tiff-net/issues/3) | CI | ubuntu + windows build and test; LF check (`git ls-files --eol`); `permissions:` minimal; actions pinned by SHA; Dependabot (nuget, github-actions); package job runs `tools/verify_package.py` (from FitsNet, adapted): content, metadata, use from a new net10 project | MAINT-03, MAINT-06, MAINT-18, SEC-15 | S |
 | [#4](https://github.com/sputier/tiff-net/issues/4) | Release pipeline | `release.yml` (tag = version, test, pack, verify, `nuget` environment, GitHub release), `RELEASING.md`, `CHANGELOG.md`, `EnablePackageValidation`, `SECURITY.md` | MAINT-06, SEC-15 | S |
 | [#5](https://github.com/sputier/tiff-net/issues/5) | Documentation skeleton | MkDocs (`mkdocs.yml`, `docs/index.md`), `tools/DocGen` from FitsNet generating API pages (`--check` in CI), `tools/check_docs.py`, examples project compiled and run by the tests; design pages kept under `docs/design/` | MAINT-11 | M |
-| [#6](https://github.com/sputier/tiff-net/issues/6) | Interop corpus | `tools/make_fixtures.py` (from `research/review-2026-11/interop`) generates the tifffile corpus (about 6 000 files) with SHA-256 of the samples; expectations committed, files generated in CI; `TIFFNET_SKIP_INTEROP=1` skips the live tests; an `interop` CI job | MAINT-05 | M |
+| [#6](https://github.com/sputier/tiff-net/issues/6) | Interop corpus | `tools/make_fixtures.py` generates the tifffile corpus (about 6 000 files) with SHA-256 of the samples; expectations committed, files generated in CI; `TIFFNET_SKIP_INTEROP=1` skips the live tests; an `interop` CI job | MAINT-05 | M |
 | [#7](https://github.com/sputier/tiff-net/issues/7) | Siril and domain fixtures | Siril 1.4.4 files regenerated from the `siril-cli` scripts and cropped (≤ 1 MB each): 8/16/32-bit grey and RGB, Astro-TIFF header, ICC; domain cases (thumbnail in IFD0, grey with 3 samples, associated alpha, MinIsWhite, palette, 12-bit packed); provenance in `tests/Fixtures/README.md` | MAINT-10 | S |
-| [#8](https://github.com/sputier/tiff-net/issues/8) | Hostile fixtures and test helpers | the 20 files of `research/…/security/repro` plus `tools/make_hostile.py` (from `tiffcraft.py`, `craft_*.py`); a test helper asserting "fails with `TiffException` within T seconds and A bytes allocated" | SEC-01…07 | S |
-| [#9](https://github.com/sputier/tiff-net/issues/9) | Fuzz harness | `tools/Fuzz` from the review's structure-aware fuzzer, seed replay, corpus from #6 and #7; runnable locally; wired to CI in lot 3 | MAINT-09 | M |
+| [#8](https://github.com/sputier/tiff-net/issues/8) | Hostile fixtures and test helpers | the 20 files of `tests/Fixtures/hostile/review` plus `tools/make_hostile.py`; a test helper asserting "fails with `TiffException` within T seconds and A bytes allocated" | SEC-01…07 | S |
+| [#9](https://github.com/sputier/tiff-net/issues/9) | Fuzz harness | `tools/Fuzz` from the structure-aware fuzzer of the audit, seed replay, corpus from #6 and #7; runnable locally; wired to CI in lot 3 | MAINT-09 | M |
 
 ## Lot 1 — Structure and metadata (reading)
 
@@ -48,7 +48,7 @@ unless a dependency is given.
 | [#18](https://github.com/sputier/tiff-net/issues/18) | Parallel decoding | `MaxDegreeOfParallelism`; identical results on 1 and n threads; cancellation between strips | PERF-03 | M |
 | [#19](https://github.com/sputier/tiff-net/issues/19) | Sample types and byte order | 8 to 64-bit integers, Float16/32/64; big endian swapped with `ReverseEndianness`; NaN/infinity/−0 preserved | PERF-07 | S |
 | [#20](https://github.com/sputier/tiff-net/issues/20) | Pixel API | `ReadRawPixels`, `ReadPixels` (Stored / Normalized, conversion rules of the API), `ReadPixels(Span)`, `ReadChannel`, `ReadRegion`, `ReadRawRegion`, interleaved and planar order, `ReadPixelsAsync`; region reads decode only the strips/tiles they cover | DOM-05, DOM-13, DOM-12, PERF-11 | M |
-| [#21](https://github.com/sputier/tiff-net/issues/21) | Orientation | values 1 to 8 applied (including transpositions), typed row operations | PERF-15, need 28 of the review | S |
+| [#21](https://github.com/sputier/tiff-net/issues/21) | Orientation | values 1 to 8 applied (including transpositions), typed row operations | PERF-15, need 28 of the audit | S |
 | [#22](https://github.com/sputier/tiff-net/issues/22) | Colour model and extra channels | `ColorModel` from the file, `ExtraChannels` with their kinds, grey with 3+ samples stays grey | DOM-02, DOM-03 | S |
 | [#23](https://github.com/sputier/tiff-net/issues/23) | Low depths, MinIsWhite, palette | unpacking of 1–16-bit unsigned samples (both fill orders), `Normalized` by `2^bits − 1`; MinIsWhite inverted; palette expanded to RGB 16-bit | decision 4 | M |
 
@@ -57,7 +57,7 @@ unless a dependency is given.
 | Issue | Story | Acceptance criteria | Closes | Size |
 | --- | --- | --- | --- | --- |
 | [#24](https://github.com/sputier/tiff-net/issues/24) | PackBits decoder | span loops; output bounded by the destination | — | S |
-| [#25](https://github.com/sputier/tiff-net/issues/25) | LZW decoder | back-referencing table, state in locals, both bit orders (old-style included); prototype of the review as starting point; benchmarked against it | PERF-10 | M |
+| [#25](https://github.com/sputier/tiff-net/issues/25) | LZW decoder | back-referencing table, state in locals, both bit orders (old-style included); the prototype of the first implementation as starting point; benchmarked against it | PERF-10 | M |
 | [#26](https://github.com/sputier/tiff-net/issues/26) | Deflate decoder | `ZLibStream` into the destination; overflow of the destination is a `TiffException`; codes 8 and 32946 | PERF-02, SEC-06 | S |
 | [#27](https://github.com/sputier/tiff-net/issues/27) | Predictors (decoding) | horizontal 8–64-bit and floating point 16–64-bit, in place, typed spans, vectorised where the stride allows; no allocation per row | PERF-04, PERF-05, PERF-06 | M |
 | [#28](https://github.com/sputier/tiff-net/issues/28) | Interop gate | 100 % of the tifffile corpus readable except the features refused by design, samples equal to tifffile's (SHA-256); Siril fixtures read with their metadata | MAINT-05, MAINT-13 | S |
@@ -72,7 +72,7 @@ unless a dependency is given.
 | [#32](https://github.com/sputier/tiff-net/issues/32) | Progressive decoding | spectral selection and successive approximation, `EOBRUN` bounded by the remaining blocks; coefficient buffer counted in the budget before allocation; `MaxJpegScans`; no-progress scans refused | SEC-04, SEC-05 | L |
 | [#33](https://github.com/sputier/tiff-net/issues/33) | Colour and upsampling | YCbCr → RGB (and `ReferenceBlackWhite`), "fancy" upsampling, results within ±1 of libjpeg-turbo | — | M |
 | [#34](https://github.com/sputier/tiff-net/issues/34) | JPEG in TIFF (Technical Note 2) | `JPEGTables` abbreviated streams, strips and tiles, frame size equal to the strip/tile size, YCbCr photometric delivered as RGB; Pillow/tifffile oracle files in the interop corpus | — | M |
-| [#35](https://github.com/sputier/tiff-net/issues/35) | JPEG hardening | hostile JPEG fixtures of the review (scan amplification, coefficient bombs) fail within bounds; JPEG-focused fuzzing; benchmark vs libjpeg-turbo (target: within 2× on one core) | SEC-04, SEC-05 | M |
+| [#35](https://github.com/sputier/tiff-net/issues/35) | JPEG hardening | hostile JPEG fixtures of the audit (scan amplification, coefficient bombs) fail within bounds; JPEG-focused fuzzing; benchmark vs libjpeg-turbo (target: within 2× on one core) | SEC-04, SEC-05 | M |
 
 ## Lot 5 — Writing
 

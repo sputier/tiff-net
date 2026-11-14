@@ -19,7 +19,7 @@ internal enum MutationMode
 }
 
 /// <summary>
-/// Structure-aware mutations of TIFF files, from the fuzzer of the review of the first implementation. Every mutation is a pure
+/// Structure-aware mutations of TIFF files, from the fuzzer of the audit of the first implementation. Every mutation is a pure
 /// function of the input and of the <see cref="Random"/> it is given, so that an input can be produced again from its seed. A
 /// mutation never throws: an input it cannot parse is mutated byte by byte.
 /// </summary>
