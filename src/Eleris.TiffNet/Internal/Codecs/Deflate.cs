@@ -7,14 +7,15 @@ internal static class Deflate
 {
     /// <summary>Inflates the compressed bytes straight into <paramref name="destination"/>; returns the number of bytes written.</summary>
     /// <param name="source">An array holding the compressed bytes of a strip or tile.</param>
-    /// <param name="length">The number of compressed bytes at the start of <paramref name="source"/>.</param>
+    /// <param name="start">Where they start in <paramref name="source"/>.</param>
+    /// <param name="length">The number of compressed bytes.</param>
     /// <param name="destination">The decoded bytes wanted: the inflation stops when it is full.</param>
     /// <param name="checkOverflow">Whether to look for data beyond the destination (one more byte inflated).</param>
     /// <param name="overflow">Whether the stream goes on beyond the destination (always false unless checked).</param>
     /// <exception cref="InvalidDataException">The stream is damaged (whether zlib reports it as invalid data or as an error).</exception>
-    public static int Decode(byte[] source, int length, Span<byte> destination, bool checkOverflow, out bool overflow)
+    public static int Decode(byte[] source, int start, int length, Span<byte> destination, bool checkOverflow, out bool overflow)
     {
-        using var compressed = new MemoryStream(source, 0, length, writable: false);
+        using var compressed = new MemoryStream(source, start, length, writable: false);
         using var zlib = new ZLibStream(compressed, CompressionMode.Decompress);
         try
         {

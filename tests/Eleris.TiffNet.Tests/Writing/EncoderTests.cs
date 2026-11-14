@@ -58,7 +58,7 @@ public class EncoderTests
         byte[] encoded = DeflateEncoder.Encode(data, level);
         byte[] decoded = new byte[data.Length];
 
-        Assert.Equal(data.Length, Deflate.Decode(encoded, encoded.Length, decoded, true, out bool overflow));
+        Assert.Equal(data.Length, Deflate.Decode(encoded, 0, encoded.Length, decoded, true, out bool overflow));
         Assert.Equal(data, decoded);
         Assert.False(overflow);
     }
@@ -94,7 +94,7 @@ public class EncoderTests
 
         Assert.Equal(expected.ToArray(), encoded);
         byte[] decoded = new byte[data.Length];
-        Assert.Equal(data.Length, Deflate.Decode(encoded, encoded.Length, decoded, true, out _));
+        Assert.Equal(data.Length, Deflate.Decode(encoded, 0, encoded.Length, decoded, true, out _));
         Assert.Equal(data, decoded);
     }
 }

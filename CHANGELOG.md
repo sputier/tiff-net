@@ -17,6 +17,9 @@
 - `SetPixels` removes the tags of the ranges of the former values; MinIsWhite, palette and YCbCr images are read without them.
 - Faster: planar and FITS-cube reads, normalised and converted reads, 12 and 14-bit samples, big-endian files, predictors,
   LZW, files of many small strips, single-strip Deflate images (in bounded memory), JPEG without AVX2.
+- Faster again: 4:2:0 JPEG colour conversion (15 % on a 12 MP image), files of small Deflate strips (about 45 %), planar files
+  read interleaved (12 to 22 %), whole-image reads of a file that is not in the system cache (1.3 to 2.2 times, the handle
+  no longer has the `RandomAccess` hint); LZW and PackBits strips of more than 4 MB (19 MB for LZW) are decoded as a stream.
 
 ## 0.1.0
 

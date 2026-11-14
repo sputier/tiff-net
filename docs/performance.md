@@ -20,17 +20,48 @@ astronomical frames are. `benchmarks/` reproduces the figures (`TargetBenchmarks
 
 JPEG (12 MP, quality 90, one thread) is decoded in 1.1 to 1.35 times the time of libjpeg-turbo, with the same samples bit for bit.
 
+Gains of the last batch, each measured against the previous version (`PathBenchmarks`, `JpegBenchmarks`, medium job unless noted):
+
+| Change | Case | Before | After |
+| --- | --- | --- | --- |
+| YCbCr 4:2:0 colour and upsampling with vectors | `ToImage` ycc420 | 63.0 ms | 53.2 ms (conversion 23.2 to 13.3 ms) |
+| Small compressed strips read together | u16 Deflate, small strips, short job | 54 to 69 ms | 26 to 37 ms |
+| Planes of a planar file read together, band by band | u16 RGB planar read interleaved | 15.8 ms | 13.9 ms |
+| | the same, converted to `double` | 56.8 ms | 44.2 ms |
+
+Not changed (measured, within the noise): YCbCr 4:4:4 (94.1 to 91.2 ms), and the planar read of a planar file.
+
 ## Memory
 
 - A whole-image read allocates its pixels and the buffers of one strip or tile per thread: 1.00 to 1.07 times the pixels
   above about 50 MB, at most 1.1 times. `ReadPixels(Memory<T>)` reads into a buffer of the application.
 - A region reads only the strips or tiles under it, and decodes a compressed strip only up to the last row it needs.
-- A Deflate strip of more than 4 MB (an image written in one strip) is inflated as a stream, a megabyte of rows at a time,
-  straight to the destination: it costs its pixels, not twice its pixels. LZW and PackBits strips are still decoded whole into
-  a buffer of the strip.
+- A Deflate or PackBits strip of more than 4 MB, or an LZW strip of more than 19 MB (an image written in one strip), is
+  decoded as a stream, a megabyte of rows at a time, straight to the destination: it costs its pixels, not twice its pixels.
+  The stream of LZW allocates, for each strip it decodes, the output of a generation of its table (since its last clear code),
+  at most 9.6 MB with its table and its input, which flat data comes close to: that memory is counted once per worker in
+  `MaxPixelBytes` before the read. Decoding LZW as a stream takes 1.4 to 2 times the time of
+  decoding it whole (an extra copy of its output), PackBits the same time: the price of the memory.
 - Writing holds a band of rows of the source (the whole image when the source is one compressed strip, or stored on its
   side) and at most 2 × `MaxDegreeOfParallelism` encoded blocks; `TiffImageWriter` writes an
   image of any size with a bounded window (under 16 MB for 64 MB of pixels).
+
+## Cold cache
+
+A file opened by path is read through a handle without an access hint, so that the system keeps its read-ahead. Reading a
+whole 6000 × 4000 RGB 16-bit image from a file that is not in the system cache (Windows 11, median of 7 reads; the program is
+`research/review-2026-11/performance/cold`) took:
+
+| File | Threads | `RandomAccess` (before) | none (now) | `SequentialScan` |
+| --- | --- | --- | --- | --- |
+| Uncompressed, 144 MB | 1 | 114 ms | 53 ms | 52 ms |
+| Uncompressed, 144 MB | all cores | 100 ms | 75 ms | 63 ms |
+| Deflate, 72 MB | 1 | 581 ms | 451 ms | 460 ms |
+| Deflate, 72 MB | all cores | 133 ms | 82 ms | 76 ms |
+
+`SequentialScan` was not adopted: it gains a further 7 to 16 % on all cores, but the hint is fixed when the file is opened,
+before the caller chooses between a whole image and a region, and the reads of a region and of the directories are not
+sequential. Not measured: Linux, regions on a cold cache. A stream of the application is read as it opens it.
 
 ## Tuning
 
