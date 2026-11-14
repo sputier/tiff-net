@@ -120,6 +120,66 @@ public class CompressedPixelTests
     }
 
     [Theory]
+    [InlineData(1)]
+    [InlineData(-1)]
+    public void Small_strips_read_together_give_their_rows(int threads)
+    {
+        // 300 Deflate strips of 3 rows, one after the other in the file: read in groups, each decoded from the bytes of its
+        // group; whole, by region (from the middle of a strip), by channel; a damaged strip in a group names itself.
+        const int width = 50, height = 900, rows = 3;
+        var random = new Random(124);
+        byte[] samples = new byte[width * height];
+        random.NextBytes(samples);
+        var strips = new List<byte[]>();
+        for (int y = 0; y < height; y += rows)
+        {
+            using var compressed = new MemoryStream();
+            using (var zlib = new System.IO.Compression.ZLibStream(compressed, System.IO.Compression.CompressionLevel.Fastest))
+            {
+                zlib.Write(samples.AsSpan(y * width, rows * width));
+            }
+
+            strips.Add(compressed.ToArray());
+        }
+
+        byte[] File(int damaged = -1)
+        {
+            byte[] data = [.. strips.SelectMany(b => b)];
+            if (damaged >= 0)
+            {
+                int at = strips.Take(damaged).Sum(b => b.Length);
+                data[at + 2] ^= 0xFF;   // the deflate data of that strip, after its zlib header
+                data[at + 3] ^= 0xFF;
+            }
+
+            var builder = new TiffBuilder { Data = data };
+            long offset = builder.DataOffset;
+            var offsets = new List<long>();
+            foreach (var strip in strips)
+            {
+                offsets.Add(offset);
+                offset += strip.Length;
+            }
+
+            builder.AddDirectory().Image(width, height).Remove(259).Add(259, TiffTagType.Short, 8).Remove(273).Remove(278).Remove(279)
+                .Add(273, TiffTagType.Long, [.. offsets]).Add(278, TiffTagType.Long, rows)
+                .Add(279, TiffTagType.Long, [.. strips.Select(b => (long)b.Length)]).Sorted();
+            return builder.Build();
+        }
+
+        var options = TiffReadOptions.Default with { MaxDegreeOfParallelism = threads };
+        using (var file = TiffFile.Read(new MemoryStream(File()), options))
+        {
+            Assert.Equal(samples, file.Primary.ReadRawPixels<byte>());
+            Assert.Equal(samples.Skip(7 * width + 3).Take(20 * width).Where((_, i) => i % width < 30), file.Primary.ReadRegion<byte>(3, 7, 30, 20));
+            Assert.Equal(samples.Select(v => (float)v), file.Primary.ReadPixels<float>());
+        }
+
+        using var damaged = TiffFile.Read(new MemoryStream(File(damaged: 150)), options);
+        Assert.Contains("strip 150", Assert.Throws<TiffException>(() => damaged.Primary.ReadRawPixels<byte>()).Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
     [InlineData(TiffCompression.Lzw, TiffPredictor.Horizontal)]
     [InlineData(TiffCompression.Deflate, TiffPredictor.Horizontal)]
     [InlineData(TiffCompression.Deflate, TiffPredictor.FloatingPoint)]
