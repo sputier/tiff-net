@@ -50,7 +50,7 @@ Not changed (measured, within the noise): YCbCr 4:4:4 (94.1 to 91.2 ms), and the
 
 A file opened by path is read through a handle without an access hint, so that the system keeps its read-ahead. Reading a
 whole 6000 × 4000 RGB 16-bit image from a file that is not in the system cache (Windows 11, median of 7 reads; the program is
-`research/review-2026-11/performance/cold`) took:
+`benchmarks/ColdCache`) took:
 
 | File | Threads | `RandomAccess` (before) | none (now) | `SequentialScan` |
 | --- | --- | --- | --- | --- |

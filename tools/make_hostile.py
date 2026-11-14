@@ -5,8 +5,8 @@
 
 Writes tests/Fixtures/hostile/crafted/*.tif (committed) and updates the "crafted" part of tests/Fixtures/hostile/manifest.json.
 Every file must fail with a TiffException (or a NotSupportedException for a feature refused by design) within the time and
-allocation bounds of the manifest; the tests assert it with HostileAssert. The cases come from the review of the first
-implementation (findings SEC-01 to SEC-06), where each one was measured: see docs/review-2026-11-05.md.
+allocation bounds of the manifest; the tests assert it with HostileAssert. The cases come from the audit of the first
+implementation (findings SEC-01 to SEC-06), where each one was measured.
 
 The files are built byte by byte (classic TIFF with tiffcraft-like helpers, BigTIFF by hand), so that their defects are exactly
 the intended ones; the compressed payloads use zlib, imagecodecs (LZW) and a PackBits run written here.
@@ -258,8 +258,8 @@ def progressive_jpeg() -> None:
 # A progressive JPEG made of thousands of scans: refused by MaxJpegScans, or before as soon as a scan adds no bit (a damaged file).
 SCAN_AMPLIFICATION = "TiffException:MaxJpegScans|TiffException"
 
-# The files of the review (tests/Fixtures/hostile/review), measured on the first implementation; kept as they are. The fourth
-# value says whether a small device's options apply: the bombs of the review declare 2 147 024 896 bytes, just below the default
+# The files of the audit (tests/Fixtures/hostile/review), measured on the first implementation; kept as they are. The fourth
+# value says whether a small device's options apply: the bombs of the audit declare 2 147 024 896 bytes, just below the default
 # MaxPixelBytes, so they are refused only with a lower limit.
 REVIEW_CASES = {
     "bomb-deflate-2G.tif": ("SEC-05", "Deflate strips sharing one stream, 2 GB declared", "TiffException:MaxPixelBytes", True),

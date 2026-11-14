@@ -5,8 +5,7 @@ floating point samples, grey or RGB, the metadata astronomy software stores in T
 multi-core encoding and decoding, and bounded resources on hostile files. The sister library of
 [Eleris.FitsNet](https://github.com/sputier/fits-net).
 
-**Status: 0.1.0.** Written from scratch; the requirements come from the
-[review of the first implementation](docs/review-2026-11-05.md) (in French). See the [changelog](CHANGELOG.md), the
+**Status: 0.1.0.** Written from scratch after an audit of a first implementation. See the [changelog](CHANGELOG.md), the
 [guide](docs/getting-started.md) and the [coverage of the standard](docs/standard-coverage.md).
 
 Targets: net10.0 on Windows, Linux, NativeAOT and .NET MAUI (checked on Android), trimming compatible, no dependency.
@@ -40,3 +39,10 @@ structurally and saves every input that crashes, hangs or allocates too much, wi
 dotnet run -c Release --project tools/Fuzz -- run --seconds 600 --seed 1       # a campaign (see tools/Fuzz/Program.cs)
 dotnet run -c Release --project tools/Fuzz -- reproduce --seed 1 --iteration 1234
 ```
+
+## Contributing, security, licence
+
+Bug reports and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md) and the
+[code of conduct](CODE_OF_CONDUCT.md). To report a vulnerability (a file that crashes the library, exhausts its memory or blocks
+it), follow [SECURITY.md](SECURITY.md) and do not open a public issue. Eleris.TiffNet is released under the
+[MIT licence](LICENSE).

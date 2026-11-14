@@ -6,7 +6,7 @@ using Eleris.TiffNet.Internal.Codecs;
 namespace Eleris.TiffNet.Benchmarks;
 
 /// <summary>
-/// The LZW decoder of the library against the prototype of the review (research/review-2026-11/performance/bench/Kernels.cs),
+/// The LZW decoder of the library against the prototype of the first implementation,
 /// on a strip of 8 MB: 16-bit samples of a smooth image with noise (an astronomical frame), the same through the horizontal
 /// predictor (as most LZW files are written: short strings of small differences) and a flat one (long strings).
 /// </summary>
@@ -62,7 +62,7 @@ public class LzwBenchmarks
     [Benchmark]
     public int LibraryEncode() => LzwEncoder.Encode(_decoded, _output);
 
-    /// <summary>The prototype of the review, unchanged.</summary>
+    /// <summary>The prototype of the first implementation, unchanged.</summary>
     private static class PrototypeLzw
     {
         public static int Decode(ReadOnlySpan<byte> src, Span<byte> dst)

@@ -84,7 +84,7 @@ public class HostileAssertTests
     {
         var cases = HostileAssert.Cases;
 
-        Assert.Equal(35, cases.Count);   // 20 from the review, 15 crafted by tools/make_hostile.py
+        Assert.Equal(35, cases.Count);   // 20 from the audit, 15 crafted by tools/make_hostile.py
         Assert.All(cases, c =>
         {
             Assert.True(File.Exists(c.Path), $"{c} is missing");

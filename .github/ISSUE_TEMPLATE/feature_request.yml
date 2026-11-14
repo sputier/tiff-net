@@ -1,0 +1,21 @@
+name: Feature request
+description: A format feature, a codec, an API or a documentation need
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What do you need to do?
+      description: Describe the task, not only the feature. Say what you do today instead.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like the library to offer?
+      description: For a format feature, the part of the TIFF 6.0 specification, BigTIFF or the extension it comes from. For an API, a short code sketch.
+  - type: textarea
+    id: files
+    attributes:
+      label: Example files
+      description: A file that needs it, or the software that writes it. Do not attach a file you are not allowed to share.

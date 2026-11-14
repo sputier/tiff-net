@@ -14,8 +14,6 @@ How the library was designed:
 | [Public API](design/api.md) | the types and members of the library |
 | [Architecture](design/architecture.md) | layers, resource limits, parallelism, tests, performance targets, decisions |
 | [Backlog](design/backlog.md) | how the work is cut; progress is followed in the GitHub issues |
-| [Review of the first implementation](review-2026-11-05.md) | the findings that motivate the design (in French) |
-| [Review of version 0.1.0](review-2026-11-06.md) | business, security, maintainability, quality, performance (in French) |
 | [Fuzzing campaign](fuzzing-2026-11.md) | 148 million inputs over every reader, no finding |
 | [Mutation testing](mutation-2026-11.md) | Stryker.NET on the structure and the codecs: 84.6 %, the gaps found and fixed |
 

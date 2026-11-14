@@ -24,7 +24,7 @@ internal static class HostileAssert
 
     public static string Folder => System.IO.Path.Combine(AppContext.BaseDirectory, "Fixtures", "hostile");
 
-    /// <summary>Every hostile file: the files of the review and the crafted ones.</summary>
+    /// <summary>Every hostile file: the files of the audit and the crafted ones.</summary>
     public static IReadOnlyList<HostileCase> Cases => Loaded.Value;
 
     public static void FailsWithinBounds(HostileCase hostile, Action read) =>

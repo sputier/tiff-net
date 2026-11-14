@@ -23,7 +23,7 @@
 
 ## 0.1.0
 
-The first version, written from scratch after the [review of the first implementation](docs/review-2026-11-05.md).
+The first version, written from scratch after an audit of a first implementation.
 
 ### Reading
 
