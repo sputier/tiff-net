@@ -62,6 +62,7 @@ internal static class BlockPipeline
                     StartHelpers();
                     T value = Next(i);
                     append(i, value);
+                    Appended();
                 }
             }
             catch (Exception ex)
@@ -91,8 +92,6 @@ internal static class BlockPipeline
                         T value = _slots[slot];
                         _slots[slot] = default!;
                         _states[slot] = Empty;
-                        _appended++;
-                        Monitor.PulseAll(_sync);
                         return value;
                     }
 
@@ -106,6 +105,19 @@ internal static class BlockPipeline
 
                 // A block nobody encodes yet (this one, or one after it): encode it here rather than wait.
                 Encode(mine);
+            }
+        }
+
+        /// <summary>
+        /// A block has been appended: its place in the window is free. It is counted only now, not when the writer takes the block,
+        /// so that the block the writer is holding is inside the window and at most 2 × the degree blocks are alive at once.
+        /// </summary>
+        private void Appended()
+        {
+            lock (_sync)
+            {
+                _appended++;
+                Monitor.PulseAll(_sync);
             }
         }
 

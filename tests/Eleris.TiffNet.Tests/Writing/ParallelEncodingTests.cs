@@ -53,6 +53,33 @@ public class ParallelEncodingTests
     }
 
     [Fact]
+    public void The_block_the_writer_holds_counts_in_the_window_of_blocks_in_flight()
+    {
+        // The writer is slow on its first block: the encoders fill the window meanwhile. They must stop at 2 × the degree blocks
+        // alive, the block the writer holds included (not at 2 × the degree after it).
+        const int degree = 4, window = 2 * degree;
+        int started = 0, startedWhileWriting = 0;
+
+        BlockPipeline.Run<byte[]>(100, degree, block =>
+        {
+            Interlocked.Increment(ref started);
+            return [(byte)block];
+        }, (block, _) =>
+        {
+            if (block == 0)
+            {
+                // The window fills (the time limit is only for a machine that never gets there), then a pause in which a
+                // block beyond the window would start if the pipeline let it.
+                SpinWait.SpinUntil(() => Volatile.Read(ref started) >= window, TimeSpan.FromSeconds(10));
+                Thread.Sleep(300);
+                startedWhileWriting = Volatile.Read(ref started);
+            }
+        }, _ => { }, CancellationToken.None);
+
+        Assert.Equal(window, startedWhileWriting);
+    }
+
+    [Fact]
     public void A_failing_block_stops_the_write_with_its_exception()
     {
         var failure = new InvalidDataException("block 37");
