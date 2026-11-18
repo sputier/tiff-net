@@ -48,6 +48,7 @@ nav:
     - Overview: api/index.md
     - Eleris.TiffNet:
       - "TiffBigTiff": api/Eleris.TiffNet.TiffBigTiff.md
+      - "TiffBlock": api/Eleris.TiffNet.TiffBlock.md
       - "TiffColorModel": api/Eleris.TiffNet.TiffColorModel.md
       - "TiffCompression": api/Eleris.TiffNet.TiffCompression.md
       - "TiffCompressionLevel": api/Eleris.TiffNet.TiffCompressionLevel.md

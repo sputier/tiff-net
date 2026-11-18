@@ -7,6 +7,7 @@ Every public type of the library, by namespace. The pages are generated from the
 | Type | Kind | Description |
 | --- | --- | --- |
 | [`TiffBigTiff`](Eleris.TiffNet.TiffBigTiff.md) | enum | Whether a file is written as BigTIFF (64-bit offsets, files beyond 4 GB) or as classic TIFF. |
+| [`TiffBlock`](Eleris.TiffNet.TiffBlock.md) | struct | Where one strip or tile of an image is stored in its file: the position and the size of its bytes, still compressed as the file holds them. |
 | [`TiffColorModel`](Eleris.TiffNet.TiffColorModel.md) | enum | What the colour channels of an image are. |
 | [`TiffCompression`](Eleris.TiffNet.TiffCompression.md) | enum | How samples are compressed in a file. |
 | [`TiffCompressionLevel`](Eleris.TiffNet.TiffCompressionLevel.md) | enum | How hard the compressor of a write works (Deflate): faster, or smaller files. |

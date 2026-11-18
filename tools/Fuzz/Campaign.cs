@@ -128,6 +128,21 @@ internal static class Targets
         }
     }
 
+    /// <summary>The stored blocks of an image, listed and read raw (the first few and the last, so the work stays bounded).</summary>
+    private static void TouchBlocks(TiffImage image)
+    {
+        var blocks = image.Blocks;
+        int[] indices = [.. Enumerable.Range(0, Math.Min(blocks.Count, 8)).Append(blocks.Count - 1).Where(i => i >= 0).Distinct()];
+        foreach (int index in indices)
+        {
+            byte[] bytes = new byte[blocks[index].ByteCount];
+            if (image.ReadBlock(index, bytes) != bytes.Length || image.TryGetBlockMemory(index) is { } view && !view.Span.SequenceEqual(bytes))
+            {
+                throw new InvalidOperationException($"block {index} was not read as it is stored");
+            }
+        }
+    }
+
     /// <summary>Every property of an image and of its sub-images, without recursion (a hostile chain could be deep).</summary>
     private static void Touch(TiffImage first)
     {
@@ -141,6 +156,7 @@ internal static class Targets
             }
 
             _ = image.Storage;
+            TouchBlocks(image);
             var m = image.Metadata;
             _ = (m.Description, m.Software, m.DateTime, m.Resolution, m.SampleRange, m.IccProfile, m.Xmp, m.Iptc, m.Artist, m.Copyright);
             foreach (var tag in m.Concat(m.Exif).Concat(m.Gps))

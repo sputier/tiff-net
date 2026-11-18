@@ -37,3 +37,33 @@ Console.WriteLine($"{file.Count} page(s) read from a stream");
 <!-- /example -->
 
 A file can be built and changed: `new TiffFile()`, `Add`, `Insert`, `Remove`, then `Save` (see [writing](writing.md)).
+
+## Stored blocks
+
+`TiffImage.Blocks` lists where the strips or tiles of an image are stored: for each, its `Offset` in the file and its `ByteCount`,
+in file order (plane after plane for a planar image; `Storage.Layout` tells strips from tiles). Nothing is decoded, so the list
+is available for every image, including one the library cannot decode, such as a vendor compression. This is what an
+application with its own decoder needs: the tags that hold the tables are not part of `Metadata`.
+
+```csharp
+using var file = TiffFile.Open(path);
+var image = file.Primary;
+byte[] buffer = new byte[image.Blocks.Max(b => b.ByteCount)];   // allocated once, reused
+for (int i = 0; i < image.Blocks.Count; i++)
+{
+    int count = image.ReadBlock(i, buffer);                     // the stored bytes, still compressed
+    MyDecoder.Decode(buffer.AsSpan(0, count));
+}
+```
+
+- The offsets and counts are those the library itself reads with, after the checks of a damaged file: a block that starts outside
+  the file makes the file fail to open (`TiffException`), and a last block cut by a truncated file is shortened to the end of
+  the file, unless `TiffReadOptions.Strict` is set, which refuses the file when it is opened.
+- `ReadBlock(index, destination)` copies the block and returns its byte count; it allocates nothing, honours the limits of
+  the file and can be called from several threads. `ArgumentException` when the destination is too short,
+  `ArgumentOutOfRangeException` for an index outside `Blocks`. `ReadBlockAsync` does the same asynchronously and can be
+  cancelled; its failures come through the task.
+- `TryGetBlockMemory(index)` gives the block as a view of the memory the file is held in, without a copy; it returns `null` when
+  the file is read on demand from a file or a stream, and for a stream read with `TiffFile.Read(stream)` that cannot seek.
+- An image created in memory (`TiffImage.Create`, or after `SetPixels`) stores nothing: its `Blocks` is empty and `ReadBlock`
+  throws `InvalidOperationException`.
