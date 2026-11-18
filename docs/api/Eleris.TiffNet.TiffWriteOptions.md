@@ -81,6 +81,7 @@ public TiffCompression Compression { get; init; }
 **Exceptions**
 
 - [`NotSupportedException`](https://learn.microsoft.com/dotnet/api/system.notsupportedexception) — The value is [`TiffCompression.Jpeg`](Eleris.TiffNet.TiffCompression.md#eleris-tiffnet-tiffcompression-jpeg): JPEG is read, not written.
+- [`ArgumentException`](https://learn.microsoft.com/dotnet/api/system.argumentexception) — The value is [`TiffCompression.Unknown`](Eleris.TiffNet.TiffCompression.md#eleris-tiffnet-tiffcompression-unknown): it stands for a code the library reads, not for one it can write.
 - [`ArgumentOutOfRangeException`](https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception) — The value is not a compression of the enumeration.
 
 <a id="eleris-tiffnet-tiffwriteoptions-default"></a>

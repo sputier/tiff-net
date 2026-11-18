@@ -26,6 +26,7 @@ An image can be read from several threads at once. Changing it ([`TiffImage.SetP
 | [`ExtraChannels`](#eleris-tiffnet-tiffimage-extrachannels) | The channels after the colour channels, with what they hold (see [`TiffImage.SetExtraChannels`](#eleris-tiffnet-tiffimage-setextrachannels-eleris-tiffnet-tiffextrachannelkind)). |
 | [`Height`](#eleris-tiffnet-tiffimage-height) | The height of the delivered image, in pixels, with its orientation applied. |
 | [`IsReducedResolution`](#eleris-tiffnet-tiffimage-isreducedresolution) | Whether the image is a reduced-resolution version of another (a thumbnail, a level of a pyramid). |
+| [`IsSupported`](#eleris-tiffnet-tiffimage-issupported) | Whether the library can deliver the pixels of the image: `true` when [`TiffImage.UnsupportedReason`](#eleris-tiffnet-tiffimage-unsupportedreason) is `null`. |
 | [`Metadata`](#eleris-tiffnet-tiffimage-metadata) | The tags of the image other than its structure: description (the FITS header of an Astro-TIFF file), ICC profile, resolution, private tags… Read with the image and kept when it is saved again. |
 | [`SampleType`](#eleris-tiffnet-tiffimage-sampletype) | The type of the samples the image delivers. |
 | [`Storage`](#eleris-tiffnet-tiffimage-storage) | How the image is stored in the file it was read from; `null` for an image created in memory. |
@@ -124,6 +125,15 @@ Whether the image is a reduced-resolution version of another (a thumbnail, a lev
 
 ```csharp
 public bool IsReducedResolution { get; }
+```
+
+<a id="eleris-tiffnet-tiffimage-issupported"></a>
+### `IsSupported`
+
+Whether the library can deliver the pixels of the image: `true` when [`TiffImage.UnsupportedReason`](#eleris-tiffnet-tiffimage-unsupportedreason) is `null`. The members that describe the image work either way.
+
+```csharp
+public bool IsSupported { get; }
 ```
 
 <a id="eleris-tiffnet-tiffimage-metadata"></a>

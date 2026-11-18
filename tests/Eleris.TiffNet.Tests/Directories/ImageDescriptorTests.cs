@@ -42,8 +42,8 @@ public class ImageDescriptorTests
                 Assert.True(page.GetProperty("samplesPerPixel").GetInt32() == image.SamplesPerPixel, what);
                 Assert.True(page.GetProperty("bitsPerSample").GetInt32() == image.BitsPerSample, what);
                 Assert.True(page.GetProperty("sampleFormat").GetInt32() == image.SampleFormat, what);
-                Assert.True(page.GetProperty("photometric").GetInt32() == (int)image.Photometric, what);
-                Assert.True(page.GetProperty("compression").GetInt32() == (int)image.Compression, what);
+                Assert.True(page.GetProperty("photometric").GetInt32() == image.PhotometricCode, what);
+                Assert.True(page.GetProperty("compression").GetInt32() == image.CompressionCode, what);
                 Assert.True(page.GetProperty("planar").GetBoolean() == image.Planar, what);
                 Assert.True(page.GetProperty("orientation").GetInt32() == image.Orientation, what);
                 Assert.True(((page.GetProperty("subfileType").GetInt32() & 1) != 0) == image.IsReducedResolution, what);

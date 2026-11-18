@@ -155,7 +155,15 @@ internal static class Targets
                 _ = (image.SampleType, image.ColorModel);
             }
 
-            _ = image.Storage;
+            _ = image.IsSupported;
+            if (image.Storage is { } storage)
+            {
+                // Every member of the storage describes the file, whatever it holds: none may throw.
+                _ = (storage.Compression, storage.RawCompressionCode, storage.Photometric, storage.RawPhotometricCode, storage.Layout,
+                    storage.RowsPerStrip, storage.TileWidth, storage.TileHeight, storage.BigEndian, storage.BigTiff, storage.Orientation,
+                    storage.BitsPerSample, storage.Predictor, storage.PlanarConfiguration);
+            }
+
             TouchBlocks(image);
             var m = image.Metadata;
             _ = (m.Description, m.Software, m.DateTime, m.Resolution, m.SampleRange, m.IccProfile, m.Xmp, m.Iptc, m.Artist, m.Copyright);

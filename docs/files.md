@@ -24,7 +24,7 @@ Console.WriteLine($"Primary: {file.Primary.Width} x {file.Primary.Height}");
   reduced-resolution version (a thumbnail) nor a transparency mask, as `NewSubfileType` says.
 - **Sub-images** (`SubIFDs`, a pyramid) are reached through `TiffImage.SubImages`; they are read only in this version.
 - **Images the library does not handle** (CMYK, Lab, a compression it does not read) do not make the file fail: they are listed
-  with their size, metadata and `Storage`, and `UnsupportedReason` says why; their pixels throw a `NotSupportedException`.
+  with their size, metadata and `Storage`, and `UnsupportedReason` says why; their pixels throw a `NotSupportedException`. [Images the library cannot decode](unsupported-images.md) lists what stays usable.
 - **`Storage`** tells how an image is stored: compression, predictor, layout, byte order, BigTIFF, the stored depth and
   photometric interpretation, the orientation.
 

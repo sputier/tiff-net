@@ -90,7 +90,7 @@ so that they behave like `MinIsBlack`; `TiffStorage` keeps what the file said.
 | 3 palette | R, expanded to RGB `UInt16` from the `ColorMap` | — |
 | 4 mask, 5 separated (CMYK), 8/9/10 Lab, 32803 CFA, 34892 LinearRaw, LogL/LogLuv | — | — |
 
-CFA and LinearRaw (DNG raw data) are refused with a message that points to a raw decoder.
+CFA and LinearRaw (DNG raw data) are refused with a message that points to a raw decoder. Their description (size, CFA tags, storage, the code 32803 as `RawPhotometricCode`) stays readable: see [images the library cannot decode](unsupported-images.md).
 
 ## Compression
 

@@ -144,7 +144,7 @@ internal sealed class Options
             if (File.Exists(Path.Combine(dir.FullName, "Eleris.TiffNet.slnx")))
             {
                 string fixtures = Path.Combine(dir.FullName, "tests", "Fixtures");
-                return [Path.Combine(fixtures, "domain"), Path.Combine(fixtures, "hostile"), Path.Combine(fixtures, "jpeg"), Path.Combine(fixtures, "interop", "generated")];
+                return [Path.Combine(fixtures, "domain"), Path.Combine(fixtures, "unsupported"), Path.Combine(fixtures, "hostile"), Path.Combine(fixtures, "jpeg"), Path.Combine(fixtures, "interop", "generated")];
             }
         }
 

@@ -34,7 +34,13 @@ internal sealed record ImageDescriptor
 
     public TiffPhotometric Photometric { get; private init; }
 
+    /// <summary>The PhotometricInterpretation code as stored (the named value of <see cref="Photometric"/>, or the code it has no name for).</summary>
+    public int PhotometricCode { get; private init; }
+
     public TiffCompression Compression { get; private init; }
+
+    /// <summary>The Compression code as stored (32946, the first code of Deflate, included).</summary>
+    public int CompressionCode { get; private init; }
 
     public TiffPredictor Predictor { get; private init; }
 
@@ -142,7 +148,7 @@ internal sealed record ImageDescriptor
             photometricCode = strict ? throw budget.Invalid("the required tag PhotometricInterpretation is missing.") : samples >= 3 ? 2 : 1;
         }
 
-        var photometric = (TiffPhotometric)photometricCode;
+        var photometric = Enum.IsDefined((TiffPhotometric)photometricCode) ? (TiffPhotometric)photometricCode : TiffPhotometric.Unknown;
         int colorChannels = photometric is TiffPhotometric.Rgb or TiffPhotometric.YCbCr ? 3 : 1;
         int extras = samples - colorChannels;
         if (extras < 0)
@@ -170,7 +176,10 @@ internal sealed record ImageDescriptor
             BitsPerSample = (int)bits[0],
             SampleFormat = (int)formats[0],
             Photometric = photometric,
-            Compression = compression == 32946 ? TiffCompression.Deflate : (TiffCompression)compression,   // the first code of Deflate
+            PhotometricCode = (int)photometricCode,
+            Compression = compression == 32946 ? TiffCompression.Deflate   // the first code of Deflate
+                : Enum.IsDefined((TiffCompression)compression) ? (TiffCompression)compression : TiffCompression.Unknown,
+            CompressionCode = (int)compression,
             Predictor = predictor == 0 ? TiffPredictor.None : (TiffPredictor)predictor,   // 0 is not defined; libtiff reads it as none
             Planar = planar,
             Orientation = orientation,
@@ -223,6 +232,8 @@ internal sealed record ImageDescriptor
             SampleFormat = format,
             Photometric = model == TiffColorModel.Rgb ? TiffPhotometric.Rgb : TiffPhotometric.MinIsBlack,
             Compression = TiffCompression.None,
+            CompressionCode = 1,
+            PhotometricCode = model == TiffColorModel.Rgb ? 2 : 1,
             Predictor = TiffPredictor.None,
             Planar = planar && channels > 1,
             Orientation = 1,
@@ -336,7 +347,7 @@ internal sealed record ImageDescriptor
     public ImageDescriptor WithSubfileType(int subfileType) => this with { SubfileType = subfileType };
 
     /// <summary>A palette image as its indices: grey samples of the stored depth, no colour map to expand.</summary>
-    public ImageDescriptor AsIndices() => this with { Photometric = TiffPhotometric.MinIsBlack, ColorMap = null, Channels = SamplesPerPixel };
+    public ImageDescriptor AsIndices() => this with { Photometric = TiffPhotometric.MinIsBlack, PhotometricCode = 1, ColorMap = null, Channels = SamplesPerPixel };
 
     /// <summary>Bytes of one row of <paramref name="width"/> pixels of <paramref name="samples"/> samples, padded to a byte.</summary>
     public static long BytesPerRow(long width, int samples, int bits) => (width * samples * bits + 7) / 8;
@@ -385,7 +396,7 @@ internal sealed record ImageDescriptor
             return $"images wider or taller than {int.MaxValue} pixels are not supported ({Width} x {Height}).";
         }
 
-        string? compression = (int)Compression switch
+        string? compression = CompressionCode switch
         {
             1 or 5 or 7 or 8 or 32946 or 32773 => null,
             2 or 3 or 4 => "CCITT fax compression is not supported (bilevel images are read when uncompressed, LZW, Deflate or PackBits).",
@@ -402,7 +413,7 @@ internal sealed record ImageDescriptor
             return compression;
         }
 
-        string? photometric = (int)Photometric switch
+        string? photometric = PhotometricCode switch
         {
             0 or 1 or 2 or 3 => null,
             6 when Compression == TiffCompression.Jpeg => null,
