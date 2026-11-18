@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `TiffImage.Blocks` (`TiffBlock`: offset and byte count of each strip or tile, in file order), `ReadBlock`, `ReadBlockAsync`
+  and `TryGetBlockMemory`: the stored, still compressed bytes of an image, without decoding them, for every image including
+  one whose compression the library does not read (#142).
+
 ## 0.1.0
 
 The first version, written from scratch after an audit of a first implementation.

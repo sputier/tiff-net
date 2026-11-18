@@ -20,6 +20,7 @@ An image can be read from several threads at once. Changing it ([`TiffImage.SetP
 
 | Member | Description |
 | --- | --- |
+| [`Blocks`](#eleris-tiffnet-tiffimage-blocks) | The strips or tiles of the image as the file stores them, in file order ([`TiffStorage.Layout`](Eleris.TiffNet.TiffStorage.md#eleris-tiffnet-tiffstorage-layout) tells which): the order of the `StripOffsets` or `TileOffsets` table, plane after plane when the image is planar. |
 | [`Channels`](#eleris-tiffnet-tiffimage-channels) | The number of channels: the colour channels (1 for grey, 3 for RGB), then the extra channels. |
 | [`ColorModel`](#eleris-tiffnet-tiffimage-colormodel) | What the colour channels are, as the file says: never inferred from the number of channels. |
 | [`ExtraChannels`](#eleris-tiffnet-tiffimage-extrachannels) | The channels after the colour channels, with what they hold (see [`TiffImage.SetExtraChannels`](#eleris-tiffnet-tiffimage-setextrachannels-eleris-tiffnet-tiffextrachannelkind)). |
@@ -37,6 +38,8 @@ An image can be read from several threads at once. Changing it ([`TiffImage.SetP
 | Member | Description |
 | --- | --- |
 | [`Create<T>(ReadOnlySpan<T>, int, int, int, TiffColorModel?, TiffPixelOrder)`](#eleris-tiffnet-tiffimage-create-1-system-readonlyspan-0-system-int32-system-int32-system-int32-system-nullable-eleris-tiffnet-tiffcolormodel-eleris-tiffnet-tiffpixelorder) | Creates an image from pixels of the application, which are copied once. |
+| [`ReadBlock(int, Span<byte>)`](#eleris-tiffnet-tiffimage-readblock-system-int32-system-span-system-byte) | Copies the stored bytes of a strip or tile, still compressed, without decoding them. |
+| [`ReadBlockAsync(int, Memory<byte>, CancellationToken)`](#eleris-tiffnet-tiffimage-readblockasync-system-int32-system-memory-system-byte-system-threading-cancellationtoken) | Copies the stored bytes of a strip or tile, still compressed, asynchronously (see [`TiffImage.ReadBlock`](#eleris-tiffnet-tiffimage-readblock-system-int32-system-span-system-byte)). |
 | [`ReadChannel<T>(int, TiffPixelScale)`](#eleris-tiffnet-tiffimage-readchannel-1-system-int32-eleris-tiffnet-tiffpixelscale) | One channel of the image, converted as by [`TiffImage.ReadPixels`](#eleris-tiffnet-tiffimage-readpixels-1-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder). |
 | [`ReadChannelAsync<T>(int, TiffPixelScale, IProgress<double>, CancellationToken)`](#eleris-tiffnet-tiffimage-readchannelasync-1-system-int32-eleris-tiffnet-tiffpixelscale-system-iprogress-system-double-system-threading-cancellationtoken) | Reads one channel on a thread of the pool, as [`TiffImage.ReadChannel`](#eleris-tiffnet-tiffimage-readchannel-1-system-int32-eleris-tiffnet-tiffpixelscale). |
 | [`ReadIndices()`](#eleris-tiffnet-tiffimage-readindices) | The indices of a palette image, before the colour map expands them to RGB: a classification map or a label image keeps its classes. |
@@ -51,8 +54,24 @@ An image can be read from several threads at once. Changing it ([`TiffImage.SetP
 | [`ReadRegionAsync<T>(int, int, int, int, TiffPixelScale, TiffPixelOrder, IProgress<double>, CancellationToken)`](#eleris-tiffnet-tiffimage-readregionasync-1-system-int32-system-int32-system-int32-system-int32-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder-system-iprogress-system-double-system-threading-cancellationtoken) | Reads a region on a thread of the pool, as [`TiffImage.ReadRegion`](#eleris-tiffnet-tiffimage-readregion-1-system-int32-system-int32-system-int32-system-int32-eleris-tiffnet-tiffpixelscale-eleris-tiffnet-tiffpixelorder). |
 | [`SetExtraChannels(TiffExtraChannelKind[])`](#eleris-tiffnet-tiffimage-setextrachannels-eleris-tiffnet-tiffextrachannelkind) | Sets what each extra channel holds: alpha, associated (premultiplied) or not, or other data. |
 | [`SetPixels<T>(ReadOnlySpan<T>, int, int, int, TiffColorModel?, TiffPixelOrder)`](#eleris-tiffnet-tiffimage-setpixels-1-system-readonlyspan-0-system-int32-system-int32-system-int32-system-nullable-eleris-tiffnet-tiffcolormodel-eleris-tiffnet-tiffpixelorder) | Replaces the pixels of the image (and so its size, channels and sample type) by pixels of the application, copied once. |
+| [`TryGetBlockMemory(int)`](#eleris-tiffnet-tiffimage-trygetblockmemory-system-int32) | The stored bytes of a strip or tile as a view of the memory the file is held in, without a copy. |
 
 ## Property details
+
+<a id="eleris-tiffnet-tiffimage-blocks"></a>
+### `Blocks`
+
+The strips or tiles of the image as the file stores them, in file order ([`TiffStorage.Layout`](Eleris.TiffNet.TiffStorage.md#eleris-tiffnet-tiffstorage-layout) tells which): the order of the `StripOffsets` or `TileOffsets` table, plane after plane when the image is planar.
+
+```csharp
+public IReadOnlyList<TiffBlock> Blocks { get; }
+```
+
+**Remarks**
+
+Valid for every image of a file, including one the library cannot decode ([`TiffImage.UnsupportedReason`](#eleris-tiffnet-tiffimage-unsupportedreason)): nothing is decoded. The offsets and byte counts are those the library itself reads with, after its checks: a block that starts outside the file is refused when the file is opened, and a last block cut by a truncated file is shortened to the end of the file (refused with [`TiffReadOptions.Strict`](Eleris.TiffNet.TiffReadOptions.md#eleris-tiffnet-tiffreadoptions-strict)). The list is a view of tables the image already holds: nothing is copied, and nothing is done until it is first used.
+
+An image created in memory ([`TiffImage.Create`](#eleris-tiffnet-tiffimage-create-1-system-readonlyspan-0-system-int32-system-int32-system-int32-system-nullable-eleris-tiffnet-tiffcolormodel-eleris-tiffnet-tiffpixelorder), or whose pixels were replaced by [`TiffImage.SetPixels`](#eleris-tiffnet-tiffimage-setpixels-1-system-readonlyspan-0-system-int32-system-int32-system-int32-system-nullable-eleris-tiffnet-tiffcolormodel-eleris-tiffnet-tiffpixelorder)) stores nothing in a file: its list is empty.
 
 <a id="eleris-tiffnet-tiffimage-channels"></a>
 ### `Channels`
@@ -201,6 +220,68 @@ An image in memory: no [`TiffImage.Storage`](#eleris-tiffnet-tiffimage-storage),
 
 - [`ArgumentException`](https://learn.microsoft.com/dotnet/api/system.argumentexception) — The sizes do not match the pixels, the colour model is missing or does not fit the channels, `T` is not a sample type of TIFF, or the pixels are more bytes than an array holds (write them with TiffImageWriter).
 - [`ArgumentOutOfRangeException`](https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception) — A size is not positive.
+
+<a id="eleris-tiffnet-tiffimage-readblock-system-int32-system-span-system-byte"></a>
+### `ReadBlock(int, Span<byte>)`
+
+Copies the stored bytes of a strip or tile, still compressed, without decoding them.
+
+```csharp
+public int ReadBlock(int index, Span<byte> destination)
+```
+
+**Parameters**
+
+- `index` — The position of the block in [`TiffImage.Blocks`](#eleris-tiffnet-tiffimage-blocks).
+- `destination` — Receives the bytes; at least [`TiffBlock.ByteCount`](Eleris.TiffNet.TiffBlock.md#eleris-tiffnet-tiffblock-bytecount) long.
+
+**Returns**
+
+The number of bytes copied: the byte count of the block.
+
+**Exceptions**
+
+- [`ArgumentOutOfRangeException`](https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception) — `index` is not the position of a block.
+- [`ArgumentException`](https://learn.microsoft.com/dotnet/api/system.argumentexception) — `destination` is shorter than the block.
+- [`InvalidOperationException`](https://learn.microsoft.com/dotnet/api/system.invalidoperationexception) — The image was created in memory: it has no stored blocks.
+- [`IOException`](https://learn.microsoft.com/dotnet/api/system.io.ioexception) — The source no longer holds the bytes (a file or stream that shrank since the file was opened).
+- [`ObjectDisposedException`](https://learn.microsoft.com/dotnet/api/system.objectdisposedexception) — The file is disposed.
+
+**Remarks**
+
+Allocates nothing, and can be called from several threads at once, whatever the source of the file.
+
+<a id="eleris-tiffnet-tiffimage-readblockasync-system-int32-system-memory-system-byte-system-threading-cancellationtoken"></a>
+### `ReadBlockAsync(int, Memory<byte>, CancellationToken)`
+
+Copies the stored bytes of a strip or tile, still compressed, asynchronously (see [`TiffImage.ReadBlock`](#eleris-tiffnet-tiffimage-readblock-system-int32-system-span-system-byte)).
+
+```csharp
+public ValueTask<int> ReadBlockAsync(int index, Memory<byte> destination, CancellationToken cancellationToken = default)
+```
+
+**Parameters**
+
+- `index` — The position of the block in [`TiffImage.Blocks`](#eleris-tiffnet-tiffimage-blocks).
+- `destination` — Receives the bytes; at least [`TiffBlock.ByteCount`](Eleris.TiffNet.TiffBlock.md#eleris-tiffnet-tiffblock-bytecount) long, and left alone by the caller until the task ends.
+- `cancellationToken` — Cancels the read before it starts.
+
+**Returns**
+
+The number of bytes copied. Every failure is reported by the task, never thrown by the call.
+
+**Exceptions**
+
+- [`ArgumentOutOfRangeException`](https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception) — `index` is not the position of a block.
+- [`ArgumentException`](https://learn.microsoft.com/dotnet/api/system.argumentexception) — `destination` is shorter than the block.
+- [`InvalidOperationException`](https://learn.microsoft.com/dotnet/api/system.invalidoperationexception) — The image was created in memory: it has no stored blocks.
+- [`IOException`](https://learn.microsoft.com/dotnet/api/system.io.ioexception) — The source no longer holds the bytes.
+- [`ObjectDisposedException`](https://learn.microsoft.com/dotnet/api/system.objectdisposedexception) — The file is disposed.
+- [`OperationCanceledException`](https://learn.microsoft.com/dotnet/api/system.operationcanceledexception) — `cancellationToken` was cancelled.
+
+**Remarks**
+
+A file held in memory completes at once; a file or a stream is read on a pool thread.
 
 <a id="eleris-tiffnet-tiffimage-readchannel-1-system-int32-eleris-tiffnet-tiffpixelscale"></a>
 ### `ReadChannel<T>(int, TiffPixelScale)`
@@ -601,3 +682,25 @@ public void SetPixels<T>(ReadOnlySpan<T> pixels, int width, int height, int chan
 **Remarks**
 
 The metadata and the sub-images are kept, except the tags that describe the values of the former pixels ([`TiffMetadata.PixelTags`](Eleris.TiffNet.TiffMetadata.md#eleris-tiffnet-tiffmetadata-pixeltags)); a header written in the description (Astro-TIFF: `NAXIS1`, `BITPIX`…) describes the pixels it came with and is the application's to update. [`TiffImage.Storage`](#eleris-tiffnet-tiffimage-storage) still tells how the image was stored in its file. The extra channels become [`TiffExtraChannelKind.Data`](Eleris.TiffNet.TiffExtraChannelKind.md#eleris-tiffnet-tiffextrachannelkind-data); a reason the library could not deliver the former pixels ([`TiffImage.UnsupportedReason`](#eleris-tiffnet-tiffimage-unsupportedreason)) no longer applies. Like the other changes of an image, it must not run while the image is read on another thread.
+
+<a id="eleris-tiffnet-tiffimage-trygetblockmemory-system-int32"></a>
+### `TryGetBlockMemory(int)`
+
+The stored bytes of a strip or tile as a view of the memory the file is held in, without a copy.
+
+```csharp
+public ReadOnlyMemory<byte>? TryGetBlockMemory(int index)
+```
+
+**Parameters**
+
+- `index` — The position of the block in [`TiffImage.Blocks`](#eleris-tiffnet-tiffimage-blocks).
+
+**Returns**
+
+The bytes of the block, or `null` when the file is read on demand from a file or a stream (use [`TiffImage.ReadBlock`](#eleris-tiffnet-tiffimage-readblock-system-int32-system-span-system-byte)). The view stays valid as long as the memory it points into (also after the file is disposed): it must not be written to.
+
+**Exceptions**
+
+- [`ArgumentOutOfRangeException`](https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception) — `index` is not the position of a block.
+- [`InvalidOperationException`](https://learn.microsoft.com/dotnet/api/system.invalidoperationexception) — The image was created in memory: it has no stored blocks.
