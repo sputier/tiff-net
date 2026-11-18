@@ -270,6 +270,7 @@ public sealed partial class TiffFile : IReadOnlyList<TiffImage>, IDisposable
         var storage = new TiffStorage
         {
             Compression = descriptor.Compression,
+            RawCompressionCode = descriptor.CompressionCode,
             Predictor = descriptor.Predictor,
             Layout = descriptor.Layout,
             // Tiles larger than an int make the image unsupported; their size is reported as the largest int.
@@ -281,6 +282,7 @@ public sealed partial class TiffFile : IReadOnlyList<TiffImage>, IDisposable
             BigTiff = reader.Header.BigTiff,
             Orientation = descriptor.Orientation,
             Photometric = descriptor.Photometric,
+            RawPhotometricCode = descriptor.PhotometricCode,
             BitsPerSample = descriptor.BitsPerSample,
         };
         var metadata = MetadataReader.Read(reader, directory);

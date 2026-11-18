@@ -30,6 +30,7 @@ public sealed record TiffWriteOptions
 
     /// <summary>The compression: <see cref="TiffCompression.Deflate"/> by default; None, LZW and PackBits too.</summary>
     /// <exception cref="NotSupportedException">The value is <see cref="TiffCompression.Jpeg"/>: JPEG is read, not written.</exception>
+    /// <exception cref="ArgumentException">The value is <see cref="TiffCompression.Unknown"/>: it stands for a code the library reads, not for one it can write.</exception>
     /// <exception cref="ArgumentOutOfRangeException">The value is not a compression of the enumeration.</exception>
     public TiffCompression Compression
     {
@@ -37,6 +38,9 @@ public sealed record TiffWriteOptions
         init => _compression = value switch
         {
             TiffCompression.None or TiffCompression.Lzw or TiffCompression.Deflate or TiffCompression.PackBits => value,
+            TiffCompression.Unknown => throw new ArgumentException(
+                "Compression cannot be Unknown: it stands for a code the library does not name, and a file written with it could not be encoded. Choose a compression the library writes.",
+                nameof(Compression)),
             TiffCompression.Jpeg => throw new NotSupportedException(
                 "JPEG is not written: it is lossy. Write Deflate (the default), LZW, PackBits or no compression."),
             _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Not a compression the library writes."),

@@ -23,6 +23,7 @@ How the library was designed:
 | --- | --- |
 | [Getting started](getting-started.md) | install, a first image |
 | [Files and pages](files.md) | opening, pages, sub-images, images the library does not handle |
+| [Images the library cannot decode](unsupported-images.md) | the members that stay usable, unnamed codes, `IsSupported` |
 | [Reading pixels](pixels.md) | types, conversions, normalisation, regions, channels, planar order, orientation |
 | [Metadata and Astro-TIFF](metadata.md) | tags, the FITS header, what is kept on saving |
 | [Writing](writing.md) | creating images, saving, options |

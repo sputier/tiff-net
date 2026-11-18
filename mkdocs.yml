@@ -32,6 +32,7 @@ nav:
     - Writing: writing.md
     - Large images: large-images.md
     - Threads and memory: threads.md
+    - Images the library cannot decode: unsupported-images.md
     - Reliability and limits: reliability.md
     - Performance: performance.md
     - Platforms: platforms.md

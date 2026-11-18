@@ -7,6 +7,21 @@
 - `TiffImage.Blocks` (`TiffBlock`: offset and byte count of each strip or tile, in file order), `ReadBlock`, `ReadBlockAsync`
   and `TryGetBlockMemory`: the stored, still compressed bytes of an image, without decoding them, for every image including
   one whose compression the library does not read (#142).
+- `TiffCompression.Unknown` and `TiffPhotometric.Unknown`, `TiffStorage.RawCompressionCode` and `RawPhotometricCode` (the exact code
+  stored in the file; for a named code, the numeric value of the enumeration member) and `TiffImage.IsSupported`
+  (`UnsupportedReason is null`). The guide page "Images the library cannot decode" lists the members that never throw for such an
+  image, and tests guarantee them in strict mode and not (#143).
+
+### Changed
+
+- **Behaviour change.** When a file holds a compression or a photometric interpretation that `TiffCompression` or
+  `TiffPhotometric` does not name (34713, 32803, CMYK, Lab...), `TiffStorage.Compression` and `TiffStorage.Photometric` used to
+  return an unnamed value of the enumeration (the code cast to it); they now return `Unknown`, and the exact code is in
+  `RawCompressionCode` or `RawPhotometricCode`. Code that compared against a numeric cast, such as
+  `(int)storage.Compression == 34713`, must compare the raw property instead. `Unknown` is refused when writing:
+  `TiffWriteOptions.Compression = TiffCompression.Unknown` throws an `ArgumentException` that names the property, and no file is
+  created or changed. `TiffStorage` has two new required properties; an application that builds one through its initializer must
+  set them (the constructor is internal, so only a `with` expression exists in application code, and it is unaffected) (#143).
 
 ## 0.1.0
 

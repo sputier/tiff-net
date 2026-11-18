@@ -77,6 +77,12 @@ public sealed partial class TiffImage
     /// <summary>Why the library cannot deliver this image, or <see langword="null"/> when it can.</summary>
     public string? UnsupportedReason => _descriptor.Unsupported;
 
+    /// <summary>
+    /// Whether the library can deliver the pixels of the image: <see langword="true"/> when <see cref="UnsupportedReason"/> is
+    /// <see langword="null"/>. The members that describe the image work either way.
+    /// </summary>
+    public bool IsSupported => _descriptor.Unsupported is null;
+
     /// <summary>The file the image was read from.</summary>
     internal TiffFile? File { get; private set; }
 

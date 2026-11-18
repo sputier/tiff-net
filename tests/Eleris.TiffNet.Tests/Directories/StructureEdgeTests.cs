@@ -189,8 +189,8 @@ public class StructureEdgeTests
     public void The_values_of_the_public_enumerations_do_not_change()
     {
         Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], Enum.GetValues<TiffSampleType>().Select(v => (int)v));
-        Assert.Equal([1, 5, 7, 8, 32773], Enum.GetValues<TiffCompression>().Select(v => (int)v));
-        Assert.Equal([0, 1, 2, 3, 6], Enum.GetValues<TiffPhotometric>().Select(v => (int)v));
+        Assert.Equal([1, 5, 7, 8, 32773, -1], Enum.GetValues<TiffCompression>().Select(v => (int)v));   // Unknown is -1: no code of a file
+        Assert.Equal([0, 1, 2, 3, 6, -1], Enum.GetValues<TiffPhotometric>().Select(v => (int)v));
         Assert.Equal([0, 1, 2, 3], Enum.GetValues<TiffPredictor>().Select(v => (int)v));
         Assert.Equal([1, 2], Enum.GetValues<TiffColorModel>().Select(v => (int)v));
         Assert.Equal([0, 1, 2], Enum.GetValues<TiffExtraChannelKind>().Select(v => (int)v));

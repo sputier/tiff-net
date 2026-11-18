@@ -88,7 +88,12 @@ public enum TiffPixelOrder
 }
 
 /// <summary>How samples are compressed in a file. The values are the codes of the TIFF <c>Compression</c> tag.</summary>
-/// <remarks>A file can hold a code this enumeration does not name (a compression the library does not read); it is kept as it is.</remarks>
+/// <remarks>
+/// A file can hold a code this enumeration does not name (a vendor compression such as 34713, a compression the library does not
+/// read): <see cref="TiffStorage.Compression"/> then reads <see cref="Unknown"/>, and <see cref="TiffStorage.RawCompressionCode"/>
+/// holds the code. The numeric values of the named members are the TIFF codes; <see cref="Unknown"/> is -1, which no code of a
+/// file (0 to 65535) can be.
+/// </remarks>
 public enum TiffCompression
 {
     /// <summary>No compression.</summary>
@@ -105,6 +110,12 @@ public enum TiffCompression
 
     /// <summary>PackBits (run lengths).</summary>
     PackBits = 32773,
+
+    /// <summary>
+    /// A code of a file that has no name here. Only read: it is refused when writing (<see cref="TiffWriteOptions.Compression"/>);
+    /// the code is in <see cref="TiffStorage.RawCompressionCode"/>.
+    /// </summary>
+    Unknown = -1,
 }
 
 /// <summary>The prediction applied to samples before their compression.</summary>
@@ -134,7 +145,11 @@ public enum TiffLayout
 }
 
 /// <summary>The photometric interpretation of a file: what its samples mean. The values are the codes of the TIFF tag.</summary>
-/// <remarks>A file can hold a code this enumeration does not name (CMYK, Lab…); it is kept as it is.</remarks>
+/// <remarks>
+/// A file can hold a code this enumeration does not name (CMYK, Lab, 32803 CFA…): <see cref="TiffStorage.Photometric"/> then reads
+/// <see cref="Unknown"/>, and <see cref="TiffStorage.RawPhotometricCode"/> holds the code. The numeric values of the named members
+/// are the TIFF codes; <see cref="Unknown"/> is -1, which no code of a file (0 to 65535) can be.
+/// </remarks>
 public enum TiffPhotometric
 {
     /// <summary>Grey, 0 being white.</summary>
@@ -151,6 +166,9 @@ public enum TiffPhotometric
 
     /// <summary>Luminance and chrominance (with JPEG compression).</summary>
     YCbCr = 6,
+
+    /// <summary>A code of a file that has no name here (the code is in <see cref="TiffStorage.RawPhotometricCode"/>).</summary>
+    Unknown = -1,
 }
 
 /// <summary>How hard the compressor of a write works (Deflate): faster, or smaller files.</summary>

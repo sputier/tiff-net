@@ -71,6 +71,7 @@ public class WriteOptionsTests
         var storage = new TiffStorage
         {
             Compression = TiffCompression.Lzw,
+            RawCompressionCode = 5,
             Predictor = TiffPredictor.Horizontal,
             Layout = TiffLayout.Tiles,
             TileWidth = 128,
@@ -81,6 +82,7 @@ public class WriteOptionsTests
             BigTiff = true,
             Orientation = 1,
             Photometric = TiffPhotometric.Rgb,
+            RawPhotometricCode = 2,
             BitsPerSample = 16,
         };
 

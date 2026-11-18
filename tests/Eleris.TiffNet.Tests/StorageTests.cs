@@ -16,8 +16,8 @@ public class StorageTests
                 var page = entry.GetProperty("pages")[i];
                 var s = file[i].Storage!;
                 string what = $"{name}, page {i}";
-                Assert.True(page.GetProperty("compression").GetInt32() == (int)s.Compression, what);
-                Assert.True(page.GetProperty("photometric").GetInt32() == (int)s.Photometric, what);
+                Assert.True(page.GetProperty("compression").GetInt32() == s.RawCompressionCode, what);
+                Assert.True(page.GetProperty("photometric").GetInt32() == s.RawPhotometricCode, what);
                 Assert.True(page.GetProperty("bitsPerSample").GetInt32() == s.BitsPerSample, what);
                 Assert.True(page.GetProperty("orientation").GetInt32() == s.Orientation, what);
                 Assert.True(page.GetProperty("planar").GetBoolean() == (s.PlanarConfiguration == TiffPixelOrder.Planar), what);
@@ -66,7 +66,7 @@ public class StorageTests
                 _ => 34925,
             };
             string what = f.Name;
-            Assert.True((int)s.Compression == code, what);
+            Assert.True(s.RawCompressionCode == code, what);
             Assert.True((s.Predictor != TiffPredictor.None) == f.Predictor, what);
             Assert.True((s.Layout == TiffLayout.Tiles) == f.Tiled, what);
             Assert.True((s.PlanarConfiguration == TiffPixelOrder.Planar) == f.Planar, what);
