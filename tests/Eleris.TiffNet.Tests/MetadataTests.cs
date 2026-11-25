@@ -300,4 +300,142 @@ public class MetadataTests
         Assert.Null(target.Metadata.SampleRange);
         Assert.Null(target.Metadata.Artist);
     }
+
+    // The position of the value field of entry k of a directory written at offset d.
+    private static long ValueField(bool bigTiff, long d, int k) => d + (bigTiff ? 8 : 2) + k * (bigTiff ? 20 : 12) + (bigTiff ? 12 : 8);
+
+    private const string OutOfLineText = "out of line text";
+
+    // A 4 x 3 image, a text and an IPTC block stored in the data after the strip, at known positions, and an inline SHORT.
+    private static TiffBuilder WithKnownPositions(bool bigTiff, bool littleEndian, out long text, out long iptc)
+    {
+        byte[] textBytes = [.. System.Text.Encoding.ASCII.GetBytes(OutOfLineText), 0];   // 17 bytes, 18 with the padding
+        byte[] iptcBytes = [0x1C, 0x02, 0x00, 0x02, 0x00, 0x04, 0x41, 0x42, 0x43, 0x44, 0x00, 0x00];
+        var builder = new TiffBuilder(bigTiff, littleEndian) { Data = [.. new byte[12], .. textBytes, 0, .. iptcBytes] };
+        text = builder.DataOffset + 12;
+        iptc = text + 18;
+        builder.AddDirectory().Image(4, 3)
+            .Pointing(270, TiffTagType.Ascii, (ulong)textBytes.Length, (ulong)text)
+            .Pointing(33723, TiffTagType.Long, 3, (ulong)iptc)
+            .Add(65000, TiffTagType.Short, 7)
+            .Sorted();
+        return builder;
+    }
+
+    [Theory]
+    [MemberData(nameof(Directories.StructureReaderTests.Layouts), MemberType = typeof(Directories.StructureReaderTests))]
+    public void A_value_stored_elsewhere_gives_its_position_in_the_file(bool bigTiff, bool littleEndian)
+    {
+        var builder = WithKnownPositions(bigTiff, littleEndian, out long text, out long iptc);
+
+        foreach (bool strict in new[] { false, true })
+        {
+            var m = Of(builder, new TiffReadOptions { Strict = strict });
+
+            Assert.Equal(OutOfLineText, m.Description);
+            Assert.Equal(text, m[270]!.FileOffset);
+            Assert.Equal(iptc, m[33723]!.FileOffset);   // IPTC, read as UNDEFINED, keeps the position of its bytes
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(Directories.StructureReaderTests.Layouts), MemberType = typeof(Directories.StructureReaderTests))]
+    public void A_value_inline_gives_the_position_of_the_value_field(bool bigTiff, bool littleEndian)
+    {
+        var builder = WithKnownPositions(bigTiff, littleEndian, out _, out _);
+        // Sorted: 256 257 258 259 262 270 273 277 278 279 33723 65000.
+        long expected = ValueField(bigTiff, builder.OffsetOf(0), 11);
+
+        foreach (bool strict in new[] { false, true })
+        {
+            var tag = Of(builder, new TiffReadOptions { Strict = strict })[65000]!;
+
+            Assert.Equal([(ushort)7], tag.AsNumbers<ushort>());
+            Assert.Equal(expected, tag.FileOffset);
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(Directories.StructureReaderTests.Layouts), MemberType = typeof(Directories.StructureReaderTests))]
+    public void Tags_of_the_EXIF_and_GPS_directories_have_their_offset(bool bigTiff, bool littleEndian)
+    {
+        var builder = new TiffBuilder(bigTiff, littleEndian) { Data = new byte[12] };
+        var image = builder.AddDirectory().Image(4, 3);
+        var exif = builder.AddDirectory().Add(33434, TiffTagType.Rational, 1, 250).Add(36867, TiffTagType.Ascii, (long)'2');
+        builder.AddDirectory().Add(1, TiffTagType.Ascii, (long)'N', 0);
+        exif.NextOverride = 0;
+        image.NextOverride = 0;
+        // Placeholders first, so that the size of the first directory, and the offsets after it, do not change.
+        image.Add(34665, TiffTagType.Long, 0).Add(34853, TiffTagType.Long, 0);
+        long exifOffset = builder.OffsetOf(1), gpsOffset = builder.OffsetOf(2);
+        image.Remove(34665).Remove(34853).Add(34665, TiffTagType.Long, exifOffset).Add(34853, TiffTagType.Long, gpsOffset);
+        // The RATIONAL (8 bytes) fits in a BigTIFF entry; in classic TIFF it follows the next-directory field of its directory.
+        long rational = bigTiff ? ValueField(true, exifOffset, 0) : exifOffset + 2 + 2 * 12 + 4;
+
+        var m = Of(builder);
+
+        Assert.Equal(rational, m.Exif[0].FileOffset);
+        Assert.Equal(ValueField(bigTiff, exifOffset, 1), m.Exif[1].FileOffset);
+        Assert.Equal(ValueField(bigTiff, gpsOffset, 0), m.Gps.Single().FileOffset);
+    }
+
+    [Fact]
+    public void A_tag_created_in_memory_has_no_offset()
+    {
+        Assert.Null(TiffTag.FromString(65000, "text").FileOffset);
+        Assert.Null(TiffTag.FromBytes(65001, [1, 2, 3]).FileOffset);
+        Assert.Null(TiffTag.FromNumbers<ushort>(65002, [7]).FileOffset);
+
+        var m = Of(WithKnownPositions(false, true, out _, out _));
+        Assert.NotNull(m[270]!.FileOffset);
+        m.Description = "replaced";
+        m.Resolution = new TiffResolution(300, 300, TiffResolutionUnit.Inch);
+
+        Assert.Null(m[270]!.FileOffset);
+        Assert.Null(m[282]!.FileOffset);
+    }
+
+    [Fact]
+    public void The_offset_is_not_part_of_equality()
+    {
+        var read = Of(WithKnownPositions(false, false, out _, out _))[65000]!;
+        var created = TiffTag.FromNumbers<ushort>(65000, [7]);
+
+        Assert.NotEqual(read.FileOffset, created.FileOffset);
+        Assert.Equal(created, read);
+        Assert.True(read.Equals((object)created));
+        Assert.Equal(created.GetHashCode(), read.GetHashCode());
+    }
+
+    [Fact]
+    public void FileOffset_is_read_only()
+    {
+        var property = typeof(TiffTag).GetProperty(nameof(TiffTag.FileOffset))!;
+
+        Assert.Equal(typeof(long?), property.PropertyType);
+        Assert.False(property.CanWrite);
+    }
+
+    [Fact]
+    public void A_tag_read_from_a_file_keeps_its_offset_after_writing()
+    {
+        var read = Of(WithKnownPositions(false, true, out _, out _))[65000]!;
+        long? offset = read.FileOffset;
+
+        byte[] Save(TiffTag tag)
+        {
+            var image = TiffImage.Create<byte>(new byte[16], 4, 4);
+            image.Metadata.Set(tag);
+            using var stream = new MemoryStream();
+            new TiffFile().Add(image).Save(stream);
+            return stream.ToArray();
+        }
+
+        byte[] withRead = Save(read);
+
+        Assert.Equal(offset, read.FileOffset);
+        Assert.Equal(Save(TiffTag.FromNumbers<ushort>(65000, [7])), withRead);   // the offset is never written
+        using var back = TiffFile.Read(new MemoryStream(withRead));
+        Assert.Equal(read, back.Primary.Metadata[65000]);
+    }
 }

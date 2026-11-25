@@ -11,6 +11,9 @@
   stored in the file; for a named code, the numeric value of the enumeration member) and `TiffImage.IsSupported`
   (`UnsupportedReason is null`). The guide page "Images the library cannot decode" lists the members that never throw for such an
   image, and tests guarantee them in strict mode and not (#143).
+- `TiffTag.FileOffset`: the position in the file of the first byte of a tag's value as stored (the value field of the entry
+  when the value fits in it), for tags read from a file (main directories, SubIFDs, EXIF and GPS); `null` for a tag created in
+  memory. It is not part of equality and is never written (#145).
 
 ### Changed
 

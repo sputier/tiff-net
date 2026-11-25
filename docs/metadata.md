@@ -31,5 +31,10 @@ Console.WriteLine($"{read.Software}, {read.Resolution!.X} dpi, {read[65000]!.AsS
 - **Saving again** keeps every tag except those that hold offsets into the file (EXIF, GPS and Interoperability
   sub-directories, `SubIFDs`, `FreeOffsets`, and any tag of type `IFD`): they would point nowhere in a new file. The EXIF and GPS
   tags are readable (`Exif`, `Gps`) but not written in this version.
+- **Offsets relative to the file**: some vendor structures stored in a tag (maker notes) hold offsets from the start of the
+  file. `TiffTag.FileOffset` gives the position in the file of the first byte of a tag's value as stored (the value field of
+  the directory entry when the value fits in it), for every tag read from a file, EXIF and GPS ones included; it is `null` for
+  a tag created in memory. It stays the position in the file the tag was read from, is never written, and is not compared
+  by `Equals`.
 - Text is read as UTF-8 when it is valid UTF-8 (ASCII is), as Latin-1 otherwise; it is written as ASCII when it is, as UTF-8
   otherwise.
