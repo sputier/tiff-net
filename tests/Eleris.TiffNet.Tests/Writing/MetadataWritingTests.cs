@@ -87,6 +87,6 @@ public class MetadataWritingTests
 
         Assert.Equal(new uint[] { 1234 }, back.Primary.Metadata[65010]!.AsNumbers<uint>());
         Assert.Null(back.Primary.Metadata[34665]);
-        Assert.Throws<ArgumentException>(() => file.Primary.Metadata.Set(TiffTag.FromFile(65011, TiffTagType.Ifd, [8, 0, 0, 0], littleEndian: true)));
+        Assert.Throws<ArgumentException>(() => file.Primary.Metadata.Set(TiffTag.FromFile(65011, TiffTagType.Ifd, [8, 0, 0, 0], littleEndian: true, fileOffset: 8)));
     }
 }

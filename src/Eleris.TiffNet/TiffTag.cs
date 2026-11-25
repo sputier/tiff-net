@@ -6,13 +6,16 @@ using Eleris.TiffNet.Internal.Structure;
 namespace Eleris.TiffNet;
 
 /// <summary>One tag of a TIFF directory: its code, the type of its values and the values, independent of the byte order of the file.</summary>
-/// <remarks>Two tags are equal when their code, type and values are.</remarks>
+/// <remarks>Two tags are equal when their code, type and values are; <see cref="FileOffset"/> is not compared.</remarks>
 public sealed class TiffTag : IEquatable<TiffTag>
 {
     // The values, little endian.
     private readonly byte[] _values;
 
-    private TiffTag(int code, TiffTagType type, byte[] values)
+    // The position of the value in the file it was read from; -1 for a tag created in memory.
+    private readonly long _fileOffset;
+
+    private TiffTag(int code, TiffTagType type, byte[] values, long fileOffset = -1)
     {
         if (code is < 0 or > ushort.MaxValue)
         {
@@ -22,7 +25,19 @@ public sealed class TiffTag : IEquatable<TiffTag>
         Code = code;
         Type = type;
         _values = values;
+        _fileOffset = fileOffset;
     }
+
+    /// <summary>
+    /// The position in the file of the first byte of the value as stored (the value field of the directory entry when the value
+    /// fits in it); <see langword="null"/> for a tag created in memory.
+    /// </summary>
+    /// <remarks>
+    /// It is the position in the file the tag was read from, useful to resolve the offsets relative to the file that some vendor
+    /// structures (maker notes) hold. Writing the tag to another file does not change it and does not write it. It is not
+    /// compared by <see cref="Equals(TiffTag)"/>.
+    /// </remarks>
+    public long? FileOffset => _fileOffset < 0 ? null : _fileOffset;
 
     /// <summary>The code of the tag, for example 270 for <c>ImageDescription</c>.</summary>
     public int Code { get; }
@@ -97,7 +112,7 @@ public sealed class TiffTag : IEquatable<TiffTag>
     }
 
     /// <summary>A tag read from a file: the values are put in little-endian order, value by value.</summary>
-    internal static TiffTag FromFile(int code, TiffTagType type, byte[] values, bool littleEndian)
+    internal static TiffTag FromFile(int code, TiffTagType type, byte[] values, bool littleEndian, long fileOffset)
     {
         int size = TagTypes.Size(type);
         int part = type is TiffTagType.Rational or TiffTagType.SRational ? 4 : size;
@@ -109,7 +124,7 @@ public sealed class TiffTag : IEquatable<TiffTag>
             }
         }
 
-        return new TiffTag(code, type, values);
+        return new TiffTag(code, type, values, fileOffset);
     }
 
     /// <summary>The text of the tag: up to the first NUL byte, decoded as UTF-8 when it is valid UTF-8 (ASCII is), as Latin-1 otherwise.</summary>

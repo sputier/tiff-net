@@ -12,7 +12,7 @@ public sealed class TiffTag : IEquatable<TiffTag>
 
 **Remarks**
 
-Two tags are equal when their code, type and values are.
+Two tags are equal when their code, type and values are; [`TiffTag.FileOffset`](#eleris-tiffnet-tifftag-fileoffset) is not compared.
 
 ## Properties
 
@@ -20,6 +20,7 @@ Two tags are equal when their code, type and values are.
 | --- | --- |
 | [`Code`](#eleris-tiffnet-tifftag-code) | The code of the tag, for example 270 for `ImageDescription`. |
 | [`Count`](#eleris-tiffnet-tifftag-count) | The number of values (characters, NUL bytes included, for [`TiffTagType.Ascii`](Eleris.TiffNet.TiffTagType.md#eleris-tiffnet-tifftagtype-ascii)). |
+| [`FileOffset`](#eleris-tiffnet-tifftag-fileoffset) | The position in the file of the first byte of the value as stored (the value field of the directory entry when the value fits in it); `null` for a tag created in memory. |
 | [`Type`](#eleris-tiffnet-tifftag-type) | How the values are stored. |
 
 ## Methods
@@ -57,6 +58,19 @@ The number of values (characters, NUL bytes included, for [`TiffTagType.Ascii`](
 ```csharp
 public int Count { get; }
 ```
+
+<a id="eleris-tiffnet-tifftag-fileoffset"></a>
+### `FileOffset`
+
+The position in the file of the first byte of the value as stored (the value field of the directory entry when the value fits in it); `null` for a tag created in memory.
+
+```csharp
+public long? FileOffset { get; }
+```
+
+**Remarks**
+
+It is the position in the file the tag was read from, useful to resolve the offsets relative to the file that some vendor structures (maker notes) hold. Writing the tag to another file does not change it and does not write it. It is not compared by [`TiffTag.Equals`](#eleris-tiffnet-tifftag-equals-eleris-tiffnet-tifftag).
 
 <a id="eleris-tiffnet-tifftag-type"></a>
 ### `Type`

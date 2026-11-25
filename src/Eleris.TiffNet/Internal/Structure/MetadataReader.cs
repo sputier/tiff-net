@@ -33,7 +33,7 @@ internal static class MetadataReader
             byte[] values = reader.ReadBytes(entry);
             // IPTC is a stream of bytes that writers declare as LONG: swapping its "values" would corrupt it.
             var type = entry.Code == IptcTag ? TiffTagType.Undefined : entry.Type;
-            tags.Add(TiffTag.FromFile(entry.Code, type, values, reader.Header.LittleEndian || type == TiffTagType.Undefined));
+            tags.Add(TiffTag.FromFile(entry.Code, type, values, reader.Header.LittleEndian || type == TiffTagType.Undefined, entry.DataOffset));
         }
 
         return tags;
